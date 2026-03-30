@@ -6,16 +6,16 @@
 <div x-data="mapController()" class="flex flex-col h-full">
 
     <!-- HEADER -->
-    <header class="flex-none border-b border-slate-800 bg-slate-950/80 backdrop-blur-sm px-6 py-4">
+    <header class="flex-none border-b border-fsmb-navy-100 bg-fsmb-navy px-6 py-4">
         <div class="flex items-center justify-between">
             <div class="flex items-center gap-3">
                 <div class="flex items-center gap-2">
-                    <div class="w-2 h-2 rounded-full bg-pulse-sky pulse-dot"></div>
+                    <div class="w-2 h-2 rounded-full bg-fsmb-teal pulse-dot"></div>
                     <h1 class="text-xl font-bold tracking-tight">
-                        <span class="text-white">board</span><span class="text-pulse-sky">pulse</span>
+                        <span class="text-white">board</span><span class="text-fsmb-teal">pulse</span>
                     </h1>
                 </div>
-                <span class="text-xs text-slate-500 font-mono border-l border-slate-700 pl-3 hidden sm:inline">
+                <span class="text-xs text-fsmb-navy-400 font-mono border-l border-[#354358] pl-3 hidden sm:inline">
                     State Medical Board Intelligence
                 </span>
             </div>
@@ -23,31 +23,31 @@
             <!-- Stats -->
             <div class="flex items-center gap-4">
                 <div class="stat-card flex items-center gap-3">
-                    <i data-lucide="building-2" class="w-4 h-4 text-pulse-muted"></i>
+                    <i data-lucide="building-2" class="w-4 h-4 text-fsmb-navy-400"></i>
                     <div>
                         <div class="text-lg font-bold text-white leading-none">{{ total_boards }}</div>
-                        <div class="text-[10px] text-slate-500 uppercase tracking-wider">Boards</div>
+                        <div class="text-[10px] text-fsmb-navy-400 uppercase tracking-wider">Boards</div>
                     </div>
                 </div>
                 <div class="stat-card flex items-center gap-3">
-                    <i data-lucide="check-circle-2" class="w-4 h-4 text-pulse-green"></i>
+                    <i data-lucide="check-circle-2" class="w-4 h-4 text-fsmb-teal"></i>
                     <div>
-                        <div class="text-lg font-bold text-pulse-green leading-none">{{ collected_count }}</div>
-                        <div class="text-[10px] text-slate-500 uppercase tracking-wider">Collected</div>
+                        <div class="text-lg font-bold text-fsmb-teal leading-none">{{ collected_count }}</div>
+                        <div class="text-[10px] text-fsmb-navy-400 uppercase tracking-wider">Collected</div>
                     </div>
                 </div>
                 <div class="stat-card flex items-center gap-3">
-                    <i data-lucide="search" class="w-4 h-4 text-pulse-yellow"></i>
+                    <i data-lucide="search" class="w-4 h-4 text-fsmb-gold"></i>
                     <div>
-                        <div class="text-lg font-bold text-pulse-yellow leading-none">{{ discovered_count }}</div>
-                        <div class="text-[10px] text-slate-500 uppercase tracking-wider">Discovered</div>
+                        <div class="text-lg font-bold text-fsmb-gold leading-none">{{ discovered_count }}</div>
+                        <div class="text-[10px] text-fsmb-navy-400 uppercase tracking-wider">Discovered</div>
                     </div>
                 </div>
                 <div class="stat-card flex items-center gap-3">
-                    <i data-lucide="calendar" class="w-4 h-4 text-pulse-muted"></i>
+                    <i data-lucide="calendar" class="w-4 h-4 text-fsmb-navy-400"></i>
                     <div>
                         <div class="text-lg font-bold text-white leading-none">{{ total_meetings }}</div>
-                        <div class="text-[10px] text-slate-500 uppercase tracking-wider">Meetings</div>
+                        <div class="text-[10px] text-fsmb-navy-400 uppercase tracking-wider">Meetings</div>
                     </div>
                 </div>
             </div>
@@ -57,7 +57,7 @@
     <!-- MAIN CONTENT — Split Panel -->
     <main class="flex-1 flex min-h-0">
         <!-- LEFT PANEL — Map + State Directory -->
-        <div class="w-1/2 xl:w-3/5 border-r border-slate-800 flex flex-col">
+        <div class="w-1/2 xl:w-3/5 border-r border-fsmb-navy-100 flex flex-col bg-fsmb-navy-50">
             <!-- Map -->
             <div class="flex-none flex items-center justify-center p-4 pb-0">
                 <div class="relative w-full max-w-3xl">
@@ -69,24 +69,24 @@
                          @mouseleave="tooltipVisible = false">
                         {% include "partials/us_map_paths.html" %}
                     </svg>
-                    <div class="absolute bottom-2 left-2 flex items-center gap-4 text-[10px] text-slate-400 bg-slate-900/80 backdrop-blur-sm rounded-lg px-3 py-1.5 border border-slate-800">
-                        <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm bg-pulse-green"></span> Collected</span>
-                        <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm bg-pulse-yellow"></span> Discovered</span>
-                        <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm bg-pulse-red"></span> Not Scraped</span>
-                        <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm bg-slate-700"></span> No Board</span>
+                    <div class="absolute bottom-2 left-2 flex items-center gap-4 text-[10px] text-fsmb-navy-600 bg-white/90 backdrop-blur-sm rounded-lg px-3 py-1.5 border border-fsmb-navy-100 shadow-sm">
+                        <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm bg-fsmb-teal"></span> Collected</span>
+                        <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm bg-fsmb-gold"></span> Discovered</span>
+                        <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm bg-fsmb-navy-300"></span> Pending</span>
+                        <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm bg-[#2B3648]"></span> No Board</span>
                     </div>
                 </div>
             </div>
 
             <!-- State Directory -->
-            <div class="flex-1 min-h-0 border-t border-slate-800 mt-2">
+            <div class="flex-1 min-h-0 border-t border-fsmb-navy-100 mt-2">
                 <div class="px-4 py-2 flex items-center justify-between">
-                    <h3 class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <h3 class="text-[11px] font-semibold text-fsmb-navy-500 uppercase tracking-wider flex items-center gap-1.5">
                         <i data-lucide="list" class="w-3.5 h-3.5"></i> State Directory
                     </h3>
                     <div class="relative">
                         <input type="text" x-model="stateFilter" placeholder="Search states..."
-                               class="w-40 text-xs bg-slate-900 border border-slate-700 rounded-md px-2.5 py-1 text-slate-300 placeholder-slate-600 focus:outline-none focus:border-pulse-sky/50">
+                               class="w-40 text-xs bg-white border border-fsmb-navy-100 rounded-md px-2.5 py-1 text-fsmb-navy placeholder-fsmb-navy-300 focus:outline-none focus:border-fsmb-teal focus:ring-1 focus:ring-fsmb-teal/20">
                     </div>
                 </div>
                 <div class="overflow-y-auto px-4 pb-3 state-directory-scroll" style="max-height: calc(100% - 40px);">
@@ -94,17 +94,17 @@
                         {% for state_abbr in state_boards.keys() | sort %}
                         {% set boards_list = state_boards[state_abbr] %}
                         {% set color = state_colors.get(state_abbr, 'no_board') %}
-                        <button class="state-dir-btn flex items-center gap-1.5 px-2 py-1.5 rounded-md text-left text-xs transition-colors hover:bg-slate-800/80 group"
-                                :class="activeState === '{{ state_abbr }}' ? 'bg-pulse-blue/20 border border-pulse-blue/30' : 'border border-transparent'"
+                        <button class="state-dir-btn flex items-center gap-1.5 px-2 py-1.5 rounded-md text-left text-xs transition-colors hover:bg-fsmb-teal/10 group"
+                                :class="activeState === '{{ state_abbr }}' ? 'bg-fsmb-teal/15 border border-fsmb-teal/30' : 'border border-transparent'"
                                 x-show="!stateFilter || '{{ state_abbr }}'.toLowerCase().includes(stateFilter.toLowerCase()) || STATE_NAMES['{{ state_abbr }}']?.toLowerCase().includes(stateFilter.toLowerCase())"
                                 @click="selectStateByCode('{{ state_abbr }}')"
                                 data-state="{{ state_abbr }}">
                             <span class="w-1.5 h-1.5 rounded-full flex-none
-                                {% if color == 'collected' %}bg-pulse-green
-                                {% elif color == 'discovered' %}bg-pulse-yellow
-                                {% else %}bg-pulse-red{% endif %}"></span>
-                            <span class="font-mono font-medium text-slate-400 group-hover:text-slate-200 w-6">{{ state_abbr }}</span>
-                            <span class="text-slate-500 group-hover:text-slate-300 truncate text-[11px]">{{ boards_list[0].name | truncate(20) }}</span>
+                                {% if color == 'collected' %}bg-fsmb-teal
+                                {% elif color == 'discovered' %}bg-fsmb-gold
+                                {% else %}bg-fsmb-navy-300{% endif %}"></span>
+                            <span class="font-mono font-medium text-fsmb-navy-700 group-hover:text-fsmb-navy w-6">{{ state_abbr }}</span>
+                            <span class="text-fsmb-navy-400 group-hover:text-fsmb-navy-700 truncate text-[11px]">{{ boards_list[0].name | truncate(20) }}</span>
                         </button>
                         {% endfor %}
                     </div>
@@ -121,20 +121,18 @@
     </main>
 
     <!-- BOTTOM BAR -->
-    <footer class="flex-none border-t border-slate-800 bg-slate-950/80 backdrop-blur-sm px-6 py-3">
+    <footer class="flex-none border-t border-fsmb-navy-100 bg-fsmb-navy px-6 py-3">
         <div class="flex items-center justify-between">
-            <div class="flex items-center gap-2 text-xs text-slate-500">
+            <div class="flex items-center gap-2 text-xs text-fsmb-navy-300">
                 <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
                 <span>National Landscape Report</span>
             </div>
             <div class="flex items-center gap-2">
-                <button class="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-700 text-slate-300 hover:bg-slate-800 hover:border-slate-600 transition-colors"
-                        onclick="alert('Report generation requires AI summarization (Plan 2). Coming soon.')">
+                <button class="px-3 py-1.5 text-xs font-medium rounded-lg border border-fsmb-navy-600 text-fsmb-navy-200 hover:bg-fsmb-navy-800 hover:border-fsmb-teal/40 transition-colors">
                     <i data-lucide="sparkles" class="w-3 h-3 inline -mt-0.5 mr-1"></i>
                     Generate Report
                 </button>
-                <button class="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-700 text-slate-300 hover:bg-slate-800 hover:border-slate-600 transition-colors"
-                        onclick="alert('No reports generated yet.')">
+                <button class="px-3 py-1.5 text-xs font-medium rounded-lg border border-fsmb-navy-600 text-fsmb-navy-200 hover:bg-fsmb-navy-800 hover:border-fsmb-teal/40 transition-colors">
                     <i data-lucide="eye" class="w-3 h-3 inline -mt-0.5 mr-1"></i>
                     View Latest
                 </button>
@@ -201,7 +199,6 @@
             },
 
             selectStateByCode(state) {
-                // Highlight on map too
                 document.querySelectorAll('.state-path.active').forEach(p => p.classList.remove('active'));
                 document.querySelector(`.state-path[data-state="${state}"]`)?.classList.add('active');
                 this.activeState = state;

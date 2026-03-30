@@ -34,10 +34,26 @@ DATE_PATTERNS = [
         r'|Dec(?:ember)?)\s+\d{1,2},?\s+\d{4})',
         re.IGNORECASE,
     ),
+    # "Apr 3 2026 8:30AM" — date-time format used by VA DHP calendar
+    re.compile(
+        r'((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}\s+\d{4})',
+        re.IGNORECASE,
+    ),
     # "2026-01-15"
     re.compile(r'(\d{4}-\d{2}-\d{2})'),
-    # "01/15/2026"
+    # "2026_01_15" — embedded in filenames (e.g. AK board books)
+    re.compile(r'(\d{4}_\d{2}_\d{2})'),
+    # "01/15/2026" or "03/20/2026"
     re.compile(r'(\d{1,2}/\d{1,2}/\d{4})'),
+    # "01.15.2026" or "01.15.26" — e.g. HI Medical Board "01.16.25 Meeting Minutes"
+    re.compile(r'(\d{1,2}\.\d{1,2}\.\d{2,4})'),
+    # "January 2026" or "Jan 2026" — month+year only (e.g. MS_MD "January 2026 Board Meeting Minutes")
+    re.compile(
+        r'((?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?'
+        r'|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?'
+        r'|Dec(?:ember)?)\s+\d{4})',
+        re.IGNORECASE,
+    ),
 ]
 
 # File extensions we consider downloadable documents
@@ -53,6 +69,9 @@ def parse_date(text: str) -> date | None:
 
     Returns the first successfully-parsed date, or ``None``.
     """
+    # Normalize ordinal suffixes: "30th" -> "30", "2nd" -> "2", "3rd" -> "3"
+    # This handles PA boards that publish "January 30th, 2024" style dates.
+    text = re.sub(r'(\d+)(?:st|nd|rd|th)\b', r'\1', text)
     for pattern in DATE_PATTERNS:
         m = pattern.search(text)
         if not m:
@@ -65,7 +84,12 @@ def parse_date(text: str) -> date | None:
             "%b %d, %Y",   # Jan 15, 2026
             "%b %d %Y",    # Jan 15 2026
             "%Y-%m-%d",    # 2026-01-15
+            "%Y_%m_%d",    # 2026_01_15 (filename-embedded dates)
             "%m/%d/%Y",    # 01/15/2026
+            "%m.%d.%Y",    # 01.15.2026
+            "%m.%d.%y",    # 01.15.26 (2-digit year, e.g. HI Medical Board)
+            "%B %Y",       # January 2026 (month+year only — assign day=1)
+            "%b %Y",       # Jan 2026 (month+year only)
         ):
             try:
                 return datetime.strptime(raw, fmt).date()
@@ -86,6 +110,9 @@ def is_within_window(d: date, months: int = 12) -> bool:
 
 _EXTRACT_LINKS_JS = """() => {
     const docExts = ['.pdf', '.docx', '.doc', '.xlsx', '.xls'];
+    // Date patterns to detect whether an ancestor element contains a date
+    const dateRe = /(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\s+\\d{1,2}|\\d{1,2}\\/\\d{1,2}\\/\\d{4}|\\d{4}[-_]\\d{2}[-_]\\d{2}/i;
+    const yearOnlyRe = /^\\s*(20\\d{2})\\s*$/;
     const results = [];
     for (const a of document.querySelectorAll('a[href]')) {
         const href = a.href || '';
@@ -93,7 +120,38 @@ _EXTRACT_LINKS_JS = """() => {
         const parentText = (a.parentElement ? a.parentElement.innerText || '' : '').trim();
         const lowerHref = href.toLowerCase();
         const isDoc = docExts.some(ext => lowerHref.endsWith(ext));
-        results.push({href, text, parentText, isDoc});
+
+        // Walk up to 8 ancestor levels to find context with a date.
+        // Two strategies:
+        //  1. Shallowest ancestor < 600 chars that contains a date pattern
+        //  2. Nearest ancestor/sibling heading whose text is just a 4-digit year
+        let ancestorText = '';
+        let sectionYear = '';
+        let el = a.parentElement;
+        for (let i = 0; i < 8 && el && el.tagName !== 'BODY' && el.tagName !== 'HTML'; i++) {
+            const t = (el.innerText || '').trim();
+            // Strategy 1: short ancestor with a recognisable date
+            if (!ancestorText && t.length < 600 && dateRe.test(t)) {
+                ancestorText = t;
+            }
+            // Strategy 2: look for sibling headings/elements that are just a year
+            // (covers sites like GA that use year-only accordion labels)
+            if (!sectionYear) {
+                const siblings = el.parentElement ? Array.from(el.parentElement.children) : [];
+                for (const sib of siblings) {
+                    const st = (sib.innerText || sib.textContent || '').trim();
+                    const ym = yearOnlyRe.exec(st);
+                    if (ym) { sectionYear = ym[1]; break; }
+                }
+            }
+            el = el.parentElement;
+        }
+        // If we found a year section but no full date in ancestor, append year to context
+        if (sectionYear && !ancestorText) {
+            ancestorText = sectionYear;
+        }
+
+        results.push({href, text, parentText, ancestorText, isDoc});
     }
     return results;
 }"""
@@ -182,7 +240,32 @@ async def collect_board(board: Board, page) -> dict:
     except Exception as exc:
         logger.warning("Screenshot failed for %s: %s", board.code, exc)
 
-    # 3. Extract all links
+    # 3. Expand year-based accordions/tabs (e.g. Georgia GCMB, some state sites
+    #    use clickable year labels that reveal monthly meeting links beneath them).
+    #    We try to click exact-text-match elements for the current and prior year.
+    try:
+        current_year = date.today().year
+        expand_years = [str(current_year), str(current_year - 1)]
+        for year_label in expand_years:
+            # Use Playwright's locator to find and click year-text elements.
+            # Filter to elements whose *exact* trimmed text is the year number.
+            locator = page.locator(
+                "button, summary, [role='button'], a, li, div, span"
+            ).filter(has_text=re.compile(rf"^\s*{year_label}\s*$"))
+            count = await locator.count()
+            for i in range(count):
+                try:
+                    await locator.nth(i).click(timeout=2000)
+                    await asyncio.sleep(0.5)
+                except Exception:
+                    pass
+            if count:
+                logger.debug("Clicked %s year accordion(s) for %s on %s", count, year_label, board.code)
+                await asyncio.sleep(1)
+    except Exception as exc:
+        logger.debug("Accordion expansion failed for %s: %s", board.code, exc)
+
+    # 4. Extract all links
     try:
         links = await page.evaluate(_EXTRACT_LINKS_JS)
     except Exception as exc:
@@ -195,7 +278,12 @@ async def collect_board(board: Board, page) -> dict:
     meetings_map: dict[date, list[dict]] = {}
 
     for link in links:
-        combined_text = f"{link.get('text', '')} {link.get('parentText', '')}"
+        combined_text = (
+            f"{link.get('text', '')} "
+            f"{link.get('parentText', '')} "
+            f"{link.get('ancestorText', '')} "
+            f"{link.get('href', '')}"  # href often contains YYYY_MM_DD or YYYY-MM-DD
+        )
         d = parse_date(combined_text)
         if d is None:
             continue

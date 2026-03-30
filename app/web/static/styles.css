@@ -1,4 +1,5 @@
-/* boardpulse — custom styles */
+/* boardpulse — FSMB Brand Theme */
+/* Navy + Teal + Gold | Professional & Modern */
 
 /* ------------------------------------------------------------------ */
 /* Scrollbar                                                           */
@@ -11,11 +12,11 @@
     background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-    background: #334155;
+    background: #354358;
     border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-    background: #475569;
+    background: #44546B;
 }
 
 /* ------------------------------------------------------------------ */
@@ -23,29 +24,29 @@
 /* ------------------------------------------------------------------ */
 .state-path {
     cursor: pointer;
-    stroke: #1e293b;
-    stroke-width: 1;
+    stroke: #ffffff;
+    stroke-width: 1.2;
     transition: opacity 0.15s ease, stroke-width 0.15s ease, filter 0.15s ease;
 }
 .state-path:hover {
-    opacity: 0.85;
+    opacity: 0.8;
     stroke-width: 2;
-    stroke: #f8fafc;
-    filter: brightness(1.2);
+    stroke: #1B2636;
+    filter: brightness(0.95);
 }
 .state-path.active {
     stroke-width: 2.5;
-    stroke: #38bdf8;
-    filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.5));
+    stroke: #1B2636;
+    filter: drop-shadow(0 0 6px rgba(19, 154, 208, 0.4));
 }
 
-/* State color fills */
-.state-collected  { fill: #22C55E; }
-.state-discovered { fill: #EAB308; }
+/* State color fills — FSMB palette */
+.state-collected  { fill: #139AD0; }
+.state-discovered { fill: #FBAA29; }
 .state-not-scraped,
-.state-not_scraped { fill: #EF4444; }
+.state-not_scraped { fill: #97A8BD; }
 .state-no-board,
-.state-no_board   { fill: #334155; }
+.state-no_board   { fill: #2B3648; }
 
 /* ------------------------------------------------------------------ */
 /* Lightbox                                                            */
@@ -54,7 +55,7 @@
     position: fixed;
     inset: 0;
     z-index: 50;
-    background: rgba(0, 0, 0, 0.85);
+    background: rgba(27, 38, 54, 0.92);
     backdrop-filter: blur(4px);
     display: flex;
     align-items: center;
@@ -90,15 +91,15 @@
 /* Stat cards                                                          */
 /* ------------------------------------------------------------------ */
 .stat-card {
-    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-    border: 1px solid #334155;
-    border-radius: 12px;
-    padding: 1rem 1.25rem;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
     transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 .stat-card:hover {
-    border-color: #475569;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    border-color: rgba(255, 255, 255, 0.2);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 /* ------------------------------------------------------------------ */
@@ -121,9 +122,9 @@
     position: fixed;
     z-index: 40;
     pointer-events: none;
-    background: #1e293b;
-    border: 1px solid #475569;
-    color: #e2e8f0;
+    background: #1B2636;
+    border: 1px solid #354358;
+    color: #F2F5F9;
     font-size: 0.75rem;
     font-weight: 500;
     padding: 4px 10px;
@@ -139,7 +140,7 @@
 }
 
 /* ------------------------------------------------------------------ */
-/* Pulse animation for "live" indicator                                */
+/* Pulse animation                                                     */
 /* ------------------------------------------------------------------ */
 @keyframes pulse-dot {
     0%, 100% { opacity: 1; }
@@ -166,14 +167,14 @@
     width: 4px;
 }
 .state-directory-scroll::-webkit-scrollbar-thumb {
-    background: #1e293b;
+    background: #2B3648;
 }
 
 /* ------------------------------------------------------------------ */
-/* Markdown summary prose overrides                                    */
+/* Markdown summary prose                                              */
 /* ------------------------------------------------------------------ */
 .summary-content h1, .summary-content h2, .summary-content h3 {
-    color: #e2e8f0;
+    color: #1B2636;
     font-weight: 600;
     margin-top: 0.75rem;
     margin-bottom: 0.25rem;
@@ -192,5 +193,13 @@
     margin: 0.35rem 0;
 }
 .summary-content strong {
-    color: #f1f5f9;
+    color: #1B2636;
+}
+
+/* ------------------------------------------------------------------ */
+/* Gold accent underline (FSMB style)                                  */
+/* ------------------------------------------------------------------ */
+.gold-underline {
+    border-bottom: 3px solid #FBAA29;
+    padding-bottom: 2px;
 }

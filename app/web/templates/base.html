@@ -12,19 +12,32 @@
             theme: {
                 extend: {
                     colors: {
-                        slate: {
-                            850: '#172033',
-                            950: '#0B1120',
+                        'fsmb-navy': {
+                            DEFAULT: '#1B2636',
+                            50:  '#F2F5F9',
+                            100: '#DCE3ED',
+                            200: '#C0CEDC',
+                            300: '#97A8BD',
+                            400: '#72849E',
+                            500: '#576A83',
+                            600: '#44546B',
+                            700: '#354358',
+                            800: '#2B3648',
+                            900: '#1B2636',
                         },
-                        pulse: {
-                            blue:    '#2563EB',
-                            navy:    '#1E3A5F',
-                            sky:     '#38BDF8',
-                            slate:   '#64748B',
-                            green:   '#22C55E',
-                            yellow:  '#EAB308',
-                            red:     '#EF4444',
-                            muted:   '#94A3B8',
+                        'fsmb-teal': {
+                            DEFAULT: '#139AD0',
+                            400: '#3DB8E5',
+                            500: '#139AD0',
+                            600: '#0F7EB0',
+                            700: '#0B6490',
+                        },
+                        'fsmb-gold': {
+                            DEFAULT: '#FBAA29',
+                            400: '#FCC254',
+                            500: '#FBAA29',
+                            600: '#E8950F',
+                            700: '#C47D0A',
                         },
                     },
                     fontFamily: {
@@ -58,7 +71,7 @@
 
     {% block head %}{% endblock %}
 </head>
-<body class="h-full bg-slate-950 text-slate-200 font-sans antialiased">
+<body class="h-full bg-white text-fsmb-navy font-sans antialiased">
     {% block body %}{% endblock %}
 
     <script>
