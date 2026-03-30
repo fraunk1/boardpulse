@@ -27,11 +27,23 @@ def main():
     # extract
     sub.add_parser("extract", help="Extract text from collected documents")
 
+    # summarize
+    summ = sub.add_parser("summarize", help="Prepare AI summarization data bundles")
+    summ.add_argument("--board", type=str, help="Board code (e.g., CA_MD) — one board only")
+    summ.add_argument(
+        "--ingest", action="store_true",
+        help="Ingest completed summary files back into the database",
+    )
+    summ.add_argument(
+        "--national", action="store_true",
+        help="Prepare national landscape synthesis prompt (requires per-board summaries)",
+    )
+
     # status
     sub.add_parser("status", help="Show collection status for all boards")
 
     # run
-    sub.add_parser("run", help="Run full pipeline (bootstrap → discover → collect → extract)")
+    sub.add_parser("run", help="Run full pipeline (bootstrap -> discover -> collect -> extract)")
 
     args = parser.parse_args()
 
@@ -59,6 +71,9 @@ async def dispatch(args):
         from app.extractor.extract import extract_all
         await extract_all()
 
+    elif args.command == "summarize":
+        await handle_summarize(args)
+
     elif args.command == "status":
         await show_status()
 
@@ -77,6 +92,60 @@ async def dispatch(args):
         print("\n=== Extract ===")
         await extract_all()
         print("\n=== Done ===")
+
+
+async def handle_summarize(args):
+    """Handle the summarize command and its flags."""
+    from app.extractor.summarizer import (
+        prepare_all_bundles,
+        ingest_all_summaries,
+        ingest_board_summary,
+        prepare_national_bundle,
+    )
+    from app.config import REPORTS_DIR
+
+    if args.ingest:
+        # Ingest mode: read completed summary files back into DB
+        if args.board:
+            await ingest_board_summary(args.board)
+        else:
+            await ingest_all_summaries()
+        return
+
+    if args.national:
+        # National synthesis mode: build synthesis prompt from per-board summaries
+        path = await prepare_national_bundle()
+        if path:
+            print(f"\n{'='*60}")
+            print("NATIONAL SYNTHESIS PROMPT READY")
+            print(f"{'='*60}")
+            print(f"Prompt file: {path}")
+            print(f"\nTo generate the report, have a Claude Code subagent:")
+            print(f"  1. Read: {path}")
+            print(f"  2. Write output to: {REPORTS_DIR}/{{date}}-board-landscape.md")
+        return
+
+    # Default: prepare per-board data bundles
+    prompt_paths = await prepare_all_bundles(board_code=args.board)
+
+    if prompt_paths:
+        print(f"\n{'='*60}")
+        print("SUMMARIZATION PROMPTS READY")
+        print(f"{'='*60}")
+        print(f"\nPrompt files written to: {REPORTS_DIR}/")
+        print(f"Files: {len(prompt_paths)}")
+        print()
+        for p in prompt_paths:
+            board_code = p.stem.replace("_prompt", "")
+            print(f"  {board_code}:")
+            print(f"    Read:  {p}")
+            print(f"    Write: {REPORTS_DIR}/{board_code}_summary.md")
+        print()
+        print("Next steps:")
+        print("  1. Dispatch Claude Code subagents to process each prompt file")
+        print("  2. Each subagent reads the prompt and writes the summary file")
+        print("  3. Run 'python cli.py summarize --ingest' to store summaries in the DB")
+        print("  4. Run 'python cli.py summarize --national' to prepare the synthesis prompt")
 
 
 async def show_status():
