@@ -1,0 +1,187 @@
+<!-- Board Detail Partial — loaded via HTMX into #detail-panel -->
+<div x-data="{ expandedMeeting: null }">
+
+    <!-- Board Header -->
+    <div class="mb-6">
+        <div class="flex items-start justify-between gap-3">
+            <div>
+                <div class="flex items-center gap-2 mb-1">
+                    <h2 class="text-lg font-bold text-white">{{ board.name }}</h2>
+                    <span class="px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded-full
+                        {% if board.board_type == 'MD' %}bg-blue-500/20 text-blue-400 border border-blue-500/30
+                        {% elif board.board_type == 'DO' %}bg-emerald-500/20 text-emerald-400 border border-emerald-500/30
+                        {% else %}bg-purple-500/20 text-purple-400 border border-purple-500/30{% endif %}">
+                        {{ board.board_type }}
+                    </span>
+                </div>
+                <div class="flex items-center gap-2 text-xs text-slate-400">
+                    <span class="font-mono">{{ board.code }}</span>
+                    <span class="text-slate-600">|</span>
+                    <span class="flex items-center gap-1">
+                        <span class="w-1.5 h-1.5 rounded-full
+                            {% if board.discovery_status == 'found' %}bg-pulse-green
+                            {% elif board.discovery_status == 'pending' %}bg-pulse-yellow
+                            {% else %}bg-pulse-red{% endif %}"></span>
+                        {{ board.discovery_status | capitalize }}
+                    </span>
+                </div>
+            </div>
+            {% if board.minutes_url %}
+            <button class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-pulse-blue/20 text-pulse-blue border border-pulse-blue/30 hover:bg-pulse-blue/30 transition-colors"
+                    hx-post="/collect/{{ board.code }}" hx-target="closest div" hx-swap="afterend">
+                <i data-lucide="download" class="w-3 h-3"></i> Collect
+            </button>
+            {% endif %}
+        </div>
+
+        {% if has_multiple_boards %}
+        <div class="mt-3">
+            <label class="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Switch Board</label>
+            <div class="flex gap-1.5">
+                {% for b in all_boards %}
+                <a class="px-3 py-1 text-xs rounded-md cursor-pointer transition-colors
+                    {% if b.code == board.code %}bg-pulse-blue text-white{% else %}bg-slate-800 text-slate-400 hover:bg-slate-700 border border-slate-700{% endif %}"
+                   hx-get="/board/{{ b.state }}/{{ b.code }}" hx-target="#detail-panel" hx-swap="innerHTML">
+                    {{ b.board_type }}
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Contact & Links -->
+    <div class="grid grid-cols-1 gap-2 mb-6 p-3 rounded-lg bg-slate-900/50 border border-slate-800">
+        {% if board.homepage %}
+        <a href="{{ board.homepage }}" target="_blank" rel="noopener"
+           class="flex items-center gap-2 text-xs text-pulse-sky hover:text-pulse-blue transition-colors">
+            <i data-lucide="globe" class="w-3.5 h-3.5 text-slate-500"></i>
+            {{ board.homepage | truncate(50) }}
+            <i data-lucide="external-link" class="w-3 h-3 text-slate-600"></i>
+        </a>
+        {% endif %}
+        {% if board.minutes_url %}
+        <a href="{{ board.minutes_url }}" target="_blank" rel="noopener"
+           class="flex items-center gap-2 text-xs text-pulse-sky hover:text-pulse-blue transition-colors">
+            <i data-lucide="file-text" class="w-3.5 h-3.5 text-slate-500"></i>
+            Minutes page
+            <i data-lucide="external-link" class="w-3 h-3 text-slate-600"></i>
+        </a>
+        {% endif %}
+        {% if board.phone %}
+        <div class="flex items-center gap-2 text-xs text-slate-400">
+            <i data-lucide="phone" class="w-3.5 h-3.5 text-slate-500"></i> {{ board.phone }}
+        </div>
+        {% endif %}
+        {% if board.email %}
+        <a href="mailto:{{ board.email }}" class="flex items-center gap-2 text-xs text-pulse-sky hover:text-pulse-blue transition-colors">
+            <i data-lucide="mail" class="w-3.5 h-3.5 text-slate-500"></i> {{ board.email }}
+        </a>
+        {% endif %}
+        {% if board.address %}
+        <div class="flex items-start gap-2 text-xs text-slate-400">
+            <i data-lucide="map-pin" class="w-3.5 h-3.5 text-slate-500 mt-0.5"></i>
+            <span>{{ board.address }}</span>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Meetings -->
+    <div>
+        <div class="flex items-center justify-between mb-3">
+            <h3 class="text-sm font-semibold text-slate-300 flex items-center gap-2">
+                <i data-lucide="calendar-days" class="w-4 h-4 text-slate-500"></i>
+                Meetings
+                <span class="text-xs font-normal text-slate-500">({{ meeting_data | length }})</span>
+            </h3>
+        </div>
+
+        {% if meeting_data %}
+        <div class="space-y-3">
+            {% for item in meeting_data %}
+            {% set m = item.meeting %}
+            {% set docs = item.documents %}
+            <div class="rounded-lg border border-slate-800 bg-slate-900/30 overflow-hidden">
+                <div class="flex items-center gap-3 px-4 py-3">
+                    <div class="flex-none w-14 text-center">
+                        <div class="text-lg font-bold text-white leading-none">{{ m.meeting_date.strftime('%d') }}</div>
+                        <div class="text-[10px] uppercase text-slate-500 tracking-wider">{{ m.meeting_date.strftime('%b %Y') }}</div>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="text-sm font-medium text-slate-200 truncate">{{ m.title or 'Meeting' }}</div>
+                        <div class="flex items-center gap-3 mt-1">
+                            {% if m.meeting_type %}
+                            <span class="text-[10px] uppercase tracking-wider text-slate-500 bg-slate-800 px-1.5 py-0.5 rounded">{{ m.meeting_type }}</span>
+                            {% endif %}
+                            {% if m.source_url %}
+                            <a href="{{ m.source_url }}" target="_blank" rel="noopener" class="text-[10px] text-pulse-sky hover:text-pulse-blue flex items-center gap-0.5">
+                                <i data-lucide="link" class="w-2.5 h-2.5"></i> Source
+                            </a>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-1.5 flex-none">
+                        {% if m.screenshot_path %}
+                        <button onclick="openLightbox('/screenshot/{{ relative_screenshot(m.screenshot_path) }}')"
+                                class="p-1.5 rounded-md hover:bg-slate-800 text-slate-500 hover:text-slate-300 transition-colors" title="View screenshot">
+                            <i data-lucide="image" class="w-3.5 h-3.5"></i>
+                        </button>
+                        {% endif %}
+                        {% for doc in docs %}
+                        <a href="/document/{{ board.code }}/{{ doc.filename }}" target="_blank"
+                           class="p-1.5 rounded-md hover:bg-slate-800 text-slate-500 hover:text-slate-300 transition-colors"
+                           title="{{ doc.doc_type | capitalize }}: {{ doc.filename }}">
+                            <i data-lucide="file-down" class="w-3.5 h-3.5"></i>
+                        </a>
+                        {% endfor %}
+                        {% if m.summary %}
+                        <button @click="expandedMeeting = expandedMeeting === {{ m.id }} ? null : {{ m.id }}"
+                                class="p-1.5 rounded-md hover:bg-slate-800 text-slate-500 hover:text-slate-300 transition-colors" title="Toggle AI summary">
+                            <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+
+                {% if m.screenshot_path %}
+                <div class="px-4 pb-3">
+                    <img src="/screenshot/{{ relative_screenshot(m.screenshot_path) }}"
+                         alt="Meeting screenshot"
+                         class="w-full max-h-32 object-cover object-top rounded-md border border-slate-700 cursor-pointer hover:border-slate-500 transition-colors"
+                         onclick="openLightbox(this.src)" loading="lazy">
+                </div>
+                {% endif %}
+
+                {% if m.summary %}
+                <div class="summary-accordion" :class="{ 'open': expandedMeeting === {{ m.id }} }">
+                    <div class="px-4 pb-3 border-t border-slate-800 pt-3">
+                        <div class="text-[10px] uppercase tracking-wider text-slate-500 mb-2 flex items-center gap-1">
+                            <i data-lucide="sparkles" class="w-3 h-3"></i> AI Summary
+                        </div>
+                        <div class="text-xs text-slate-300 leading-relaxed prose prose-invert prose-sm max-w-none">{{ m.summary }}</div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="rounded-lg border border-dashed border-slate-700 p-6 text-center">
+            <i data-lucide="calendar-x" class="w-8 h-8 text-slate-600 mx-auto mb-2"></i>
+            <p class="text-sm text-slate-500">No meetings collected yet.</p>
+            {% if board.discovery_status == 'found' %}
+            <p class="text-xs text-slate-600 mt-1">Click <strong>Collect</strong> above to scrape meeting minutes.</p>
+            {% elif board.discovery_status == 'pending' %}
+            <p class="text-xs text-slate-600 mt-1">Run discovery first: <code class="text-slate-400">python cli.py discover --board {{ board.code }}</code></p>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+
+    {% if board.last_scraped_at %}
+    <div class="mt-6 pt-3 border-t border-slate-800 text-[10px] text-slate-600 flex items-center gap-1">
+        <i data-lucide="clock" class="w-3 h-3"></i>
+        Last scraped: {{ board.last_scraped_at.strftime('%Y-%m-%d %H:%M UTC') }}
+    </div>
+    {% endif %}
+</div>

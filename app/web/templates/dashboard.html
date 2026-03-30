@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+
+{% block title %}boardpulse — State Medical Board Intelligence{% endblock %}
+
+{% block body %}
+<div x-data="mapController()" class="flex flex-col h-full">
+
+    <!-- HEADER -->
+    <header class="flex-none border-b border-slate-800 bg-slate-950/80 backdrop-blur-sm px-6 py-4">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="flex items-center gap-2">
+                    <div class="w-2 h-2 rounded-full bg-pulse-sky pulse-dot"></div>
+                    <h1 class="text-xl font-bold tracking-tight">
+                        <span class="text-white">board</span><span class="text-pulse-sky">pulse</span>
+                    </h1>
+                </div>
+                <span class="text-xs text-slate-500 font-mono border-l border-slate-700 pl-3 hidden sm:inline">
+                    State Medical Board Intelligence
+                </span>
+            </div>
+
+            <!-- Stats -->
+            <div class="flex items-center gap-4">
+                <div class="stat-card flex items-center gap-3">
+                    <i data-lucide="building-2" class="w-4 h-4 text-pulse-muted"></i>
+                    <div>
+                        <div class="text-lg font-bold text-white leading-none">{{ total_boards }}</div>
+                        <div class="text-[10px] text-slate-500 uppercase tracking-wider">Boards</div>
+                    </div>
+                </div>
+                <div class="stat-card flex items-center gap-3">
+                    <i data-lucide="check-circle-2" class="w-4 h-4 text-pulse-green"></i>
+                    <div>
+                        <div class="text-lg font-bold text-pulse-green leading-none">{{ collected_count }}</div>
+                        <div class="text-[10px] text-slate-500 uppercase tracking-wider">Collected</div>
+                    </div>
+                </div>
+                <div class="stat-card flex items-center gap-3">
+                    <i data-lucide="search" class="w-4 h-4 text-pulse-yellow"></i>
+                    <div>
+                        <div class="text-lg font-bold text-pulse-yellow leading-none">{{ discovered_count }}</div>
+                        <div class="text-[10px] text-slate-500 uppercase tracking-wider">Discovered</div>
+                    </div>
+                </div>
+                <div class="stat-card flex items-center gap-3">
+                    <i data-lucide="calendar" class="w-4 h-4 text-pulse-muted"></i>
+                    <div>
+                        <div class="text-lg font-bold text-white leading-none">{{ total_meetings }}</div>
+                        <div class="text-[10px] text-slate-500 uppercase tracking-wider">Meetings</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN CONTENT — Split Panel -->
+    <main class="flex-1 flex min-h-0">
+        <!-- LEFT PANEL — Map -->
+        <div class="w-1/2 xl:w-3/5 border-r border-slate-800 flex flex-col">
+            <div class="flex-1 flex items-center justify-center p-6 overflow-hidden">
+                <div class="relative w-full max-w-3xl">
+                    <div x-ref="tooltip" class="map-tooltip" :class="{ 'visible': tooltipVisible }"
+                         :style="`left: ${tooltipX}px; top: ${tooltipY}px`">
+                        <span x-text="tooltipText"></span>
+                    </div>
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 600" class="w-full h-auto"
+                         @mouseleave="tooltipVisible = false">
+                        {% include "partials/us_map_paths.html" %}
+                    </svg>
+                    <div class="absolute bottom-2 left-2 flex items-center gap-4 text-[10px] text-slate-400 bg-slate-900/80 backdrop-blur-sm rounded-lg px-3 py-1.5 border border-slate-800">
+                        <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm bg-pulse-green"></span> Collected</span>
+                        <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm bg-pulse-yellow"></span> Discovered</span>
+                        <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm bg-pulse-red"></span> Not Scraped</span>
+                        <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm bg-slate-700"></span> No Board</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT PANEL — Board Detail (loaded via HTMX) -->
+        <div class="w-1/2 xl:w-2/5 flex flex-col min-h-0">
+            <div id="detail-panel" class="flex-1 overflow-y-auto p-6">
+                {% include "partials/empty_state.html" %}
+            </div>
+        </div>
+    </main>
+
+    <!-- BOTTOM BAR -->
+    <footer class="flex-none border-t border-slate-800 bg-slate-950/80 backdrop-blur-sm px-6 py-3">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2 text-xs text-slate-500">
+                <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
+                <span>National Landscape Report</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <button class="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-700 text-slate-300 hover:bg-slate-800 hover:border-slate-600 transition-colors"
+                        onclick="alert('Report generation requires AI summarization (Plan 2). Coming soon.')">
+                    <i data-lucide="sparkles" class="w-3 h-3 inline -mt-0.5 mr-1"></i>
+                    Generate Report
+                </button>
+                <button class="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-700 text-slate-300 hover:bg-slate-800 hover:border-slate-600 transition-colors"
+                        onclick="alert('No reports generated yet.')">
+                    <i data-lucide="eye" class="w-3 h-3 inline -mt-0.5 mr-1"></i>
+                    View Latest
+                </button>
+            </div>
+        </div>
+    </footer>
+
+    <!-- LIGHTBOX -->
+    <div class="lightbox-overlay" :class="{ 'active': lightboxOpen }" @click="lightboxOpen = false">
+        <img :src="lightboxSrc" @click.stop class="cursor-zoom-out" @click="lightboxOpen = false">
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const STATE_NAMES = {
+        'AL': 'Alabama', 'AK': 'Alaska', 'AZ': 'Arizona', 'AR': 'Arkansas',
+        'CA': 'California', 'CO': 'Colorado', 'CT': 'Connecticut', 'DE': 'Delaware',
+        'DC': 'District of Columbia', 'FL': 'Florida', 'GA': 'Georgia', 'HI': 'Hawaii',
+        'ID': 'Idaho', 'IL': 'Illinois', 'IN': 'Indiana', 'IA': 'Iowa',
+        'KS': 'Kansas', 'KY': 'Kentucky', 'LA': 'Louisiana', 'ME': 'Maine',
+        'MD': 'Maryland', 'MA': 'Massachusetts', 'MI': 'Michigan', 'MN': 'Minnesota',
+        'MS': 'Mississippi', 'MO': 'Missouri', 'MT': 'Montana', 'NE': 'Nebraska',
+        'NV': 'Nevada', 'NH': 'New Hampshire', 'NJ': 'New Jersey', 'NM': 'New Mexico',
+        'NY': 'New York', 'NC': 'North Carolina', 'ND': 'North Dakota', 'OH': 'Ohio',
+        'OK': 'Oklahoma', 'OR': 'Oregon', 'PA': 'Pennsylvania', 'RI': 'Rhode Island',
+        'SC': 'South Carolina', 'SD': 'South Dakota', 'TN': 'Tennessee', 'TX': 'Texas',
+        'UT': 'Utah', 'VT': 'Vermont', 'VA': 'Virginia', 'WA': 'Washington',
+        'WV': 'West Virginia', 'WI': 'Wisconsin', 'WY': 'Wyoming',
+    };
+    const STATE_COLORS = {{ state_colors | tojson }};
+
+    function mapController() {
+        return {
+            activeState: null,
+            tooltipVisible: false,
+            tooltipX: 0,
+            tooltipY: 0,
+            tooltipText: '',
+            lightboxOpen: false,
+            lightboxSrc: '',
+
+            init() {
+                this.$nextTick(() => {
+                    document.querySelectorAll('.state-path').forEach(path => {
+                        const state = path.getAttribute('data-state');
+                        const status = STATE_COLORS[state] || 'no_board';
+                        path.classList.add('state-' + status.replace(/-/g, '_'));
+                        path.addEventListener('click', (e) => this.selectState(state, e));
+                        path.addEventListener('mousemove', (e) => this.showTooltip(state, e));
+                        path.addEventListener('mouseleave', () => this.tooltipVisible = false);
+                    });
+                });
+            },
+
+            selectState(state, event) {
+                document.querySelectorAll('.state-path.active').forEach(p => p.classList.remove('active'));
+                event.currentTarget.classList.add('active');
+                this.activeState = state;
+                htmx.ajax('GET', `/board/${state}`, {target: '#detail-panel', swap: 'innerHTML'});
+            },
+
+            showTooltip(state, event) {
+                this.tooltipText = STATE_NAMES[state] || state;
+                this.tooltipX = event.clientX;
+                this.tooltipY = event.clientY;
+                this.tooltipVisible = true;
+            },
+
+            openLightbox(src) {
+                this.lightboxSrc = src;
+                this.lightboxOpen = true;
+            },
+        };
+    }
+
+    window.openLightbox = function(src) {
+        const controller = document.querySelector('[x-data]').__x.$data;
+        controller.lightboxSrc = src;
+        controller.lightboxOpen = true;
+    };
+</script>
+{% endblock %}

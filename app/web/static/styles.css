@@ -42,8 +42,10 @@
 /* State color fills */
 .state-collected  { fill: #22C55E; }
 .state-discovered { fill: #EAB308; }
-.state-not-scraped { fill: #EF4444; }
-.state-no-board   { fill: #334155; }
+.state-not-scraped,
+.state-not_scraped { fill: #EF4444; }
+.state-no-board,
+.state-no_board   { fill: #334155; }
 
 /* ------------------------------------------------------------------ */
 /* Lightbox                                                            */
