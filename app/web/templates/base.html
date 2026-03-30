@@ -50,6 +50,9 @@
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
 
+    <!-- Marked.js for Markdown rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
     <!-- Custom styles -->
     <link rel="stylesheet" href="/static/styles.css">
 
@@ -61,7 +64,22 @@
     <script>
         // Initialize Lucide icons after page load and after every HTMX swap
         document.addEventListener('DOMContentLoaded', () => lucide.createIcons());
-        document.addEventListener('htmx:afterSwap', () => lucide.createIcons());
+        document.addEventListener('htmx:afterSwap', () => {
+            lucide.createIcons();
+            renderMarkdownSummaries();
+        });
+
+        // Render Markdown summaries with marked.js
+        function renderMarkdownSummaries() {
+            document.querySelectorAll('.summary-content[data-markdown]').forEach(el => {
+                if (el.dataset.rendered) return;
+                const md = el.getAttribute('data-markdown');
+                if (md && typeof marked !== 'undefined') {
+                    el.innerHTML = marked.parse(md);
+                    el.dataset.rendered = 'true';
+                }
+            });
+        }
     </script>
 
     {% block scripts %}{% endblock %}

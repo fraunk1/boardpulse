@@ -158,7 +158,8 @@
                         <div class="text-[10px] uppercase tracking-wider text-slate-500 mb-2 flex items-center gap-1">
                             <i data-lucide="sparkles" class="w-3 h-3"></i> AI Summary
                         </div>
-                        <div class="text-xs text-slate-300 leading-relaxed prose prose-invert prose-sm max-w-none">{{ m.summary }}</div>
+                        <div class="summary-content text-xs text-slate-300 leading-relaxed prose prose-invert prose-sm max-w-none"
+                             data-markdown="{{ m.summary | e }}"></div>
                     </div>
                 </div>
                 {% endif %}

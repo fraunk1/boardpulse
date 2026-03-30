@@ -158,3 +158,39 @@
 #detail-panel.htmx-swapping {
     opacity: 0.4;
 }
+
+/* ------------------------------------------------------------------ */
+/* State directory                                                     */
+/* ------------------------------------------------------------------ */
+.state-directory-scroll::-webkit-scrollbar {
+    width: 4px;
+}
+.state-directory-scroll::-webkit-scrollbar-thumb {
+    background: #1e293b;
+}
+
+/* ------------------------------------------------------------------ */
+/* Markdown summary prose overrides                                    */
+/* ------------------------------------------------------------------ */
+.summary-content h1, .summary-content h2, .summary-content h3 {
+    color: #e2e8f0;
+    font-weight: 600;
+    margin-top: 0.75rem;
+    margin-bottom: 0.25rem;
+}
+.summary-content h1 { font-size: 0.875rem; }
+.summary-content h2 { font-size: 0.8125rem; }
+.summary-content h3 { font-size: 0.75rem; }
+.summary-content ul, .summary-content ol {
+    padding-left: 1.25rem;
+    margin: 0.25rem 0;
+}
+.summary-content li {
+    margin: 0.15rem 0;
+}
+.summary-content p {
+    margin: 0.35rem 0;
+}
+.summary-content strong {
+    color: #f1f5f9;
+}
