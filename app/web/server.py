@@ -97,8 +97,7 @@ async def dashboard(request: Request):
     pending_count = total_boards - collected_count - discovered_count
     total_meetings = sum(meeting_counts.values()) if meeting_counts else 0
 
-    return templates.TemplateResponse("dashboard.html", {
-        "request": request,
+    return templates.TemplateResponse(request, "dashboard.html", context={
         "state_boards": state_boards,
         "state_colors": state_colors,
         "total_boards": total_boards,
@@ -167,8 +166,7 @@ async def _render_board_detail(request: Request, board: Board, all_boards: list[
             )).scalars().all()
             meeting_data.append({"meeting": m, "documents": docs})
 
-    return templates.TemplateResponse("partials/board_detail.html", {
-        "request": request,
+    return templates.TemplateResponse(request, "partials/board_detail.html", context={
         "board": board,
         "all_boards": all_boards,
         "meeting_data": meeting_data,
