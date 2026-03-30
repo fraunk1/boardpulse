@@ -8,7 +8,7 @@ from playwright.async_api import async_playwright
 from sqlalchemy import select
 
 from app.scraper.browser_provider import launch_browser
-from app.database import async_session, init_db
+import app.database as db
 from app.models import Board
 from app.config import FSMB_CONTACT_URL, SCRAPE_DELAY_SECONDS
 
@@ -38,11 +38,11 @@ async def bootstrap(force: bool = False):
     Args:
         force: If True, re-scrape even if boards already exist.
     """
-    await init_db()
+    await db.init_db()
 
     # Check if boards already exist
     if not force:
-        async with async_session() as session:
+        async with db.async_session() as session:
             result = await session.execute(select(Board).limit(1))
             if result.scalars().first():
                 print("Boards already populated. Use --force to re-bootstrap.")
@@ -174,7 +174,7 @@ async def bootstrap(force: bool = False):
         ))
 
     # Save to database
-    async with async_session() as session:
+    async with db.async_session() as session:
         for board in boards_to_add:
             existing = await session.execute(
                 select(Board).where(Board.code == board.code)

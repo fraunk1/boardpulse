@@ -4,14 +4,13 @@ from pathlib import Path
 from sqlalchemy import select
 
 import app.database as db
-from app.database import init_db
 from app.models import MeetingDocument
 from app.extractor.parser import extract_text_from_file
 
 
 async def extract_all():
     """Run text extraction on all documents missing content_text."""
-    await init_db()
+    await db.init_db()
 
     async with db.async_session() as session:
         result = await session.execute(

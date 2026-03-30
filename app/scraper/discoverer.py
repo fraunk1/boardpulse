@@ -243,15 +243,15 @@ async def discover_all(board_code: str | None = None, force: bool = False):
         board_code: If provided, only discover for this board.
         force: If True, re-discover even if minutes_url is already set.
     """
-    from app.database import async_session, init_db
+    import app.database as db
     from app.models import Board
     from app.config import SCRAPE_DELAY_SECONDS
     from app.scraper.browser_provider import launch_browser
     from sqlalchemy import select
 
-    await init_db()
+    await db.init_db()
 
-    async with async_session() as session:
+    async with db.async_session() as session:
         stmt = select(Board)
         if board_code:
             stmt = stmt.where(Board.code == board_code.upper())
@@ -276,7 +276,7 @@ async def discover_all(board_code: str | None = None, force: bool = False):
                 minutes_url = await discover_board(board, page, max_depth=2)
 
                 # Update the database
-                async with async_session() as session:
+                async with db.async_session() as session:
                     async with session.begin():
                         stmt = select(Board).where(Board.id == board.id)
                         result = await session.execute(stmt)

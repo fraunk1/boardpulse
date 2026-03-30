@@ -16,7 +16,7 @@ from playwright.async_api import async_playwright
 from sqlalchemy import select
 
 from app.scraper.browser_provider import launch_browser
-from app.database import async_session, init_db
+import app.database as db
 from app.models import Board, Meeting, MeetingDocument
 from app.config import SCRAPE_DELAY_SECONDS, SCREENSHOTS_DIR, DOCUMENTS_DIR, USER_AGENT
 
@@ -208,7 +208,7 @@ async def collect_board(board: Board, page) -> dict:
         return stats
 
     # 5. Persist meetings and download documents
-    async with async_session() as session:
+    async with db.async_session() as session:
         async with httpx.AsyncClient(
             headers={"User-Agent": USER_AGENT},
             follow_redirects=True,
@@ -298,10 +298,10 @@ async def collect_all(board_code: str | None = None):
                     Otherwise collect for all boards with discovery_status
                     in ('found', 'manual').
     """
-    await init_db()
+    await db.init_db()
 
     # Query target boards
-    async with async_session() as session:
+    async with db.async_session() as session:
         stmt = select(Board).where(Board.minutes_url.isnot(None))
         if board_code:
             stmt = stmt.where(Board.code == board_code)
@@ -336,7 +336,7 @@ async def collect_all(board_code: str | None = None):
                 continue
 
             # Update last_scraped_at
-            async with async_session() as session:
+            async with db.async_session() as session:
                 db_board = await session.get(Board, board.id)
                 if db_board:
                     db_board.last_scraped_at = datetime.now()
