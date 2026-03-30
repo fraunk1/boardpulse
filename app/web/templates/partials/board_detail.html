@@ -39,8 +39,8 @@
             <label class="text-[10px] text-fsmb-navy-400 uppercase tracking-wider block mb-1">Switch Board</label>
             <div class="flex gap-1.5">
                 {% for b in all_boards %}
-                <a class="px-3 py-1 text-xs rounded-md cursor-pointer transition-colors
-                    {% if b.code == board.code %}bg-pulse-blue text-fsmb-navy{% else %}bg-fsmb-navy-50 text-fsmb-navy-500 hover:bg-slate-700 border border-fsmb-navy-200{% endif %}"
+                <a class="px-3 py-1.5 text-xs font-semibold rounded-md cursor-pointer transition-colors
+                    {% if b.code == board.code %}bg-fsmb-teal text-white shadow-sm{% else %}text-fsmb-navy-400 hover:text-fsmb-navy-700 hover:bg-fsmb-navy-50{% endif %}"
                    hx-get="/board/{{ b.state }}/{{ b.code }}" hx-target="#detail-panel" hx-swap="innerHTML">
                     {{ b.board_type }}
                 </a>
