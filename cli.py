@@ -39,6 +39,11 @@ def main():
         help="Prepare national landscape synthesis prompt (requires per-board summaries)",
     )
 
+    # serve
+    srv = sub.add_parser("serve", help="Start the web dashboard (port 8099)")
+    srv.add_argument("--host", default="0.0.0.0", help="Bind address (default: 0.0.0.0)")
+    srv.add_argument("--port", type=int, default=8099, help="Port (default: 8099)")
+
     # status
     sub.add_parser("status", help="Show collection status for all boards")
 
@@ -50,6 +55,12 @@ def main():
     if not args.command:
         parser.print_help()
         sys.exit(1)
+
+    # Serve is synchronous (uvicorn manages its own event loop)
+    if args.command == "serve":
+        from app.web.server import run_server
+        run_server(host=args.host, port=args.port)
+        return
 
     asyncio.run(dispatch(args))
 
