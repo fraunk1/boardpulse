@@ -11,6 +11,10 @@ def main():
     )
     sub = parser.add_subparsers(dest="command", help="Available commands")
 
+    # seed
+    sd = sub.add_parser("seed", help="Seed all 60 US state medical boards from built-in data")
+    sd.add_argument("--force", action="store_true", help="Re-seed (skip existing boards)")
+
     # bootstrap
     bp = sub.add_parser("bootstrap", help="Scrape FSMB contact page to build board registry")
     bp.add_argument("--force", action="store_true", help="Re-bootstrap even if boards exist")
@@ -66,7 +70,10 @@ def main():
 
 
 async def dispatch(args):
-    if args.command == "bootstrap":
+    if args.command == "seed":
+        await seed_boards(force=args.force)
+
+    elif args.command == "bootstrap":
         from app.scraper.boards import bootstrap
         await bootstrap(force=args.force)
 
@@ -103,6 +110,47 @@ async def dispatch(args):
         print("\n=== Extract ===")
         await extract_all()
         print("\n=== Done ===")
+
+
+async def seed_boards(force: bool = False):
+    """Seed all US state medical boards from built-in data."""
+    from app.database import init_db
+    from app.models import Board
+    from app.scraper.seed_data import BOARDS
+    from sqlalchemy import select
+    import app.database as db
+
+    await init_db()
+
+    added = 0
+    skipped = 0
+
+    async with db.async_session() as session:
+        for board_data in BOARDS:
+            existing = (await session.execute(
+                select(Board).where(Board.code == board_data["code"])
+            )).scalar_one_or_none()
+
+            if existing:
+                skipped += 1
+                continue
+
+            board = Board(
+                state=board_data["state"],
+                code=board_data["code"],
+                name=board_data["name"],
+                board_type=board_data["board_type"],
+                homepage=board_data["homepage"],
+                discovery_status="pending",
+            )
+            session.add(board)
+            added += 1
+
+        await session.commit()
+
+    print(f"Seeded {added} boards ({skipped} already existed).")
+    print(f"Total: {added + skipped} boards across {len(set(b['state'] for b in BOARDS))} jurisdictions.")
+    print(f"\nNext: run 'python cli.py discover' to find meeting minutes pages.")
 
 
 async def handle_summarize(args):
