@@ -13,3 +13,6 @@ data/reports/
 *.egg-info/
 dist/
 build/
+data/reports/
+data/screenshots/
+data/documents/
