@@ -15,7 +15,8 @@ BOARDS = [
     # Arkansas
     {"state": "AR", "code": "AR_MD", "name": "Arkansas State Medical Board", "board_type": "combined", "homepage": "https://www.armedicalboard.org"},
     # California
-    {"state": "CA", "code": "CA_MD", "name": "Medical Board of California", "board_type": "combined", "homepage": "https://www.mbc.ca.gov"},
+    {"state": "CA", "code": "CA_MD", "name": "Medical Board of California", "board_type": "MD", "homepage": "https://www.mbc.ca.gov"},
+    {"state": "CA", "code": "CA_DO", "name": "Osteopathic Medical Board of California", "board_type": "DO", "homepage": "https://www.ombc.ca.gov"},
     # Colorado
     {"state": "CO", "code": "CO_MD", "name": "Colorado Medical Board", "board_type": "combined", "homepage": "https://dpo.colorado.gov/MedicalBoard"},
     # Connecticut
@@ -104,11 +105,13 @@ BOARDS = [
     # Utah
     {"state": "UT", "code": "UT_MD", "name": "Utah Division of Occupational and Professional Licensing — Physicians", "board_type": "combined", "homepage": "https://dopl.utah.gov/physician/"},
     # Vermont
-    {"state": "VT", "code": "VT_MD", "name": "Vermont Board of Medical Practice", "board_type": "combined", "homepage": "https://sos.vermont.gov/medical-board/"},
+    {"state": "VT", "code": "VT_MD", "name": "Vermont Board of Medical Practice", "board_type": "MD", "homepage": "https://www.healthvermont.gov/systems/board-medical-practice"},
+    {"state": "VT", "code": "VT_DO", "name": "Vermont Board of Osteopathic Physicians and Surgeons", "board_type": "DO", "homepage": "https://sos.vermont.gov/osteopathic-physicians/"},
     # Virginia
     {"state": "VA", "code": "VA_MD", "name": "Virginia Board of Medicine", "board_type": "combined", "homepage": "https://www.dhp.virginia.gov/medicine/"},
     # Washington
-    {"state": "WA", "code": "WA_MD", "name": "Washington Medical Commission", "board_type": "combined", "homepage": "https://wmc.wa.gov"},
+    {"state": "WA", "code": "WA_MD", "name": "Washington Medical Commission", "board_type": "MD", "homepage": "https://wmc.wa.gov"},
+    {"state": "WA", "code": "WA_DO", "name": "Washington Board of Osteopathic Medicine and Surgery", "board_type": "DO", "homepage": "https://doh.wa.gov/licenses-permits-and-certificates/professions-new-renew-or-update/osteopathic-physician-and-surgeon"},
     # West Virginia
     {"state": "WV", "code": "WV_MD", "name": "West Virginia Board of Medicine", "board_type": "MD", "homepage": "https://www.wvbom.wv.gov"},
     {"state": "WV", "code": "WV_DO", "name": "West Virginia Board of Osteopathic Medicine", "board_type": "DO", "homepage": "https://www.wvbdosteo.org"},
