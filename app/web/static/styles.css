@@ -1,0 +1,158 @@
+/* boardpulse — custom styles */
+
+/* ------------------------------------------------------------------ */
+/* Scrollbar                                                           */
+/* ------------------------------------------------------------------ */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+::-webkit-scrollbar-thumb {
+    background: #334155;
+    border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #475569;
+}
+
+/* ------------------------------------------------------------------ */
+/* SVG Map                                                             */
+/* ------------------------------------------------------------------ */
+.state-path {
+    cursor: pointer;
+    stroke: #1e293b;
+    stroke-width: 1;
+    transition: opacity 0.15s ease, stroke-width 0.15s ease, filter 0.15s ease;
+}
+.state-path:hover {
+    opacity: 0.85;
+    stroke-width: 2;
+    stroke: #f8fafc;
+    filter: brightness(1.2);
+}
+.state-path.active {
+    stroke-width: 2.5;
+    stroke: #38bdf8;
+    filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.5));
+}
+
+/* State color fills */
+.state-collected  { fill: #22C55E; }
+.state-discovered { fill: #EAB308; }
+.state-not-scraped { fill: #EF4444; }
+.state-no-board   { fill: #334155; }
+
+/* ------------------------------------------------------------------ */
+/* Lightbox                                                            */
+/* ------------------------------------------------------------------ */
+.lightbox-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+}
+.lightbox-overlay.active {
+    opacity: 1;
+    pointer-events: auto;
+}
+.lightbox-overlay img {
+    max-width: 90vw;
+    max-height: 85vh;
+    border-radius: 8px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+/* ------------------------------------------------------------------ */
+/* Accordion / Summary expand                                          */
+/* ------------------------------------------------------------------ */
+.summary-accordion {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+}
+.summary-accordion.open {
+    max-height: 2000px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Stat cards                                                          */
+/* ------------------------------------------------------------------ */
+.stat-card {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    border: 1px solid #334155;
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.stat-card:hover {
+    border-color: #475569;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* ------------------------------------------------------------------ */
+/* Loading spinner                                                     */
+/* ------------------------------------------------------------------ */
+.htmx-indicator {
+    display: none;
+}
+.htmx-request .htmx-indicator {
+    display: inline-flex;
+}
+.htmx-request.htmx-indicator {
+    display: inline-flex;
+}
+
+/* ------------------------------------------------------------------ */
+/* Tooltip                                                             */
+/* ------------------------------------------------------------------ */
+.map-tooltip {
+    position: fixed;
+    z-index: 40;
+    pointer-events: none;
+    background: #1e293b;
+    border: 1px solid #475569;
+    color: #e2e8f0;
+    font-size: 0.75rem;
+    font-weight: 500;
+    padding: 4px 10px;
+    border-radius: 6px;
+    white-space: nowrap;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    transform: translate(-50%, -120%);
+    opacity: 0;
+    transition: opacity 0.1s ease;
+}
+.map-tooltip.visible {
+    opacity: 1;
+}
+
+/* ------------------------------------------------------------------ */
+/* Pulse animation for "live" indicator                                */
+/* ------------------------------------------------------------------ */
+@keyframes pulse-dot {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}
+.pulse-dot {
+    animation: pulse-dot 2s ease-in-out infinite;
+}
+
+/* ------------------------------------------------------------------ */
+/* HTMX transition                                                     */
+/* ------------------------------------------------------------------ */
+#detail-panel {
+    transition: opacity 0.15s ease;
+}
+#detail-panel.htmx-swapping {
+    opacity: 0.4;
+}

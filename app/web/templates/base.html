@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}boardpulse{% endblock %}</title>
+
+    <!-- Tailwind CSS (CDN for dev) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        slate: {
+                            850: '#172033',
+                            950: '#0B1120',
+                        },
+                        pulse: {
+                            blue:    '#2563EB',
+                            navy:    '#1E3A5F',
+                            sky:     '#38BDF8',
+                            slate:   '#64748B',
+                            green:   '#22C55E',
+                            yellow:  '#EAB308',
+                            red:     '#EF4444',
+                            muted:   '#94A3B8',
+                        },
+                    },
+                    fontFamily: {
+                        sans: ['"DM Sans"', 'system-ui', '-apple-system', 'sans-serif'],
+                        mono: ['"JetBrains Mono"', 'ui-monospace', 'monospace'],
+                    },
+                },
+            },
+        }
+    </script>
+
+    <!-- DM Sans + JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+    <!-- HTMX -->
+    <script src="https://unpkg.com/htmx.org@2.0.4" integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+" crossorigin="anonymous"></script>
+
+    <!-- Alpine.js -->
+    <script defer src="https://unpkg.com/alpinejs@3.14.8/dist/cdn.min.js"></script>
+
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+
+    <!-- Custom styles -->
+    <link rel="stylesheet" href="/static/styles.css">
+
+    {% block head %}{% endblock %}
+</head>
+<body class="h-full bg-slate-950 text-slate-200 font-sans antialiased">
+    {% block body %}{% endblock %}
+
+    <script>
+        // Initialize Lucide icons after page load and after every HTMX swap
+        document.addEventListener('DOMContentLoaded', () => lucide.createIcons());
+        document.addEventListener('htmx:afterSwap', () => lucide.createIcons());
+    </script>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>
