@@ -21,6 +21,20 @@ app = FastAPI(title="boardpulse", docs_url=None, redoc_url=None)
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
+import os
+templates.env.filters["basename"] = os.path.basename
+
+
+def _relative_screenshot_path(absolute_path: str) -> str:
+    """Convert an absolute screenshot path to a path relative to SCREENSHOTS_DIR."""
+    try:
+        return str(Path(absolute_path).relative_to(SCREENSHOTS_DIR))
+    except ValueError:
+        return absolute_path
+
+
+templates.env.globals["relative_screenshot"] = _relative_screenshot_path
+
 
 @app.on_event("startup")
 async def startup():
