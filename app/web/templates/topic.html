@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% set page_title = topic_name %}
+{% block title %}{{ topic_name }} — boardpulse{% endblock %}
+
+{% block body %}
+<div class="max-w-[1400px] mx-auto px-6 py-8">
+
+    <!-- Topic Header -->
+    <div class="mb-8">
+        <div class="flex items-center gap-3 mb-2">
+            <div class="w-10 h-10 rounded-xl bg-bp-teal/10 border border-bp-teal/20 flex items-center justify-center">
+                <i data-lucide="tag" class="w-5 h-5 text-bp-teal"></i>
+            </div>
+            <div>
+                <h1 class="text-2xl font-bold text-bp-navy tracking-tight">{{ topic_name }}</h1>
+                <p class="text-sm text-bp-steel">Topic intelligence across state medical boards</p>
+            </div>
+        </div>
+
+        <!-- Topic stats -->
+        <div class="flex items-center gap-6 mt-4">
+            <div class="flex items-center gap-2">
+                <div class="text-2xl font-bold text-bp-navy">{{ meeting_count }}</div>
+                <div class="text-[11px] text-bp-mist uppercase tracking-wider leading-tight">Meetings<br>Mentioning</div>
+            </div>
+            <div class="w-px h-8 bg-bp-cloud"></div>
+            <div class="flex items-center gap-2">
+                <div class="text-2xl font-bold text-bp-teal">{{ board_count }}</div>
+                <div class="text-[11px] text-bp-mist uppercase tracking-wider leading-tight">Boards<br>Discussing</div>
+            </div>
+            <div class="w-px h-8 bg-bp-cloud"></div>
+            <div class="flex items-center gap-2">
+                <div class="text-2xl font-bold text-bp-gold">{{ state_count }}</div>
+                <div class="text-[11px] text-bp-mist uppercase tracking-wider leading-tight">States<br>Covered</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Meeting List -->
+    <div>
+        <h2 class="section-label flex items-center gap-1.5 mb-4">
+            <i data-lucide="calendar-days" class="w-3.5 h-3.5"></i>
+            Meetings Discussing {{ topic_name }}
+        </h2>
+
+        <div class="space-y-3 stagger-in">
+            {% for item in meetings %}
+            {% set m = item.meeting %}
+            {% set b = item.board %}
+            <a href="/meeting/{{ m.id }}" class="meeting-card block px-5 py-4 group">
+                <div class="flex items-start justify-between">
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="text-sm font-semibold text-bp-navy group-hover:text-bp-teal transition-colors">{{ b.name }}</span>
+                            <span class="px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded
+                                {% if b.board_type == 'MD' %}badge-md
+                                {% elif b.board_type == 'DO' %}badge-do
+                                {% else %}badge-combined{% endif %}">
+                                {{ b.board_type }}
+                            </span>
+                        </div>
+                        <div class="text-xs text-bp-steel">{{ m.title or 'Board Meeting' }}</div>
+                        {% if m.topics %}
+                        <div class="flex flex-wrap gap-1 mt-2">
+                            {% for tag in m.topics %}
+                            <span class="tag-pill text-[10px] {% if tag == topic_slug %}bg-bp-teal/10 text-bp-teal border-bp-teal/30{% endif %}">{{ tag | replace("-", " ") }}</span>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="flex-none text-right ml-4">
+                        <div class="text-sm font-mono text-bp-navy">{{ m.meeting_date.strftime('%b %d') }}</div>
+                        <div class="text-[10px] text-bp-mist">{{ m.meeting_date.strftime('%Y') }}</div>
+                        <div class="text-[10px] font-mono text-bp-mist mt-1">{{ item.state_name }}</div>
+                    </div>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+
+        {% if not meetings %}
+        <div class="text-center py-12 text-bp-mist">
+            <i data-lucide="search-x" class="w-8 h-8 mx-auto mb-2"></i>
+            <p class="text-sm">No meetings found for this topic.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

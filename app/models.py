@@ -2,7 +2,7 @@
 from datetime import date, datetime, timezone
 from typing import Optional
 
-from sqlalchemy import String, Text, Date, DateTime, ForeignKey
+from sqlalchemy import String, Text, Date, DateTime, ForeignKey, JSON
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -40,6 +40,7 @@ class Meeting(Base):
     source_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     screenshot_path: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     summary: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    topics: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     scraped_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     board: Mapped["Board"] = relationship(back_populates="meetings")

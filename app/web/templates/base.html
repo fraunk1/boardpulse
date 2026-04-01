@@ -12,32 +12,19 @@
             theme: {
                 extend: {
                     colors: {
-                        'fsmb-navy': {
-                            DEFAULT: '#1B2636',
-                            50:  '#F2F5F9',
-                            100: '#DCE3ED',
-                            200: '#C0CEDC',
-                            300: '#97A8BD',
-                            400: '#72849E',
-                            500: '#576A83',
-                            600: '#44546B',
-                            700: '#354358',
-                            800: '#2B3648',
-                            900: '#1B2636',
-                        },
-                        'fsmb-teal': {
-                            DEFAULT: '#139AD0',
-                            400: '#3DB8E5',
-                            500: '#139AD0',
-                            600: '#0F7EB0',
-                            700: '#0B6490',
-                        },
-                        'fsmb-gold': {
-                            DEFAULT: '#FBAA29',
-                            400: '#FCC254',
-                            500: '#FBAA29',
-                            600: '#E8950F',
-                            700: '#C47D0A',
+                        'bp': {
+                            'navy':   '#1B2636',
+                            'slate':  '#354358',
+                            'steel':  '#576A83',
+                            'mist':   '#97A8BD',
+                            'cloud':  '#DCE3ED',
+                            'frost':  '#F2F5F9',
+                            'teal':   '#139AD0',
+                            'teal-d': '#0F7EB0',
+                            'teal-l': '#3DB8E5',
+                            'gold':   '#FBAA29',
+                            'gold-d': '#E8950F',
+                            'gold-l': '#FCC254',
                         },
                     },
                     fontFamily: {
@@ -71,18 +58,73 @@
 
     {% block head %}{% endblock %}
 </head>
-<body class="h-full bg-white text-fsmb-navy font-sans antialiased">
-    {% block body %}{% endblock %}
+<body class="h-full bg-white text-bp-navy font-sans antialiased">
+
+    <!-- TOP NAV -->
+    <nav class="sticky top-0 z-40 bg-white/95 backdrop-blur-sm border-b border-bp-cloud">
+        <div class="max-w-[1400px] mx-auto px-6 h-14 flex items-center justify-between">
+            <!-- Logo + Breadcrumb -->
+            <div class="flex items-center gap-4">
+                <a href="/" class="flex items-center gap-2 group">
+                    <div class="w-2 h-2 rounded-full bg-bp-teal pulse-dot"></div>
+                    <span class="text-lg font-bold tracking-tight">
+                        <span class="text-bp-navy group-hover:text-bp-teal transition-colors">board</span><span class="text-bp-teal">pulse</span>
+                    </span>
+                </a>
+
+                {% if breadcrumbs is defined and breadcrumbs %}
+                <div class="flex items-center gap-1.5 text-sm text-bp-mist">
+                    <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+                    {% for bc in breadcrumbs %}
+                    <a href="{{ bc.url }}" class="text-bp-steel hover:text-bp-teal transition-colors">{{ bc.label }}</a>
+                    {% if not loop.last %}
+                    <i data-lucide="chevron-right" class="w-3.5 h-3.5 text-bp-cloud"></i>
+                    {% endif %}
+                    {% endfor %}
+                    {% if page_title is defined %}
+                    <i data-lucide="chevron-right" class="w-3.5 h-3.5 text-bp-cloud"></i>
+                    <span class="text-bp-navy font-medium">{{ page_title }}</span>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Right nav -->
+            <div class="flex items-center gap-3">
+                <a href="/report" class="text-xs text-bp-steel hover:text-bp-teal transition-colors flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-bp-frost">
+                    <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
+                    <span class="hidden sm:inline">National Report</span>
+                </a>
+                <div class="h-4 w-px bg-bp-cloud"></div>
+                <span class="text-[10px] font-mono text-bp-mist tracking-wider uppercase">Intelligence Platform</span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- MAIN CONTENT -->
+    <main class="page-transition">
+        {% block body %}{% endblock %}
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="border-t border-bp-cloud mt-auto">
+        <div class="max-w-[1400px] mx-auto px-6 py-4 flex items-center justify-between">
+            <div class="text-[11px] text-bp-mist">
+                boardpulse &mdash; State Medical Board Intelligence
+            </div>
+            <div class="text-[11px] text-bp-mist font-mono">
+                FSMB &bull; Federation of State Medical Boards
+            </div>
+        </div>
+    </footer>
 
     <script>
-        // Initialize Lucide icons after page load and after every HTMX swap
         document.addEventListener('DOMContentLoaded', () => lucide.createIcons());
         document.addEventListener('htmx:afterSwap', () => {
             lucide.createIcons();
             renderMarkdownSummaries();
         });
 
-        // Render Markdown summaries with marked.js
         function renderMarkdownSummaries() {
             document.querySelectorAll('.summary-content[data-markdown]').forEach(el => {
                 if (el.dataset.rendered) return;
@@ -90,6 +132,8 @@
                 if (md && typeof marked !== 'undefined') {
                     el.innerHTML = marked.parse(md);
                     el.dataset.rendered = 'true';
+                    // Re-render icons inside summaries
+                    lucide.createIcons();
                 }
             });
         }

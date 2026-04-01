@@ -1,0 +1,222 @@
+{% extends "base.html" %}
+
+{% block title %}boardpulse — State Medical Board Intelligence{% endblock %}
+
+{% block body %}
+<div x-data="nationalController()">
+
+    <!-- HERO STATS -->
+    <section class="bg-bp-frost border-b border-bp-cloud">
+        <div class="max-w-[1400px] mx-auto px-6 py-8">
+            <div class="flex items-end justify-between mb-6">
+                <div>
+                    <h1 class="text-2xl font-bold text-bp-navy tracking-tight">National Intelligence Overview</h1>
+                    <p class="text-sm text-bp-steel mt-1">Real-time monitoring of state medical board activity across the United States</p>
+                </div>
+                <div class="text-[10px] font-mono text-bp-mist uppercase tracking-wider">
+                    {{ stats.states_covered }} states &bull; {{ stats.total_boards }} boards &bull; Live data
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 md:grid-cols-5 gap-4 stagger-in">
+                <div class="stat-hero">
+                    <div class="stat-icon"><i data-lucide="building-2" class="w-6 h-6"></i></div>
+                    <div class="stat-number text-bp-navy">{{ stats.boards_collected }}</div>
+                    <div class="stat-label">Boards Collected</div>
+                </div>
+                <div class="stat-hero">
+                    <div class="stat-icon"><i data-lucide="calendar-days" class="w-6 h-6"></i></div>
+                    <div class="stat-number text-bp-teal">{{ stats.total_meetings }}</div>
+                    <div class="stat-label">Meetings Tracked</div>
+                </div>
+                <div class="stat-hero">
+                    <div class="stat-icon"><i data-lucide="file-text" class="w-6 h-6"></i></div>
+                    <div class="stat-number text-bp-navy">{{ stats.meetings_with_files }}</div>
+                    <div class="stat-label">Minutes on File</div>
+                    <div class="text-[10px] text-bp-mist mt-1 font-mono">{{ ((stats.meetings_with_files / stats.total_meetings) * 100) | int }}% coverage</div>
+                </div>
+                <div class="stat-hero">
+                    <div class="stat-icon"><i data-lucide="sparkles" class="w-6 h-6"></i></div>
+                    <div class="stat-number text-bp-gold">{{ stats.total_summaries }}</div>
+                    <div class="stat-label">AI Summaries</div>
+                </div>
+                <div class="stat-hero">
+                    <div class="stat-icon"><i data-lucide="alert-circle" class="w-6 h-6"></i></div>
+                    <div class="stat-number text-amber-500">{{ stats.total_meetings - stats.meetings_with_files }}</div>
+                    <div class="stat-label">Missing Documents</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- MAIN CONTENT: Map + Topics + Feed -->
+    <section class="max-w-[1400px] mx-auto px-6 py-8">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+            <!-- LEFT COL: Map + State Directory -->
+            <div class="lg:col-span-2">
+                <!-- Map -->
+                <div class="mb-6">
+                    <div class="flex items-center justify-between mb-3">
+                        <h2 class="section-label flex items-center gap-1.5">
+                            <i data-lucide="map" class="w-3.5 h-3.5"></i> Coverage Map
+                        </h2>
+                        <div class="flex items-center gap-4 text-[10px] text-bp-mist">
+                            <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-sm bg-bp-teal"></span> Collected</span>
+                            <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-sm bg-bp-gold"></span> Discovered</span>
+                            <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-sm bg-bp-cloud"></span> Pending</span>
+                        </div>
+                    </div>
+                    <div class="relative bg-white border border-bp-cloud rounded-xl p-4">
+                        <div x-ref="tooltip" class="map-tooltip" :class="{ 'visible': tooltipVisible }"
+                             :style="`left: ${tooltipX}px; top: ${tooltipY}px`">
+                            <span x-text="tooltipText"></span>
+                        </div>
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 600" class="w-full h-auto"
+                             @mouseleave="tooltipVisible = false">
+                            {% include "partials/us_map_paths.html" %}
+                        </svg>
+                    </div>
+                </div>
+
+                <!-- State Directory Grid -->
+                <div>
+                    <div class="flex items-center justify-between mb-3">
+                        <h2 class="section-label flex items-center gap-1.5">
+                            <i data-lucide="list" class="w-3.5 h-3.5"></i> State Directory
+                        </h2>
+                        <div class="relative">
+                            <i data-lucide="search" class="w-3.5 h-3.5 text-bp-mist absolute left-2.5 top-1/2 -translate-y-1/2"></i>
+                            <input type="text" x-model="stateFilter" placeholder="Filter states..."
+                                   class="w-44 text-xs bg-bp-frost border border-bp-cloud rounded-lg pl-8 pr-3 py-1.5 text-bp-navy placeholder-bp-mist focus:outline-none focus:border-bp-teal focus:ring-1 focus:ring-bp-teal/20">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-4 xl:grid-cols-5 gap-1.5">
+                        {% for abbr, data in state_data.items() | sort %}
+                        <a href="/state/{{ abbr }}"
+                           class="flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs transition-all hover:bg-bp-frost border border-transparent hover:border-bp-cloud group"
+                           x-show="!stateFilter || '{{ abbr }}'.toLowerCase().includes(stateFilter.toLowerCase()) || '{{ data.name }}'.toLowerCase().includes(stateFilter.toLowerCase())">
+                            <span class="w-1.5 h-1.5 rounded-full flex-none
+                                {% if data.status == 'collected' %}bg-bp-teal
+                                {% elif data.status == 'discovered' %}bg-bp-gold
+                                {% else %}bg-bp-cloud{% endif %}"></span>
+                            <span class="font-mono font-semibold text-bp-navy w-6">{{ abbr }}</span>
+                            <span class="text-bp-steel group-hover:text-bp-navy truncate text-[11px]">{{ data.name }}</span>
+                            {% if data.total_meetings > 0 %}
+                            <span class="ml-auto text-[10px] font-mono text-bp-mist">{{ data.total_meetings }}</span>
+                            {% endif %}
+                        </a>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- RIGHT COL: Topics + Recent Activity -->
+            <div class="space-y-8">
+                <!-- Topic Intelligence -->
+                <div>
+                    <h2 class="section-label flex items-center gap-1.5 mb-3">
+                        <i data-lucide="tags" class="w-3.5 h-3.5"></i> Topic Intelligence
+                    </h2>
+                    <div class="space-y-2 stagger-in">
+                        {% for topic in topics %}
+                        <a href="/topic/{{ topic.name }}" class="topic-card block">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <div class="topic-name">{{ topic.name | replace("-", " ") | title }}</div>
+                                    <div class="topic-boards">{{ topic.board_count }} boards &bull; {{ topic.count }} mentions</div>
+                                </div>
+                                <div class="topic-count">{{ topic.count }}</div>
+                            </div>
+                        </a>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Recent Summaries -->
+                <div>
+                    <h2 class="section-label flex items-center gap-1.5 mb-3">
+                        <i data-lucide="sparkles" class="w-3.5 h-3.5"></i> Latest Intelligence
+                    </h2>
+                    <div class="space-y-4 stagger-in">
+                        {% for item in recent_summaries %}
+                        <a href="/meeting/{{ item.meeting.id }}" class="summary-feed-item block group">
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="text-[10px] font-mono text-bp-mist">{{ item.meeting.meeting_date.strftime('%b %d, %Y') }}</span>
+                                <span class="text-bp-cloud">&bull;</span>
+                                <span class="text-[10px] font-medium text-bp-teal">{{ item.board.code }}</span>
+                            </div>
+                            <div class="text-sm font-medium text-bp-navy group-hover:text-bp-teal transition-colors">
+                                {{ item.board.name }}
+                            </div>
+                            <div class="text-xs text-bp-steel mt-0.5 line-clamp-2">
+                                {{ item.meeting.title or 'Board Meeting' }}
+                            </div>
+                            {% if item.meeting.topics %}
+                            <div class="flex flex-wrap gap-1 mt-1.5">
+                                {% for tag in item.meeting.topics[:3] %}
+                                <span class="tag-pill text-[10px]">{{ tag | replace("-", " ") }}</span>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </a>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </section>
+
+    <!-- LIGHTBOX -->
+    <div class="lightbox-overlay" :class="{ 'active': lightboxOpen }" @click="lightboxOpen = false">
+        <img :src="lightboxSrc" @click.stop class="cursor-zoom-out" @click="lightboxOpen = false">
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const STATE_NAMES = {{ state_data | tojson }};
+    const STATE_COLORS = {{ state_colors | tojson }};
+
+    function nationalController() {
+        return {
+            stateFilter: '',
+            tooltipVisible: false,
+            tooltipX: 0,
+            tooltipY: 0,
+            tooltipText: '',
+            lightboxOpen: false,
+            lightboxSrc: '',
+
+            init() {
+                this.$nextTick(() => {
+                    document.querySelectorAll('.state-path').forEach(path => {
+                        const state = path.getAttribute('data-state');
+                        const status = STATE_COLORS[state] || 'no_board';
+                        path.classList.add('state-' + status.replace(/-/g, '_'));
+                        path.addEventListener('click', () => {
+                            window.location.href = `/state/${state}`;
+                        });
+                        path.addEventListener('mousemove', (e) => this.showTooltip(state, e));
+                        path.addEventListener('mouseleave', () => this.tooltipVisible = false);
+                    });
+                });
+            },
+
+            showTooltip(state, event) {
+                const data = STATE_NAMES[state];
+                if (data) {
+                    this.tooltipText = `${data.name} — ${data.total_meetings} meetings`;
+                } else {
+                    this.tooltipText = state;
+                }
+                this.tooltipX = event.clientX;
+                this.tooltipY = event.clientY;
+                this.tooltipVisible = true;
+            },
+        };
+    }
+</script>
+{% endblock %}

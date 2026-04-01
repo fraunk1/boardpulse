@@ -1,0 +1,212 @@
+{% extends "base.html" %}
+
+{% set page_title = meeting.meeting_date.strftime('%B %d, %Y') %}
+{% block title %}{{ board.name }} — {{ meeting.meeting_date.strftime('%b %d, %Y') }} — boardpulse{% endblock %}
+
+{% block body %}
+<div x-data="{ activeDoc: {{ documents[0].id if documents else 0 }}, lightboxOpen: false, lightboxSrc: '' }">
+
+    <!-- Meeting Header -->
+    <section class="bg-bp-frost border-b border-bp-cloud">
+        <div class="max-w-[1400px] mx-auto px-6 py-6">
+            <div class="flex items-start justify-between">
+                <div>
+                    <div class="flex items-center gap-2 mb-2">
+                        <span class="px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded
+                            {% if board.board_type == 'MD' %}badge-md
+                            {% elif board.board_type == 'DO' %}badge-do
+                            {% else %}badge-combined{% endif %}">
+                            {{ board.board_type }}
+                        </span>
+                        <span class="text-xs font-mono text-bp-mist">{{ board.code }}</span>
+                    </div>
+                    <h1 class="text-2xl font-bold text-bp-navy tracking-tight">{{ meeting.title or board.name }}</h1>
+                    <div class="flex items-center gap-3 mt-2 text-sm text-bp-steel">
+                        <span class="flex items-center gap-1.5">
+                            <i data-lucide="calendar" class="w-4 h-4 text-bp-mist"></i>
+                            {{ meeting.meeting_date.strftime('%B %d, %Y') }}
+                        </span>
+                        {% if meeting.meeting_type %}
+                        <span class="text-bp-cloud">|</span>
+                        <span>{{ meeting.meeting_type }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% if meeting.source_url %}
+                <a href="{{ meeting.source_url }}" target="_blank" rel="noopener"
+                   class="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border border-bp-cloud text-bp-steel hover:border-bp-teal hover:text-bp-teal transition-colors">
+                    <i data-lucide="external-link" class="w-3.5 h-3.5"></i> Source
+                </a>
+                {% endif %}
+            </div>
+
+            {% if meeting.topics %}
+            <div class="flex flex-wrap gap-1.5 mt-3">
+                {% for tag in meeting.topics %}
+                <a href="/topic/{{ tag }}" class="tag-pill">{{ tag | replace("-", " ") }}</a>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+    </section>
+
+    {% if documents %}
+    <!-- DOCUMENT VIEWER — The main event -->
+    <section class="max-w-[1400px] mx-auto px-6 py-6">
+        <!-- Document tabs (if multiple docs) -->
+        {% if documents | length > 1 %}
+        <div class="flex items-center gap-1 mb-4 border-b border-bp-cloud pb-3">
+            <span class="section-label mr-3 flex items-center gap-1.5">
+                <i data-lucide="file-text" class="w-3.5 h-3.5"></i> Documents
+            </span>
+            {% for doc in documents %}
+            <button @click="activeDoc = {{ doc.id }}"
+                    :class="activeDoc === {{ doc.id }} ? 'bg-bp-teal text-white border-bp-teal' : 'bg-white text-bp-steel border-bp-cloud hover:border-bp-teal/30'"
+                    class="px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors">
+                {% if doc.doc_type == 'minutes' %}
+                <i data-lucide="file-text" class="w-3 h-3 inline -mt-0.5 mr-1"></i>
+                {% elif doc.doc_type == 'agenda' %}
+                <i data-lucide="list-checks" class="w-3 h-3 inline -mt-0.5 mr-1"></i>
+                {% else %}
+                <i data-lucide="file" class="w-3 h-3 inline -mt-0.5 mr-1"></i>
+                {% endif %}
+                {{ doc.doc_type | capitalize }}
+                <span class="text-[10px] opacity-70 ml-1">{{ doc.filename | truncate(30) }}</span>
+            </button>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="flex items-center justify-between mb-4">
+            <span class="section-label flex items-center gap-1.5">
+                <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
+                {{ documents[0].doc_type | capitalize }}: {{ documents[0].filename }}
+            </span>
+            <a href="/document/{{ board.code }}/{{ documents[0].filename }}" target="_blank"
+               class="text-xs text-bp-steel hover:text-bp-teal transition-colors flex items-center gap-1">
+                <i data-lucide="download" class="w-3 h-3"></i> Download
+            </a>
+        </div>
+        {% endif %}
+
+        <!-- Embedded PDF viewer -->
+        {% for doc in documents %}
+        <div x-show="activeDoc === {{ doc.id }}" x-cloak>
+            {% if doc.filename.endswith('.pdf') %}
+            <div class="rounded-xl border border-bp-cloud overflow-hidden bg-gray-100" style="height: 80vh;">
+                <iframe src="/document/{{ board.code }}/{{ doc.filename }}#toolbar=1&navpanes=0"
+                        class="w-full h-full border-0"
+                        title="{{ doc.doc_type | capitalize }}: {{ doc.filename }}">
+                </iframe>
+            </div>
+            {% elif doc.filename.endswith('.html') or doc.filename.endswith('.htm') %}
+            <div class="rounded-xl border border-bp-cloud overflow-hidden bg-white" style="height: 80vh;">
+                <iframe src="/document/{{ board.code }}/{{ doc.filename }}"
+                        class="w-full h-full border-0"
+                        title="{{ doc.doc_type | capitalize }}: {{ doc.filename }}"
+                        sandbox="allow-same-origin">
+                </iframe>
+            </div>
+            {% else %}
+            <div class="rounded-xl border border-bp-cloud p-6 text-center">
+                <i data-lucide="file-down" class="w-8 h-8 text-bp-mist mx-auto mb-3"></i>
+                <p class="text-sm text-bp-steel mb-2">{{ doc.filename }}</p>
+                <a href="/document/{{ board.code }}/{{ doc.filename }}" target="_blank"
+                   class="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg bg-bp-teal text-white hover:bg-bp-teal-d transition-colors">
+                    <i data-lucide="download" class="w-4 h-4"></i> Download {{ doc.doc_type | capitalize }}
+                </a>
+            </div>
+            {% endif %}
+            {% if documents | length > 1 %}
+            <div class="flex items-center justify-between mt-2 text-xs text-bp-mist">
+                <span class="font-mono">{{ doc.filename }}</span>
+                <a href="/document/{{ board.code }}/{{ doc.filename }}" target="_blank"
+                   class="hover:text-bp-teal transition-colors flex items-center gap-1">
+                    <i data-lucide="download" class="w-3 h-3"></i> Download
+                </a>
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </section>
+    {% else %}
+    <!-- No documents on file placeholder -->
+    <section class="max-w-[1400px] mx-auto px-6 py-6">
+        <div class="rounded-xl border-2 border-dashed border-amber-200 bg-amber-50/50 p-8 text-center">
+            <div class="w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center mx-auto mb-3">
+                <i data-lucide="file-x" class="w-6 h-6 text-amber-500"></i>
+            </div>
+            <h3 class="text-sm font-semibold text-amber-700 mb-1">No document on file</h3>
+            <p class="text-xs text-amber-600 max-w-md mx-auto">
+                Meeting minutes for this session have not yet been collected. The board may not have published them,
+                or the collector has not downloaded them.
+            </p>
+            {% if meeting.source_url %}
+            <a href="{{ meeting.source_url }}" target="_blank" rel="noopener"
+               class="inline-flex items-center gap-1.5 mt-4 px-4 py-2 text-xs font-medium rounded-lg border border-amber-300 text-amber-700 hover:bg-amber-100 transition-colors">
+                <i data-lucide="external-link" class="w-3.5 h-3.5"></i> Check source page
+            </a>
+            {% endif %}
+        </div>
+    </section>
+    {% endif %}
+
+    <!-- AI Summary -->
+    {% if meeting.summary %}
+    <section class="max-w-[1400px] mx-auto px-6 pb-8">
+        <div class="flex items-center gap-2 mb-4">
+            <div class="w-8 h-8 rounded-lg bg-bp-gold/10 border border-bp-gold/20 flex items-center justify-center">
+                <i data-lucide="sparkles" class="w-4 h-4 text-bp-gold"></i>
+            </div>
+            <div>
+                <h2 class="text-sm font-semibold text-bp-navy">AI Summary</h2>
+                <p class="text-[10px] text-bp-mist uppercase tracking-wider">Generated by boardpulse intelligence pipeline</p>
+            </div>
+        </div>
+        <div class="gold-accent">
+            <div class="summary-content text-sm text-bp-steel leading-relaxed max-w-none"
+                 data-markdown="{{ meeting.summary | e }}"></div>
+        </div>
+    </section>
+    {% endif %}
+
+    <!-- Exhibits (if any) -->
+    {% if exhibits %}
+    <section class="max-w-[1400px] mx-auto px-6 pb-8">
+        <h2 class="section-label flex items-center gap-1.5 mb-4">
+            <i data-lucide="book-open" class="w-3.5 h-3.5"></i> Source Exhibits ({{ exhibits | length }})
+        </h2>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {% for ex in exhibits %}
+            <a href="/exhibit/{{ board.code }}/{{ ex.name }}" class="exhibit-page group">
+                <img src="{{ ex.thumbnail }}" alt="{{ ex.name }}" class="w-full" loading="lazy">
+                <div class="px-3 py-2 border-t border-bp-cloud">
+                    <div class="text-xs font-medium text-bp-navy group-hover:text-bp-teal transition-colors">{{ ex.name }}</div>
+                    <div class="text-[10px] text-bp-mist">{{ ex.page_count }} pages</div>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
+    {% if not documents and not meeting.summary %}
+    <div class="max-w-[1400px] mx-auto px-6 py-16 text-center">
+        <i data-lucide="file-x" class="w-10 h-10 text-bp-cloud mx-auto mb-3"></i>
+        <p class="text-sm text-bp-steel">No documents or summaries available for this meeting.</p>
+    </div>
+    {% endif %}
+
+    <!-- LIGHTBOX -->
+    <div class="lightbox-overlay" :class="{ 'active': lightboxOpen }" @click="lightboxOpen = false">
+        <img :src="lightboxSrc" @click.stop class="cursor-zoom-out" @click="lightboxOpen = false">
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        renderMarkdownSummaries();
+    });
+</script>
+{% endblock %}

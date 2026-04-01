@@ -50,6 +50,17 @@
         {% endif %}
     </div>
 
+    <!-- Topic Tags (from AI summaries) -->
+    {% if topic_tags %}
+    <div class="mb-4 flex flex-wrap gap-1.5">
+        {% for tag in topic_tags %}
+        <span class="px-2 py-0.5 text-[10px] font-medium rounded-full bg-fsmb-teal/15 text-fsmb-teal border border-fsmb-teal/25">
+            {{ tag }}
+        </span>
+        {% endfor %}
+    </div>
+    {% endif %}
+
     <!-- Contact & Links -->
     <div class="grid grid-cols-1 gap-2 mb-6 p-3 rounded-lg bg-fsmb-navy-50 border border-fsmb-navy-100">
         {% if board.homepage %}
@@ -101,7 +112,7 @@
             {% for item in meeting_data %}
             {% set m = item.meeting %}
             {% set docs = item.documents %}
-            <div class="rounded-lg border border-fsmb-navy-100 bg-white overflow-hidden">
+            <div id="{{ m.meeting_date.isoformat() }}" class="rounded-lg border border-fsmb-navy-100 bg-white overflow-hidden scroll-mt-4">
                 <div class="flex items-center gap-3 px-4 py-3">
                     <div class="flex-none w-14 text-center">
                         <div class="text-lg font-bold text-fsmb-navy leading-none">{{ m.meeting_date.strftime('%d') }}</div>

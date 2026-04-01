@@ -7,6 +7,7 @@ def per_board_prompt(
     state: str,
     board_code: str,
     meetings: list[dict],
+    minutes_url: str = "",
 ) -> str:
     """Build the per-board summary prompt.
 
@@ -32,6 +33,12 @@ def per_board_prompt(
 
     all_meetings_text = "\n\n---\n\n".join(meeting_sections)
 
+    # Build a meeting date reference table for citations
+    meeting_refs = []
+    for i, m in enumerate(meetings):
+        meeting_refs.append(f"- `[{m['meeting_date']}]` — {m.get('title') or 'Board Meeting'}")
+    meeting_ref_table = "\n".join(meeting_refs)
+
     return f"""You are an expert analyst summarizing state medical board meeting minutes.
 
 ## Task
@@ -41,29 +48,40 @@ Summarize the meeting minutes for **{board_name}** ({state}) covering the meetin
 ## Instructions
 
 1. Read all the meeting text provided below carefully.
-2. Produce a structured summary in Markdown format with the following sections:
-   - **Key Topics Discussed** — Bulleted list of the main topics across all meetings. Group related items.
-   - **Notable Actions** — Specific decisions, rule changes, policy adoptions, disciplinary actions, or votes taken. Include dates.
-   - **Recurring Themes** — Patterns or topics that appear in multiple meetings.
-   - **Noteworthy Items** — Anything unusual, novel, or particularly significant (e.g., AI policy discussions, telehealth changes, compact participation, opioid-related actions).
-3. Be specific — cite meeting dates when referencing particular actions.
-4. Keep the summary between 500-1500 words depending on volume of source material.
-5. Write in a professional, neutral tone suitable for a regulatory affairs audience.
+2. Produce a YAML frontmatter block with topic tags extracted from the meetings.
+3. Produce a structured summary in Markdown with the sections listed below.
+4. **Every factual claim MUST cite the specific meeting date** using the format `([YYYY-MM-DD](/board/{state}/{board_code}#YYYY-MM-DD))`. This creates a clickable link.
+5. Keep the summary between 500-1500 words depending on volume of source material.
+6. Write in a professional, neutral tone suitable for a regulatory affairs audience.
+
+## Available Meeting Dates (for citations)
+
+{meeting_ref_table}
 
 ## Output Format
 
-Write the summary as a Markdown document with this structure:
+Write the summary as a Markdown document with YAML frontmatter. The frontmatter MUST include a `topics` list — choose from these standard tags (use only tags that actually appear in the minutes):
+
+`AI`, `telehealth`, `opioids`, `IMLC`, `CME`, `scope-of-practice`, `disciplinary`, `rulemaking`, `workforce`, `patient-safety`, `controlled-substances`, `physician-wellness`, `licensing`, `legislation`, `public-health`
 
 ```markdown
+---
+topics: ["tag1", "tag2", "tag3"]
+board: {board_code}
+state: {state}
+---
+
 # {board_name} — Meeting Summary
 
 **Period:** [earliest date] to [latest date]
 **Meetings analyzed:** [count]
 
 ## Key Topics Discussed
+- Topic description ([YYYY-MM-DD](/board/{state}/{board_code}#YYYY-MM-DD))
 - ...
 
 ## Notable Actions
+- Specific action with date citation ([YYYY-MM-DD](/board/{state}/{board_code}#YYYY-MM-DD))
 - ...
 
 ## Recurring Themes
@@ -71,7 +89,14 @@ Write the summary as a Markdown document with this structure:
 
 ## Noteworthy Items
 - ...
+
+## Sources
+| # | Date | Board | Source |
+|---|------|-------|--------|
+| 1 | YYYY-MM-DD | {board_name} | [Minutes page]({board_code}_MINUTES_URL) |
 ```
+
+For the Sources table, list each meeting date referenced in the summary. Use this URL as the source link: {minutes_url or 'N/A'}
 
 ## Meeting Minutes Data
 
@@ -108,22 +133,18 @@ def national_synthesis_prompt(
 
 ## Task
 
-Synthesize the per-board summaries provided below into a comprehensive national landscape report.
+Synthesize the per-board summaries provided below into a comprehensive national landscape report with full citations.
 
 ## Instructions
 
 1. Read all {board_count} board summaries carefully.
-2. Produce a national landscape report in Markdown format with the following sections:
-   - **Executive Summary** — 2-3 paragraph overview of the national landscape.
-   - **Top Topics Nationally** — The most common topics across all boards, ranked by prevalence. Note how many boards discussed each topic.
-   - **Regional Patterns** — Topics or actions concentrated in specific regions or state groups (e.g., Northeast, South, West Coast, compact states).
-   - **Emerging Trends** — Topics that appear to be new or growing in the last 12 months.
-   - **Notable Outliers** — Boards taking unusual or pioneering actions that other boards haven't adopted.
-   - **Disciplinary Patterns** — Common types of disciplinary actions, if reported in the minutes.
-   - **Recommendations for FSMB** — Based on the landscape, what should FSMB be aware of or consider acting on.
-3. Be specific — name states and boards when citing examples.
-4. Write in a professional, analytical tone suitable for FSMB leadership.
-5. Target 2000-4000 words depending on volume of source material.
+2. Produce a national landscape report in Markdown format with the sections listed below.
+3. **Every factual claim MUST include an inline citation** linking to the specific board and meeting. Use the citation links already present in the per-board summaries — preserve them in your synthesis.
+4. When citing a board action, use the format: `([STATE Board, YYYY-MM-DD](/board/STATE/CODE#YYYY-MM-DD))` — these are clickable links in the boardpulse dashboard.
+5. Include a **Bibliography** section at the end with numbered footnotes linking to the original board websites.
+6. Be specific — name states and boards when citing examples.
+7. Write in a professional, analytical tone suitable for FSMB leadership.
+8. Target 3000-5000 words depending on volume of source material.
 
 ## Output Format
 
@@ -142,7 +163,7 @@ Write the report as a Markdown document:
 
 ## Top Topics Nationally
 
-...
+1. **Topic** — *N boards.* Description with citations ([STATE, YYYY-MM-DD](/board/STATE/CODE#YYYY-MM-DD))...
 
 ## Regional Patterns
 
@@ -163,7 +184,18 @@ Write the report as a Markdown document:
 ## Recommendations for FSMB
 
 ...
+
+---
+
+## Bibliography
+
+| # | Board | State | Source URL |
+|---|-------|-------|-----------|
+| 1 | Board Name | ST | [Minutes page](https://...) |
+| 2 | ... | ... | ... |
 ```
+
+List every board referenced in the report in the bibliography, with a link to their official minutes page.
 
 ## Per-Board Summaries
 

@@ -1,0 +1,222 @@
+{% extends "base.html" %}
+
+{% set page_title = board.name %}
+{% block title %}{{ board.name }} — boardpulse{% endblock %}
+
+{% block body %}
+<div x-data="{ expandedMeeting: null, lightboxOpen: false, lightboxSrc: '' }">
+
+    <!-- Board Header -->
+    <section class="bg-bp-frost border-b border-bp-cloud">
+        <div class="max-w-[1400px] mx-auto px-6 py-8">
+            <div class="flex items-start justify-between">
+                <div>
+                    <div class="flex items-center gap-2.5 mb-1">
+                        <h1 class="text-2xl font-bold text-bp-navy tracking-tight">{{ board.name }}</h1>
+                        <span class="px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded
+                            {% if board.board_type == 'MD' %}badge-md
+                            {% elif board.board_type == 'DO' %}badge-do
+                            {% else %}badge-combined{% endif %}">
+                            {{ board.board_type }}
+                        </span>
+                    </div>
+                    <div class="flex items-center gap-3 text-sm text-bp-steel">
+                        <span class="font-mono text-bp-mist">{{ board.code }}</span>
+                        <span class="text-bp-cloud">|</span>
+                        <span>{{ state_name }}</span>
+                    </div>
+                </div>
+                {% if board.minutes_url %}
+                <button class="flex items-center gap-1.5 px-4 py-2 text-xs font-medium rounded-lg bg-bp-teal text-white hover:bg-bp-teal-d transition-colors shadow-sm"
+                        hx-post="/collect/{{ board.code }}" hx-target="#collect-status" hx-swap="innerHTML">
+                    <i data-lucide="download" class="w-3.5 h-3.5"></i> Collect New
+                </button>
+                {% endif %}
+            </div>
+            <div id="collect-status" class="mt-3"></div>
+
+            <!-- Board Info Grid -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
+                <!-- Stats -->
+                <div class="flex items-center gap-3 p-3 bg-white rounded-lg border border-bp-cloud">
+                    <i data-lucide="calendar-days" class="w-5 h-5 text-bp-teal"></i>
+                    <div>
+                        <div class="text-lg font-bold text-bp-navy">{{ meeting_data | length }}</div>
+                        <div class="text-[10px] text-bp-mist uppercase tracking-wider">Meetings</div>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3 p-3 bg-white rounded-lg border border-bp-cloud">
+                    <i data-lucide="sparkles" class="w-5 h-5 text-bp-gold"></i>
+                    <div>
+                        <div class="text-lg font-bold text-bp-navy">{{ meeting_data | selectattr('meeting.summary') | list | length }}</div>
+                        <div class="text-[10px] text-bp-mist uppercase tracking-wider">Summaries</div>
+                    </div>
+                </div>
+
+                <!-- Contact -->
+                {% if board.homepage %}
+                <a href="{{ board.homepage }}" target="_blank" rel="noopener"
+                   class="flex items-center gap-3 p-3 bg-white rounded-lg border border-bp-cloud hover:border-bp-teal/30 transition-colors">
+                    <i data-lucide="globe" class="w-5 h-5 text-bp-steel"></i>
+                    <div class="text-xs text-bp-steel truncate">Homepage</div>
+                    <i data-lucide="external-link" class="w-3 h-3 text-bp-cloud ml-auto"></i>
+                </a>
+                {% endif %}
+                {% if board.minutes_url %}
+                <a href="{{ board.minutes_url }}" target="_blank" rel="noopener"
+                   class="flex items-center gap-3 p-3 bg-white rounded-lg border border-bp-cloud hover:border-bp-teal/30 transition-colors">
+                    <i data-lucide="file-text" class="w-5 h-5 text-bp-steel"></i>
+                    <div class="text-xs text-bp-steel truncate">Minutes Page</div>
+                    <i data-lucide="external-link" class="w-3 h-3 text-bp-cloud ml-auto"></i>
+                </a>
+                {% endif %}
+            </div>
+
+            <!-- Topics -->
+            {% if topic_counts %}
+            <div class="mt-4 flex flex-wrap gap-1.5">
+                {% for tag, count in topic_counts %}
+                <a href="/topic/{{ tag }}" class="tag-pill">
+                    {{ tag | replace("-", " ") }}
+                    <span class="text-[10px] text-bp-mist font-mono">{{ count }}</span>
+                </a>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+    </section>
+
+    <!-- Meetings Timeline -->
+    <section class="max-w-[1400px] mx-auto px-6 py-8">
+        <h2 class="section-label flex items-center gap-1.5 mb-4">
+            <i data-lucide="calendar-days" class="w-3.5 h-3.5"></i> Meeting Timeline
+        </h2>
+
+        {% if meeting_data %}
+        <div class="space-y-3 stagger-in">
+            {% for item in meeting_data %}
+            {% set m = item.meeting %}
+            {% set docs = item.documents %}
+            <div class="meeting-card" id="meeting-{{ m.meeting_date.isoformat() }}" data-date="{{ m.meeting_date.isoformat() }}">
+                <a id="{{ m.meeting_date.isoformat() }}" class="scroll-mt-20"></a>
+                <div class="flex items-center gap-4 px-5 py-4">
+                    <!-- Date block -->
+                    <div class="flex-none w-16 text-center">
+                        <div class="text-xl font-bold text-bp-navy leading-none">{{ m.meeting_date.strftime('%d') }}</div>
+                        <div class="text-[10px] uppercase text-bp-mist tracking-wider">{{ m.meeting_date.strftime('%b %Y') }}</div>
+                    </div>
+
+                    <!-- Meeting info -->
+                    <div class="flex-1 min-w-0">
+                        <a href="/meeting/{{ m.id }}" class="text-sm font-medium text-bp-navy hover:text-bp-teal transition-colors">
+                            {{ m.title or 'Board Meeting' }}
+                        </a>
+                        <div class="flex items-center gap-3 mt-1">
+                            {% if m.meeting_type %}
+                            <span class="text-[10px] uppercase tracking-wider text-bp-mist bg-bp-frost px-1.5 py-0.5 rounded">{{ m.meeting_type }}</span>
+                            {% endif %}
+                            {% if m.topics %}
+                            <div class="flex gap-1">
+                                {% for tag in m.topics[:3] %}
+                                <span class="text-[10px] text-bp-steel">{{ tag | replace("-", " ") }}</span>
+                                {% if not loop.last %}<span class="text-bp-cloud">&bull;</span>{% endif %}
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="flex items-center gap-1.5 flex-none">
+                        {% if docs %}
+                        {% for doc in docs %}
+                        <a href="/meeting/{{ m.id }}" class="inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium bg-bp-frost text-bp-steel hover:bg-bp-teal/10 hover:text-bp-teal transition-colors" title="{{ doc.filename }}">
+                            {% if doc.doc_type == 'minutes' %}<i data-lucide="file-text" class="w-3 h-3"></i>
+                            {% elif doc.doc_type == 'agenda' %}<i data-lucide="list-checks" class="w-3 h-3"></i>
+                            {% else %}<i data-lucide="file" class="w-3 h-3"></i>{% endif %}
+                            {{ doc.doc_type | capitalize }}
+                        </a>
+                        {% endfor %}
+                        {% else %}
+                        <span class="inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium bg-amber-50 text-amber-500 border border-amber-200">
+                            <i data-lucide="file-x" class="w-3 h-3"></i> No document on file
+                        </span>
+                        {% endif %}
+                        {% if m.summary %}
+                        <button @click="expandedMeeting = expandedMeeting === {{ m.id }} ? null : {{ m.id }}"
+                                class="p-2 rounded-lg hover:bg-bp-frost text-bp-mist hover:text-bp-teal transition-colors" title="Toggle AI summary">
+                            <i data-lucide="sparkles" class="w-4 h-4"></i>
+                        </button>
+                        {% endif %}
+                        <a href="/meeting/{{ m.id }}" class="p-2 rounded-lg hover:bg-bp-frost text-bp-mist hover:text-bp-navy transition-colors" title="Full detail">
+                            <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                        </a>
+                    </div>
+                </div>
+
+                {% if m.summary %}
+                <div class="summary-accordion" :class="{ 'open': expandedMeeting === {{ m.id }} }">
+                    <div class="px-5 pb-4 border-t border-bp-cloud pt-4">
+                        <div class="flex items-center gap-1.5 mb-2 text-[10px] uppercase tracking-wider text-bp-gold font-semibold">
+                            <i data-lucide="sparkles" class="w-3 h-3"></i> AI Summary
+                        </div>
+                        <div class="summary-content text-xs text-bp-steel leading-relaxed max-w-none"
+                             data-markdown="{{ m.summary | e }}"></div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-16 text-bp-mist">
+            <i data-lucide="calendar-x" class="w-10 h-10 mx-auto mb-3 text-bp-cloud"></i>
+            <p class="text-sm font-medium text-bp-steel">No meetings collected yet</p>
+            {% if board.discovery_status == 'found' %}
+            <p class="text-xs text-bp-mist mt-1">Click <strong>Collect New</strong> to scrape meeting minutes.</p>
+            {% endif %}
+        </div>
+        {% endif %}
+    </section>
+
+    {% if board.last_scraped_at %}
+    <div class="max-w-[1400px] mx-auto px-6 pb-8">
+        <div class="text-[10px] text-bp-mist flex items-center gap-1 font-mono">
+            <i data-lucide="clock" class="w-3 h-3"></i>
+            Last scraped: {{ board.last_scraped_at.strftime('%Y-%m-%d %H:%M UTC') }}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- LIGHTBOX -->
+    <div class="lightbox-overlay" :class="{ 'active': lightboxOpen }" @click="lightboxOpen = false">
+        <img :src="lightboxSrc" @click.stop class="cursor-zoom-out" @click="lightboxOpen = false">
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        renderMarkdownSummaries();
+
+        // If page has a date hash (from report citations), scroll to and highlight that meeting
+        const hash = window.location.hash.replace('#', '');
+        if (hash && /^\d{4}-\d{2}-\d{2}$/.test(hash)) {
+            const target = document.querySelector(`[data-date="${hash}"]`);
+            if (target) {
+                // Scroll into view
+                setTimeout(() => {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    // Highlight with a pulse
+                    target.style.borderColor = '#139AD0';
+                    target.style.boxShadow = '0 0 0 3px rgba(19, 154, 208, 0.2)';
+                    // Auto-expand the summary if it has one
+                    const btn = target.querySelector('button[title="Toggle AI summary"]');
+                    if (btn) btn.click();
+                }, 300);
+            }
+        }
+    });
+</script>
+{% endblock %}

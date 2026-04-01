@@ -83,6 +83,7 @@ async def prepare_board_bundle(board_code: str) -> Path | None:
         state=board.state,
         board_code=board.code,
         meetings=meetings_data,
+        minutes_url=board.minutes_url or "",
     )
 
     prompt_path = REPORTS_DIR / f"{board_code}_prompt.md"
@@ -137,12 +138,34 @@ async def prepare_all_bundles(board_code: str | None = None) -> list[Path]:
     return prompt_paths
 
 
+def _parse_summary_frontmatter(text: str) -> tuple[list[str], str]:
+    """Extract YAML frontmatter topics from a summary file.
+
+    Returns (topics_list, body_text). If no frontmatter found, returns ([], text).
+    """
+    import re
+    m = re.match(r'^---\s*\n(.*?)\n---\s*\n', text, re.DOTALL)
+    if not m:
+        return [], text
+
+    frontmatter = m.group(1)
+    body = text[m.end():]
+
+    # Extract topics list from YAML (simple parser — no pyyaml dependency)
+    topics = []
+    tm = re.search(r'topics:\s*\[([^\]]*)\]', frontmatter)
+    if tm:
+        raw = tm.group(1)
+        topics = [t.strip().strip('"').strip("'") for t in raw.split(",") if t.strip()]
+
+    return topics, body
+
+
 async def ingest_board_summary(board_code: str) -> bool:
     """Read a completed summary file and store it in the database.
 
-    Looks for data/reports/{board_code}_summary.md, reads it, and stores
-    the full text in the summary field of each meeting for that board
-    (as a board-level summary, not per-meeting).
+    Parses YAML frontmatter for topic tags, then stores the summary text
+    and topics on all meetings for that board in the collection window.
 
     Returns True if successful.
     """
@@ -157,6 +180,9 @@ async def ingest_board_summary(board_code: str) -> bool:
     if not summary_text:
         print(f"Summary file is empty: {summary_path}")
         return False
+
+    # Parse frontmatter for topics
+    topics, body = _parse_summary_frontmatter(summary_text)
 
     cutoff = date.today() - timedelta(days=365)
 
@@ -175,12 +201,15 @@ async def ingest_board_summary(board_code: str) -> bool:
             .where(Meeting.meeting_date >= cutoff)
         )).scalars().all()
 
-        # Store the board-level summary on all meetings in the period
+        # Store the board-level summary and topics on all meetings in the period
         for meeting in meetings:
             meeting.summary = summary_text
+            if topics:
+                meeting.topics = topics
         await session.commit()
 
-    print(f"  Ingested summary for {board_code} ({len(meetings)} meetings updated)")
+    topic_str = f", topics={topics}" if topics else ""
+    print(f"  Ingested summary for {board_code} ({len(meetings)} meetings updated{topic_str})")
     return True
 
 

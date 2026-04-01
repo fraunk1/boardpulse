@@ -7,6 +7,7 @@ DATA_DIR = PROJECT_ROOT / "data"
 SCREENSHOTS_DIR = DATA_DIR / "screenshots"
 DOCUMENTS_DIR = DATA_DIR / "documents"
 REPORTS_DIR = DATA_DIR / "reports"
+EXHIBITS_DIR = DATA_DIR / "exhibits"
 DB_PATH = PROJECT_ROOT / "boardpulse.db"
 
 # Database
@@ -24,5 +25,5 @@ USER_AGENT = (
 FSMB_CONTACT_URL = "https://www.fsmb.org/contact-a-state-medical-board/"
 
 # Ensure data directories exist
-for d in [SCREENSHOTS_DIR, DOCUMENTS_DIR, REPORTS_DIR]:
+for d in [SCREENSHOTS_DIR, DOCUMENTS_DIR, REPORTS_DIR, EXHIBITS_DIR]:
     d.mkdir(parents=True, exist_ok=True)

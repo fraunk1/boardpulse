@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% set page_title = state_name %}
+{% block title %}{{ state_name }} — boardpulse{% endblock %}
+
+{% block body %}
+<div class="max-w-[1400px] mx-auto px-6 py-8">
+
+    <!-- State Header -->
+    <div class="mb-8">
+        <div class="flex items-center gap-3 mb-2">
+            <div class="w-10 h-10 rounded-xl bg-bp-frost border border-bp-cloud flex items-center justify-center">
+                <span class="text-lg font-bold font-mono text-bp-navy">{{ state_abbr }}</span>
+            </div>
+            <div>
+                <h1 class="text-2xl font-bold text-bp-navy tracking-tight">{{ state_name }}</h1>
+                <p class="text-sm text-bp-steel">{{ board_data | length }} board{{ 's' if board_data | length != 1 else '' }} monitored</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Board Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 stagger-in">
+        {% for item in board_data %}
+        {% set b = item.board %}
+        <a href="/board/{{ b.code }}" class="board-card block group">
+            <div class="flex items-start justify-between mb-3">
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h3 class="text-base font-semibold text-bp-navy group-hover:text-bp-teal transition-colors">{{ b.name }}</h3>
+                        <span class="px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded
+                            {% if b.board_type == 'MD' %}badge-md
+                            {% elif b.board_type == 'DO' %}badge-do
+                            {% else %}badge-combined{% endif %}">
+                            {{ b.board_type }}
+                        </span>
+                    </div>
+                    <div class="text-xs font-mono text-bp-mist mt-0.5">{{ b.code }}</div>
+                </div>
+                <i data-lucide="chevron-right" class="w-4 h-4 text-bp-cloud group-hover:text-bp-teal transition-colors"></i>
+            </div>
+
+            <!-- Board stats -->
+            <div class="grid grid-cols-4 gap-3 mb-3">
+                <div>
+                    <div class="text-lg font-bold text-bp-navy">{{ item.meetings }}</div>
+                    <div class="text-[10px] text-bp-mist uppercase tracking-wider">Meetings</div>
+                </div>
+                <div>
+                    <div class="text-lg font-bold {% if item.meetings_with_files > 0 %}text-bp-teal{% else %}text-amber-500{% endif %}">{{ item.meetings_with_files }}</div>
+                    <div class="text-[10px] text-bp-mist uppercase tracking-wider">On File</div>
+                </div>
+                <div>
+                    <div class="text-lg font-bold text-bp-gold">{{ item.summaries }}</div>
+                    <div class="text-[10px] text-bp-mist uppercase tracking-wider">Summaries</div>
+                </div>
+                <div>
+                    {% if item.meetings > 0 and item.meetings_with_files == 0 %}
+                    <div class="text-lg font-bold text-amber-500">N/A</div>
+                    <div class="text-[10px] text-amber-400 uppercase tracking-wider">No Docs</div>
+                    {% else %}
+                    <div class="text-lg font-bold text-bp-steel">{{ item.documents }}</div>
+                    <div class="text-[10px] text-bp-mist uppercase tracking-wider">Files</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Topics -->
+            {% if item.topics %}
+            <div class="flex flex-wrap gap-1">
+                {% for tag in item.topics[:6] %}
+                <span class="tag-pill text-[10px]">{{ tag | replace("-", " ") }}</span>
+                {% endfor %}
+                {% if item.topics | length > 6 %}
+                <span class="tag-pill text-[10px]">+{{ item.topics | length - 6 }}</span>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            <!-- Status indicator -->
+            <div class="flex items-center gap-1.5 mt-3 pt-3 border-t border-bp-cloud/50">
+                {% if item.meetings > 0 %}
+                <span class="w-1.5 h-1.5 rounded-full bg-bp-teal"></span>
+                <span class="text-[10px] text-bp-mist">Active — {{ item.meetings }} meetings collected</span>
+                {% elif b.discovery_status == 'found' %}
+                <span class="w-1.5 h-1.5 rounded-full bg-bp-gold"></span>
+                <span class="text-[10px] text-bp-mist">Discovered — ready for collection</span>
+                {% else %}
+                <span class="w-1.5 h-1.5 rounded-full bg-bp-cloud"></span>
+                <span class="text-[10px] text-bp-mist">Pending discovery</span>
+                {% endif %}
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

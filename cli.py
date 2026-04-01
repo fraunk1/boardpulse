@@ -48,6 +48,11 @@ def main():
     srv.add_argument("--host", default="0.0.0.0", help="Bind address (default: 0.0.0.0)")
     srv.add_argument("--port", type=int, default=8099, help="Port (default: 8099)")
 
+    # exhibits
+    exh = sub.add_parser("exhibits", help="Generate highlighted exhibit images from report citations")
+    exh.add_argument("--report", type=str, help="Path to landscape report (default: latest)")
+    exh.add_argument("--pdf", action="store_true", help="Also build a PDF with exhibits as appendix pages")
+
     # status
     sub.add_parser("status", help="Show collection status for all boards")
 
@@ -91,6 +96,9 @@ async def dispatch(args):
 
     elif args.command == "summarize":
         await handle_summarize(args)
+
+    elif args.command == "exhibits":
+        await handle_exhibits(args)
 
     elif args.command == "status":
         await show_status()
@@ -205,6 +213,32 @@ async def handle_summarize(args):
         print("  2. Each subagent reads the prompt and writes the summary file")
         print("  3. Run 'python cli.py summarize --ingest' to store summaries in the DB")
         print("  4. Run 'python cli.py summarize --national' to prepare the synthesis prompt")
+
+
+async def handle_exhibits(args):
+    """Generate exhibit images from report citations, optionally build PDF."""
+    from app.extractor.exhibits import generate_all_exhibits
+    from app.config import REPORTS_DIR
+    from pathlib import Path
+
+    # Find report
+    if args.report:
+        report_path = Path(args.report)
+    else:
+        reports = sorted(REPORTS_DIR.glob("*-board-landscape.md"), reverse=True)
+        if not reports:
+            print("No landscape report found. Run 'summarize --national' first.")
+            return
+        report_path = reports[0]
+
+    print(f"Generating exhibits from: {report_path.name}\n")
+    results = generate_all_exhibits(report_path)
+
+    if args.pdf:
+        from app.extractor.exhibit_pdf import build_exhibit_report
+        pdf_path = build_exhibit_report(report_path, results)
+        if pdf_path:
+            print(f"\nExhibit report PDF: {pdf_path}")
 
 
 async def show_status():

@@ -43,10 +43,12 @@ DATE_PATTERNS = [
     re.compile(r'(\d{4}-\d{2}-\d{2})'),
     # "2026_01_15" — embedded in filenames (e.g. AK board books)
     re.compile(r'(\d{4}_\d{2}_\d{2})'),
-    # "01/15/2026" or "03/20/2026"
-    re.compile(r'(\d{1,2}/\d{1,2}/\d{4})'),
+    # "01/15/2026" or "03/20/2026" or "12/04/25" (2-digit year)
+    re.compile(r'(\d{1,2}/\d{1,2}/\d{2,4})'),
     # "01.15.2026" or "01.15.26" — e.g. HI Medical Board "01.16.25 Meeting Minutes"
     re.compile(r'(\d{1,2}\.\d{1,2}\.\d{2,4})'),
+    # "8-7-2025" or "12-04-25" — dashes between M-D-Y (MI, OH boards)
+    re.compile(r'(\d{1,2}-\d{1,2}-\d{2,4})'),
     # "January 2026" or "Jan 2026" — month+year only (e.g. MS_MD "January 2026 Board Meeting Minutes")
     re.compile(
         r'((?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?'
@@ -86,8 +88,11 @@ def parse_date(text: str) -> date | None:
             "%Y-%m-%d",    # 2026-01-15
             "%Y_%m_%d",    # 2026_01_15 (filename-embedded dates)
             "%m/%d/%Y",    # 01/15/2026
+            "%m/%d/%y",    # 12/04/25 (2-digit year, e.g. MI_DO)
             "%m.%d.%Y",    # 01.15.2026
             "%m.%d.%y",    # 01.15.26 (2-digit year, e.g. HI Medical Board)
+            "%m-%d-%Y",    # 8-7-2025 (dashes, e.g. MI_DO filenames)
+            "%m-%d-%y",    # 8-7-25 (dashes, 2-digit year)
             "%B %Y",       # January 2026 (month+year only — assign day=1)
             "%b %Y",       # Jan 2026 (month+year only)
         ):
@@ -98,7 +103,7 @@ def parse_date(text: str) -> date | None:
     return None
 
 
-def is_within_window(d: date, months: int = 12) -> bool:
+def is_within_window(d: date, months: int = 24) -> bool:
     """Return True if *d* is within the last *months* months from today."""
     cutoff = date.today() - timedelta(days=months * 30)
     return d >= cutoff
@@ -111,7 +116,7 @@ def is_within_window(d: date, months: int = 12) -> bool:
 _EXTRACT_LINKS_JS = """() => {
     const docExts = ['.pdf', '.docx', '.doc', '.xlsx', '.xls'];
     // Date patterns to detect whether an ancestor element contains a date
-    const dateRe = /(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\s+\\d{1,2}|\\d{1,2}\\/\\d{1,2}\\/\\d{4}|\\d{4}[-_]\\d{2}[-_]\\d{2}/i;
+    const dateRe = /(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\s+\\d{1,2}|\\d{1,2}[\\/.-]\\d{1,2}[\\/.-]\\d{2,4}|\\d{4}[-_]\\d{2}[-_]\\d{2}/i;
     const yearOnlyRe = /^\\s*(20\\d{2})\\s*$/;
     const results = [];
     for (const a of document.querySelectorAll('a[href]')) {
@@ -119,7 +124,10 @@ _EXTRACT_LINKS_JS = """() => {
         const text = (a.innerText || a.textContent || '').trim();
         const parentText = (a.parentElement ? a.parentElement.innerText || '' : '').trim();
         const lowerHref = href.toLowerCase();
-        const isDoc = docExts.some(ext => lowerHref.endsWith(ext));
+        // Strip query string and fragment for extension check (CMS URLs
+        // like ...minutes.pdf?rev=abc&hash=def must still match)
+        const hrefPath = lowerHref.split('?')[0].split('#')[0];
+        const isDoc = docExts.some(ext => hrefPath.endsWith(ext));
 
         // Walk up to 8 ancestor levels to find context with a date.
         // Two strategies:
