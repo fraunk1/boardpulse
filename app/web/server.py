@@ -434,28 +434,31 @@ async def meeting_view(request: Request, meeting_id: int):
     # Only include documents whose files actually exist on disk
     docs = [d for d in docs_all if (DOCUMENTS_DIR / board.code / d.filename).exists()]
 
-    # Check for exhibits
-    exhibits = []
-    exhibit_base = EXHIBITS_DIR / board.code
-    if exhibit_base.exists():
-        for exhibit_dir in sorted(exhibit_base.iterdir()):
-            if not exhibit_dir.is_dir():
-                continue
-            pages = sorted(exhibit_dir.glob("page_*.png"))
-            if pages:
-                exhibits.append({
-                    "name": exhibit_dir.name,
-                    "page_count": len(pages),
-                    "thumbnail": f"/exhibit/{board.code}/{exhibit_dir.name}/1",
-                })
+    # Get page counts for PDF documents (for page-image rendering)
+    doc_pages = []
+    for d in docs:
+        file_path = DOCUMENTS_DIR / board.code / d.filename
+        page_count = 0
+        if file_path.suffix.lower() == ".pdf":
+            try:
+                import fitz
+                pdf = fitz.open(str(file_path))
+                page_count = len(pdf)
+                pdf.close()
+            except Exception:
+                pass
+        doc_pages.append({
+            "doc": d,
+            "page_count": page_count,
+            "is_pdf": file_path.suffix.lower() == ".pdf",
+        })
 
     state_name = STATE_NAMES.get(board.state, board.state)
 
     return templates.TemplateResponse(request, "meeting.html", context={
         "meeting": meeting,
         "board": board,
-        "documents": docs,
-        "exhibits": exhibits,
+        "doc_pages": doc_pages,
         "state_name": state_name,
         "breadcrumbs": [
             {"label": "National", "url": "/"},
@@ -528,8 +531,15 @@ async def serve_exhibit_page(board_code: str, exhibit_name: str, page_num: int):
 
 @app.get("/report", response_class=HTMLResponse)
 async def national_report(request: Request):
-    """Serve the latest national landscape report as rendered HTML."""
+    """Serve the latest national landscape report with deep-linked citations.
+
+    Citation links are rewritten from /board/{state}/{code}#{date}
+    to /meeting/{id}#page-{best_page} so clicking a citation jumps
+    directly to the evidence page in the document viewer.
+    """
     import markdown
+    import re as _re
+    import fitz
 
     report_files = sorted(REPORTS_DIR.glob("*-board-landscape.md"), reverse=True)
     if not report_files:
@@ -537,6 +547,63 @@ async def national_report(request: Request):
 
     report_path = report_files[0]
     md_text = report_path.read_text(encoding="utf-8")
+
+    # Build citation index: map (board_code, date) → (meeting_id, best_page)
+    citation_index = {}
+    async with db.async_session() as session:
+        all_meetings = (await session.execute(
+            select(Meeting, Board)
+            .join(Board, Meeting.board_id == Board.id)
+        )).all()
+        for m, b in all_meetings:
+            citation_index[(b.code, m.meeting_date.isoformat())] = m.id
+
+    # Rewrite citation links in markdown before rendering
+    # Pattern: [text](/board/{state}/{code}#{date})
+    def _rewrite_citation(match):
+        link_text = match.group(1)
+        state = match.group(2)
+        code = match.group(3)
+        date_str = match.group(4)
+
+        meeting_id = citation_index.get((code, date_str))
+        if meeting_id:
+            # Find best page for the claim text (context before the link)
+            best_page = 1
+            doc_path = DOCUMENTS_DIR / code
+            if doc_path.exists():
+                # Get the claim text from preceding context
+                start = max(0, match.start() - 300)
+                claim_text = md_text[start:match.start()].strip()
+                # Find the PDF for this date
+                for pdf_file in doc_path.glob(f"{date_str}*.pdf"):
+                    try:
+                        doc = fitz.open(str(pdf_file))
+                        # Simple best-page: find page with most matching words
+                        words = [w for w in _re.sub(r'[^\w\s]', '', claim_text).split() if len(w) >= 5][:8]
+                        skip = {'board', 'meeting', 'state', 'medical', 'discussed', 'which', 'their', 'about', 'would'}
+                        words = [w for w in words if w.lower() not in skip]
+                        best_score = 0
+                        for idx in range(len(doc)):
+                            page_text = doc[idx].get_text("text").lower()
+                            score = sum(1 for w in words if w.lower() in page_text)
+                            if score > best_score:
+                                best_score = score
+                                best_page = idx + 1
+                        doc.close()
+                        break  # use first matching PDF
+                    except Exception:
+                        pass
+
+            return f"[{link_text}](/meeting/{meeting_id}#page-{best_page})"
+        return match.group(0)  # leave unchanged if no match
+
+    md_text = _re.sub(
+        r'\[([^\]]+)\]\(/board/(\w{2})/(\w+_\w+)#(\d{4}-\d{2}-\d{2})\)',
+        _rewrite_citation,
+        md_text,
+    )
+
     html_body = markdown.markdown(md_text, extensions=["tables", "fenced_code"])
 
     return templates.TemplateResponse(request, "report.html", context={
@@ -552,6 +619,41 @@ async def national_report(request: Request):
 # File Serving
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# On-Demand PDF Page Renderer
+# ---------------------------------------------------------------------------
+
+@app.get("/document-page/{board_code}/{filename}/{page_num}")
+async def render_document_page(board_code: str, filename: str, page_num: int):
+    """Render a single PDF page as a PNG image on demand."""
+    import fitz
+    from fastapi.responses import Response
+
+    file_path = DOCUMENTS_DIR / board_code / filename
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="Document not found")
+    if not str(file_path.resolve()).startswith(str(DOCUMENTS_DIR.resolve())):
+        raise HTTPException(status_code=403, detail="Access denied")
+    if file_path.suffix.lower() != ".pdf":
+        raise HTTPException(status_code=400, detail="Not a PDF")
+
+    try:
+        doc = fitz.open(str(file_path))
+        if page_num < 1 or page_num > len(doc):
+            doc.close()
+            raise HTTPException(status_code=404, detail="Page not found")
+        page = doc[page_num - 1]
+        pix = page.get_pixmap(dpi=150)
+        img_bytes = pix.tobytes("png")
+        doc.close()
+        return Response(content=img_bytes, media_type="image/png",
+                        headers={"Cache-Control": "public, max-age=86400"})
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
 @app.get("/screenshot/{path:path}")
 async def serve_screenshot(path: str):
     file_path = SCREENSHOTS_DIR / path
@@ -564,6 +666,7 @@ async def serve_screenshot(path: str):
 
 @app.get("/document/{path:path}")
 async def serve_document(path: str):
+    """Serve a document file. PDFs render inline (no download prompt)."""
     file_path = DOCUMENTS_DIR / path
     if not file_path.exists() or not file_path.is_file():
         raise HTTPException(status_code=404, detail="Document not found")
@@ -571,7 +674,12 @@ async def serve_document(path: str):
         raise HTTPException(status_code=403, detail="Access denied")
     suffix = file_path.suffix.lower()
     media_types = {".pdf": "application/pdf", ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document", ".html": "text/html", ".txt": "text/plain"}
-    return FileResponse(str(file_path), media_type=media_types.get(suffix, "application/octet-stream"), filename=file_path.name)
+    media_type = media_types.get(suffix, "application/octet-stream")
+    # PDFs and HTML serve inline (viewable in browser). Others prompt download.
+    if suffix in (".pdf", ".html", ".htm", ".txt"):
+        return FileResponse(str(file_path), media_type=media_type)
+    else:
+        return FileResponse(str(file_path), media_type=media_type, filename=file_path.name)
 
 
 # ---------------------------------------------------------------------------
