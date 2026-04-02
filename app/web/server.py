@@ -645,6 +645,57 @@ async def pipeline_list(request: Request):
     })
 
 
+@app.get("/pipeline/{run_id}", response_class=HTMLResponse)
+async def pipeline_detail(request: Request, run_id: int):
+    """Pipeline run detail — stats, digest, event timeline."""
+    import markdown as md_lib
+
+    async with db.async_session() as session:
+        run = await session.get(PipelineRun, run_id)
+        if not run:
+            raise HTTPException(status_code=404, detail="Pipeline run not found")
+
+        events = (await session.execute(
+            select(PipelineEvent)
+            .where(PipelineEvent.run_id == run_id)
+            .order_by(PipelineEvent.timestamp)
+        )).scalars().all()
+
+    duration = None
+    if run.started_at and run.completed_at:
+        delta = run.completed_at - run.started_at
+        minutes = int(delta.total_seconds() // 60)
+        seconds = int(delta.total_seconds() % 60)
+        duration = f"{minutes}m {seconds}s" if minutes else f"{seconds}s"
+
+    digest_html = None
+    if run.digest_path:
+        digest_file = Path(run.digest_path)
+        if not digest_file.is_absolute():
+            from app.config import PROJECT_ROOT
+            digest_file = PROJECT_ROOT / digest_file
+        if digest_file.exists():
+            digest_md = digest_file.read_text(encoding="utf-8")
+            digest_html = md_lib.markdown(digest_md, extensions=["tables", "fenced_code"])
+
+    stages = {}
+    for e in events:
+        stages.setdefault(e.stage, []).append(e)
+
+    return templates.TemplateResponse(request, "pipeline_detail.html", context={
+        "run": run,
+        "events": events,
+        "stages": stages,
+        "duration": duration,
+        "digest_html": digest_html,
+        "breadcrumbs": [
+            {"label": "National", "url": "/"},
+            {"label": "Pipeline", "url": "/pipeline/"},
+        ],
+        "page_title": f"Run #{run_id}",
+    })
+
+
 # ---------------------------------------------------------------------------
 # File Serving
 # ---------------------------------------------------------------------------

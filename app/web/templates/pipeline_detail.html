@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+
+{% block title %}Pipeline Run #{{ run.id }} — boardpulse{% endblock %}
+
+{% block body %}
+<div class="max-w-[1400px] mx-auto px-6 py-8">
+
+    <div class="flex items-center justify-between mb-8">
+        <div>
+            <h1 class="text-2xl font-bold text-bp-navy tracking-tight">
+                Pipeline Run #{{ run.id }}
+            </h1>
+            <p class="text-sm text-bp-steel mt-1">
+                {{ run.started_at.strftime('%B %d, %Y at %H:%M UTC') if run.started_at else '' }}
+                {% if run.status == 'completed' %}
+                <span class="inline-flex items-center gap-1 ml-2 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Completed
+                </span>
+                {% elif run.status == 'running' %}
+                <span class="inline-flex items-center gap-1 ml-2 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                    <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span> Running
+                </span>
+                {% elif run.status == 'failed' %}
+                <span class="inline-flex items-center gap-1 ml-2 px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-700 border border-red-200">
+                    <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span> Failed
+                </span>
+                {% endif %}
+            </p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div class="bg-white border border-bp-cloud rounded-xl p-4">
+            <div class="text-[10px] font-mono text-bp-mist uppercase tracking-wider mb-1">New Meetings</div>
+            <div class="text-2xl font-bold text-bp-navy">{{ run.new_meetings_found }}</div>
+        </div>
+        <div class="bg-white border border-bp-cloud rounded-xl p-4">
+            <div class="text-[10px] font-mono text-bp-mist uppercase tracking-wider mb-1">New Documents</div>
+            <div class="text-2xl font-bold text-bp-navy">{{ run.new_documents_found }}</div>
+        </div>
+        <div class="bg-white border border-bp-cloud rounded-xl p-4">
+            <div class="text-[10px] font-mono text-bp-mist uppercase tracking-wider mb-1">Boards Summarized</div>
+            <div class="text-2xl font-bold text-bp-navy">{{ run.boards_summarized }}</div>
+        </div>
+        <div class="bg-white border border-bp-cloud rounded-xl p-4">
+            <div class="text-[10px] font-mono text-bp-mist uppercase tracking-wider mb-1">Duration</div>
+            <div class="text-2xl font-bold text-bp-navy">{{ duration or '—' }}</div>
+        </div>
+    </div>
+
+    {% if run.status == 'failed' and run.error_message %}
+    <div class="bg-red-50 border border-red-200 rounded-xl p-4 mb-8">
+        <div class="flex items-center gap-2 mb-2">
+            <i data-lucide="alert-circle" class="w-4 h-4 text-red-600"></i>
+            <span class="text-sm font-semibold text-red-700">Error</span>
+        </div>
+        <pre class="text-xs text-red-600 font-mono whitespace-pre-wrap">{{ run.error_message }}</pre>
+    </div>
+    {% endif %}
+
+    {% if digest_html %}
+    <div class="bg-white border border-bp-cloud rounded-xl overflow-hidden mb-8">
+        <div class="px-4 py-3 border-b border-bp-cloud bg-bp-frost/50 flex items-center gap-2">
+            <i data-lucide="file-text" class="w-4 h-4 text-bp-teal"></i>
+            <span class="text-sm font-semibold text-bp-slate">What's New Digest</span>
+        </div>
+        <div class="p-6 prose prose-sm max-w-none text-bp-navy">
+            {{ digest_html | safe }}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if run.report_path %}
+    <div class="bg-bp-frost/50 border border-bp-cloud rounded-xl p-4 mb-8 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+            <i data-lucide="book-open" class="w-5 h-5 text-bp-teal"></i>
+            <div>
+                <div class="text-sm font-semibold text-bp-navy">National Landscape Report</div>
+                <div class="text-xs text-bp-steel font-mono">{{ run.report_path }}</div>
+            </div>
+        </div>
+        <a href="/report" class="text-xs text-bp-teal hover:text-bp-teal-d font-semibold transition-colors">
+            View Report →
+        </a>
+    </div>
+    {% endif %}
+
+    <div class="bg-white border border-bp-cloud rounded-xl overflow-hidden" x-data="{ expanded: {} }">
+        <div class="px-4 py-3 border-b border-bp-cloud bg-bp-frost/50 flex items-center gap-2">
+            <i data-lucide="activity" class="w-4 h-4 text-bp-teal"></i>
+            <span class="text-sm font-semibold text-bp-slate">Event Timeline</span>
+            <span class="text-xs text-bp-mist ml-auto">{{ events | length }} events</span>
+        </div>
+
+        {% if events %}
+        <div class="divide-y divide-bp-cloud/50">
+            {% for event in events %}
+            <div class="px-4 py-2.5 flex items-center gap-3 text-sm hover:bg-bp-frost/30 transition-colors">
+                <span class="text-[10px] font-mono font-semibold uppercase tracking-wider px-2 py-0.5 rounded
+                    {% if event.stage == 'collect' %}bg-blue-50 text-blue-600 border border-blue-200
+                    {% elif event.stage == 'extract' %}bg-purple-50 text-purple-600 border border-purple-200
+                    {% elif event.stage == 'categorize' %}bg-teal-50 text-teal-600 border border-teal-200
+                    {% elif event.stage == 'summarize' %}bg-amber-50 text-amber-600 border border-amber-200
+                    {% elif event.stage == 'digest' %}bg-emerald-50 text-emerald-600 border border-emerald-200
+                    {% elif event.stage == 'report' %}bg-indigo-50 text-indigo-600 border border-indigo-200
+                    {% else %}bg-gray-50 text-gray-600 border border-gray-200{% endif %}
+                    " style="min-width: 80px; text-align: center;">{{ event.stage }}</span>
+
+                {% if event.event_type == 'completed' %}
+                <i data-lucide="check-circle" class="w-3.5 h-3.5 text-emerald-500 flex-shrink-0"></i>
+                {% elif event.event_type == 'failed' %}
+                <i data-lucide="x-circle" class="w-3.5 h-3.5 text-red-500 flex-shrink-0"></i>
+                {% elif event.event_type == 'started' %}
+                <i data-lucide="play" class="w-3.5 h-3.5 text-bp-teal flex-shrink-0"></i>
+                {% elif event.event_type == 'new_meeting' %}
+                <i data-lucide="calendar-plus" class="w-3.5 h-3.5 text-blue-500 flex-shrink-0"></i>
+                {% elif event.event_type == 'new_document' %}
+                <i data-lucide="file-plus" class="w-3.5 h-3.5 text-purple-500 flex-shrink-0"></i>
+                {% else %}
+                <i data-lucide="info" class="w-3.5 h-3.5 text-bp-mist flex-shrink-0"></i>
+                {% endif %}
+
+                {% if event.board_code %}
+                <span class="text-xs font-mono text-bp-teal font-semibold" style="min-width: 60px;">{{ event.board_code }}</span>
+                {% else %}
+                <span style="min-width: 60px;"></span>
+                {% endif %}
+
+                <span class="text-bp-slate flex-1">{{ event.detail or event.event_type }}</span>
+
+                <span class="text-[10px] font-mono text-bp-mist">{{ event.timestamp.strftime('%H:%M:%S') if event.timestamp else '' }}</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-8 text-sm text-bp-steel">No events recorded</div>
+        {% endif %}
+    </div>
+
+</div>
+{% endblock %}
