@@ -137,3 +137,58 @@ async def test_meeting_document_topics():
         await session.commit()
         await session.refresh(doc)
         assert doc.topics == ["licensing", "telehealth", "AI"]
+
+
+from app.pipeline.delta import snapshot_board_counts, compute_delta
+
+
+@pytest.mark.asyncio
+async def test_snapshot_board_counts():
+    """Snapshot returns {board_code: {meetings: N, documents: N}} for all boards."""
+    async with db.async_session() as session:
+        board = Board(
+            state="OH", code="OH_MD", name="Ohio Board",
+            board_type="combined", homepage="https://med.ohio.gov",
+            discovery_status="found",
+        )
+        session.add(board)
+        await session.commit()
+        await session.refresh(board)
+
+        m = Meeting(board_id=board.id, meeting_date=date(2026, 1, 15), title="Jan")
+        session.add(m)
+        await session.commit()
+        await session.refresh(m)
+
+        doc = MeetingDocument(
+            meeting_id=m.id, doc_type="minutes",
+            filename="jan.pdf", file_path="data/documents/OH_MD/jan.pdf",
+        )
+        session.add(doc)
+        await session.commit()
+
+    snap = await snapshot_board_counts()
+    assert "OH_MD" in snap
+    assert snap["OH_MD"]["meetings"] == 1
+    assert snap["OH_MD"]["documents"] == 1
+
+
+@pytest.mark.asyncio
+async def test_compute_delta():
+    """Delta shows differences between two snapshots."""
+    before = {"TX_MD": {"meetings": 5, "documents": 8}}
+    after = {"TX_MD": {"meetings": 7, "documents": 11}, "FL_MD": {"meetings": 2, "documents": 3}}
+
+    delta = compute_delta(before, after)
+    assert delta["TX_MD"]["new_meetings"] == 2
+    assert delta["TX_MD"]["new_documents"] == 3
+    assert delta["FL_MD"]["new_meetings"] == 2
+    assert delta["FL_MD"]["new_documents"] == 3
+
+
+@pytest.mark.asyncio
+async def test_compute_delta_no_changes():
+    """Delta returns empty dict when nothing changed."""
+    snap = {"TX_MD": {"meetings": 5, "documents": 8}}
+    delta = compute_delta(snap, snap)
+    assert delta == {}
