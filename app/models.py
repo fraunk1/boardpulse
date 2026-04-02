@@ -64,6 +64,7 @@ class MeetingDocument(Base):
     scraped_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     meeting: Mapped["Meeting"] = relationship(back_populates="documents")
+    pages: Mapped[list["DocumentPage"]] = relationship(back_populates="document", cascade="all, delete-orphan")
 
 
 class PipelineRun(Base):
@@ -100,3 +101,18 @@ class PipelineEvent(Base):
     detail: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     run: Mapped["PipelineRun"] = relationship(back_populates="events")
+
+
+class DocumentPage(Base):
+    __tablename__ = "document_pages"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    document_id: Mapped[int] = mapped_column(ForeignKey("meeting_documents.id"))
+    page_number: Mapped[int] = mapped_column()
+    image_path: Mapped[str] = mapped_column(Text)
+    thumb_path: Mapped[str] = mapped_column(Text)
+    topics: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    tagged_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    rendered_at: Mapped[datetime] = mapped_column(DateTime)
+
+    document: Mapped["MeetingDocument"] = relationship(back_populates="pages")
