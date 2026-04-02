@@ -122,8 +122,21 @@
         </div>
     </footer>
 
+    <!-- Lightbox -->
+    {% include "partials/lightbox.html" %}
+
     <script>
-        document.addEventListener('DOMContentLoaded', () => lucide.createIcons());
+        document.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+
+            // Lightbox event listener
+            window.addEventListener('lightbox-open', (e) => {
+                const lb = document.querySelector('[x-data*="lightbox"]');
+                if (lb && lb.__x) {
+                    lb.__x.$data.show(e.detail.pageId, e.detail.imageSrc, e.detail.context, e.detail.detail, e.detail.topics);
+                }
+            });
+        });
         document.addEventListener('htmx:afterSwap', () => {
             lucide.createIcons();
             renderMarkdownSummaries();

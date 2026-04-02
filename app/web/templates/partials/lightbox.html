@@ -1,0 +1,69 @@
+<!-- Lightbox overlay — Alpine.js component, included in base.html -->
+<div x-data="lightbox()" x-show="open" x-cloak
+     class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+     @keydown.escape.window="close()"
+     @click.self="close()">
+
+    <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden flex flex-col"
+         @click.stop>
+        <!-- Header -->
+        <div class="px-4 py-3 border-b border-bp-cloud bg-bp-frost/50 flex items-center justify-between flex-shrink-0">
+            <div>
+                <div class="text-sm font-semibold text-bp-navy" x-text="context"></div>
+                <div class="text-xs text-bp-steel" x-text="detail"></div>
+            </div>
+            <div class="flex items-center gap-3">
+                <a :href="viewerUrl" class="text-xs text-bp-teal hover:text-bp-teal-d font-semibold transition-colors">
+                    Open in viewer →
+                </a>
+                <button @click="close()" class="text-bp-mist hover:text-bp-navy transition-colors">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Image -->
+        <div class="flex-1 overflow-auto p-4 flex items-start justify-center bg-bp-frost/30">
+            <img :src="imageSrc" alt="Page preview" class="max-w-full shadow-lg rounded"
+                 x-show="imageSrc" />
+        </div>
+
+        <!-- Topic pills -->
+        <div class="px-4 py-2 border-t border-bp-cloud flex items-center gap-2 flex-shrink-0" x-show="topics.length > 0">
+            <span class="text-[10px] text-bp-mist uppercase font-semibold tracking-wider">Topics:</span>
+            <template x-for="topic in topics" :key="topic">
+                <a :href="'/search?topic=' + topic"
+                   class="text-[10px] px-2 py-0.5 rounded-full bg-bp-teal text-white font-medium hover:bg-bp-teal-d transition-colors"
+                   x-text="topic"></a>
+            </template>
+        </div>
+    </div>
+</div>
+
+<script>
+function lightbox() {
+    return {
+        open: false,
+        imageSrc: '',
+        context: '',
+        detail: '',
+        viewerUrl: '',
+        topics: [],
+
+        show(pageId, imageSrc, context, detail, topics) {
+            this.imageSrc = imageSrc;
+            this.context = context;
+            this.detail = detail;
+            this.viewerUrl = '/page/' + pageId;
+            this.topics = topics || [];
+            this.open = true;
+            document.body.style.overflow = 'hidden';
+        },
+
+        close() {
+            this.open = false;
+            document.body.style.overflow = '';
+        }
+    }
+}
+</script>
