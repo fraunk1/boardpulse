@@ -7,7 +7,7 @@ from sqlalchemy import select, func
 
 import app.database as db
 from app.models import MeetingDocument, DocumentPage, Meeting, Board
-from app.config import PAGES_DIR
+from app.config import PAGES_DIR, PROJECT_ROOT
 
 THUMB_WIDTH = 200
 
@@ -39,6 +39,8 @@ async def render_document_pages(
         board_code = board.code
 
     file_path = Path(doc.file_path)
+    if not file_path.is_absolute():
+        file_path = PROJECT_ROOT / file_path
     if not file_path.exists():
         return {"document_id": document_id, "pages_rendered": 0, "error": "file not found"}
 

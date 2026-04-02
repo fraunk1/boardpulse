@@ -53,6 +53,16 @@ def main():
     exh.add_argument("--report", type=str, help="Path to landscape report (default: latest)")
     exh.add_argument("--pdf", action="store_true", help="Also build a PDF with exhibits as appendix pages")
 
+    # classify
+    classify = sub.add_parser("classify", help="Classify documents/pages into topic categories")
+    classify.add_argument("--pages", action="store_true", help="Also classify individual pages")
+    classify.add_argument("--force", action="store_true", help="Re-classify even if topics exist")
+    classify.add_argument("--min-matches", type=int, default=2, help="Min keyword hits per topic (default: 2)")
+
+    # render
+    rend = sub.add_parser("render", help="Render PDF pages as images")
+    rend.add_argument("--doc-id", type=int, help="Render a specific document ID")
+
     # status
     sub.add_parser("status", help="Show collection status for all boards")
 
@@ -105,6 +115,12 @@ async def dispatch(args):
     elif args.command == "extract":
         from app.extractor.extract import extract_all
         await extract_all()
+
+    elif args.command == "classify":
+        await handle_classify(args)
+
+    elif args.command == "render":
+        await handle_render(args)
 
     elif args.command == "summarize":
         await handle_summarize(args)
@@ -254,6 +270,50 @@ async def handle_exhibits(args):
         pdf_path = build_exhibit_report(report_path, results)
         if pdf_path:
             print(f"\nExhibit report PDF: {pdf_path}")
+
+
+async def handle_classify(args):
+    """Classify documents and optionally pages into topic categories."""
+    from app.database import init_db
+    from app.pipeline.classifier import classify_all_documents, classify_all_pages
+
+    await init_db()
+
+    print("=== Document Classification ===")
+    result = await classify_all_documents(
+        force=args.force,
+        min_matches=args.min_matches,
+    )
+
+    if args.pages:
+        print("\n=== Page-Level Classification ===")
+        page_result = await classify_all_pages(
+            force=args.force,
+            min_matches=max(1, args.min_matches - 1),  # lower threshold for pages
+        )
+
+    # Rebuild FTS after classification
+    from app.pipeline.fts import rebuild_fts_index
+    print("\n=== Rebuilding FTS Index ===")
+    await rebuild_fts_index()
+    print("Done.")
+
+
+async def handle_render(args):
+    """Render PDF document pages as images."""
+    from app.database import init_db
+    from app.pipeline.renderer import render_document_pages, render_all_new_pages
+
+    await init_db()
+
+    if args.doc_id:
+        print(f"Rendering document {args.doc_id}...")
+        result = await render_document_pages(args.doc_id)
+        print(f"Result: {result}")
+    else:
+        print("Rendering all unrendered documents...")
+        result = await render_all_new_pages()
+        print(f"Result: {result}")
 
 
 async def show_status():

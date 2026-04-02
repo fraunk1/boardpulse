@@ -8,10 +8,11 @@ import app.database as db
 from app.models import Board, Meeting
 
 TOPIC_TAXONOMY = [
-    "licensing", "disciplinary", "telehealth", "scope-of-practice",
-    "rulemaking", "legislation", "opioids", "controlled-substances",
-    "patient-safety", "physician-wellness", "AI", "CME", "IMLC",
-    "workforce", "public-health",
+    "AI & Technology", "Board Operations", "Budget & Finance",
+    "Continuing Education", "Discipline", "Ethics",
+    "Interstate Compact", "Legal", "Licensing",
+    "Opioids & Prescribing", "Patient Safety", "Public Health",
+    "Rulemaking", "Scope of Practice", "Telehealth", "Workforce",
 ]
 
 
