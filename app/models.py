@@ -41,6 +41,9 @@ class Meeting(Base):
     screenshot_path: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     summary: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     topics: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    pipeline_run_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("pipeline_runs.id"), nullable=True
+    )
     scraped_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     board: Mapped["Board"] = relationship(back_populates="meetings")
@@ -57,6 +60,43 @@ class MeetingDocument(Base):
     file_path: Mapped[str] = mapped_column(Text)
     source_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     content_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    topics: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     scraped_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     meeting: Mapped["Meeting"] = relationship(back_populates="documents")
+
+
+class PipelineRun(Base):
+    __tablename__ = "pipeline_runs"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime)
+    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    status: Mapped[str] = mapped_column(String(20))  # "running", "completed", "failed"
+    trigger: Mapped[str] = mapped_column(String(20))  # "manual", "scheduled"
+    boards_collected: Mapped[int] = mapped_column(default=0)
+    new_meetings_found: Mapped[int] = mapped_column(default=0)
+    new_documents_found: Mapped[int] = mapped_column(default=0)
+    boards_summarized: Mapped[int] = mapped_column(default=0)
+    digest_path: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    report_path: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    log: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    events: Mapped[list["PipelineEvent"]] = relationship(
+        back_populates="run", cascade="all, delete-orphan"
+    )
+
+
+class PipelineEvent(Base):
+    __tablename__ = "pipeline_events"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    run_id: Mapped[int] = mapped_column(ForeignKey("pipeline_runs.id"))
+    timestamp: Mapped[datetime] = mapped_column(DateTime)
+    stage: Mapped[str] = mapped_column(String(20))
+    board_code: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
+    event_type: Mapped[str] = mapped_column(String(20))
+    detail: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    run: Mapped["PipelineRun"] = relationship(back_populates="events")
