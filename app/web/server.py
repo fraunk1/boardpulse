@@ -697,6 +697,56 @@ async def pipeline_detail(request: Request, run_id: int):
 
 
 # ---------------------------------------------------------------------------
+# API — Trigger Pipeline Run
+# ---------------------------------------------------------------------------
+
+@app.post("/pipeline/start", response_class=HTMLResponse)
+async def trigger_pipeline(request: Request):
+    """Start a pipeline run in the background (Stages 1-3: collect, extract, delta)."""
+    import asyncio
+    from app.pipeline.runner import PipelineRunner
+
+    async def _run_pipeline():
+        runner = PipelineRunner(trigger="dashboard")
+        try:
+            run_id = await runner.start()
+            await runner.run_collection()
+            await runner.run_extraction()
+            delta = await runner.compute_and_write_context()
+
+            total_new = sum(d["new_meetings"] for d in delta.values())
+            total_docs = sum(d["new_documents"] for d in delta.values())
+
+            async with db.async_session() as session:
+                run = await session.get(PipelineRun, run_id)
+                run.boards_collected = len(delta)
+                run.new_meetings_found = total_new
+                run.new_documents_found = total_docs
+                await session.commit()
+
+            if not delta:
+                await runner.finalize()
+
+        except Exception as e:
+            await runner.mark_failed(str(e))
+
+    asyncio.create_task(_run_pipeline())
+
+    return HTMLResponse(
+        content='''
+        <div class="flex items-center gap-2 text-sm text-bp-teal bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+            <svg class="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
+            </svg>
+            Pipeline run started. Refresh the page to track progress.
+        </div>
+        ''',
+        status_code=202,
+    )
+
+
+# ---------------------------------------------------------------------------
 # File Serving
 # ---------------------------------------------------------------------------
 
