@@ -59,6 +59,17 @@ def main():
     # run
     sub.add_parser("run", help="Run full pipeline (bootstrap -> discover -> collect -> extract)")
 
+    # pipeline
+    pipe = sub.add_parser("pipeline", help="Run the automated intelligence pipeline")
+    pipe.add_argument("--boards", type=str, help="Comma-separated board codes (e.g., TX_MD,FL_MD)")
+    pipe.add_argument("--skip-report", action="store_true", help="Collection + extraction only, skip prompt prep")
+    pipe.add_argument("--finalize", action="store_true", help="Mark a run as complete")
+    pipe.add_argument("--run-id", type=int, help="Pipeline run ID (for --finalize and --ingest-topics)")
+    pipe.add_argument("--digest-path", type=str, help="Path to digest file (for --finalize)")
+    pipe.add_argument("--report-path", type=str, help="Path to report file (for --finalize)")
+    pipe.add_argument("--ingest-topics", action="store_true", help="Ingest topic tags from JSON")
+    pipe.add_argument("--status", action="store_true", help="Show recent pipeline runs")
+
     args = parser.parse_args()
 
     if not args.command:
@@ -102,6 +113,9 @@ async def dispatch(args):
 
     elif args.command == "status":
         await show_status()
+
+    elif args.command == "pipeline":
+        await handle_pipeline(args)
 
     elif args.command == "run":
         from app.scraper.boards import bootstrap
@@ -279,6 +293,154 @@ async def show_status():
     failed = sum(1 for b in boards if b.discovery_status == "failed")
     pending = sum(1 for b in boards if b.discovery_status == "pending")
     print(f"\nTotal: {len(boards)} boards | Found: {found} | Failed: {failed} | Pending: {pending}")
+
+
+async def handle_pipeline(args):
+    """Handle the pipeline command and its flags."""
+    from app.database import init_db
+    await init_db()
+
+    if args.status:
+        await show_pipeline_status()
+        return
+
+    if args.ingest_topics:
+        if not args.run_id:
+            print("Error: --ingest-topics requires --run-id")
+            sys.exit(1)
+        from app.pipeline.topics import ingest_topics_from_file
+        from app.config import REPORTS_DIR
+        topics_file = REPORTS_DIR / f"run_{args.run_id}_topics.json"
+        if not topics_file.exists():
+            print(f"Error: topics file not found: {topics_file}")
+            sys.exit(1)
+        print(f"Ingesting topics from {topics_file}...")
+        await ingest_topics_from_file(topics_file)
+        print("Done.")
+        return
+
+    if args.finalize:
+        if not args.run_id:
+            print("Error: --finalize requires --run-id")
+            sys.exit(1)
+        from app.pipeline.runner import PipelineRunner
+        from app.models import Meeting, PipelineRun as PR
+        from sqlalchemy import select, func
+        import app.database as db
+
+        async with db.async_session() as session:
+            run = await session.get(PR, args.run_id)
+            if not run:
+                print(f"Error: run #{args.run_id} not found")
+                sys.exit(1)
+            boards_summarized = (await session.execute(
+                select(func.count(func.distinct(Meeting.board_id)))
+                .where(Meeting.pipeline_run_id == args.run_id)
+                .where(Meeting.summary.isnot(None))
+            )).scalar() or 0
+
+        runner = PipelineRunner()
+        runner.run_id = args.run_id
+        await runner.finalize(
+            digest_path=args.digest_path,
+            report_path=args.report_path,
+            boards_collected=run.boards_collected,
+            new_meetings=run.new_meetings_found,
+            new_documents=run.new_documents_found,
+            boards_summarized=boards_summarized,
+        )
+        print(f"Pipeline run #{args.run_id} marked as completed ({boards_summarized} boards summarized).")
+        return
+
+    # Default: run the full pipeline
+    from app.pipeline.runner import PipelineRunner
+    import app.database as db
+
+    board_codes = args.boards.split(",") if args.boards else None
+    runner = PipelineRunner(trigger="manual")
+
+    try:
+        run_id = await runner.start()
+        print(f"\n{'='*60}")
+        print(f"PIPELINE RUN #{run_id}")
+        print(f"{'='*60}")
+
+        print("\n--- Stage 1: Collection ---")
+        await runner.run_collection(board_codes=board_codes)
+
+        print("\n--- Stage 2: Text Extraction ---")
+        await runner.run_extraction()
+
+        if args.skip_report:
+            print("\n--- Skipping prompt preparation (--skip-report) ---")
+            delta = {}
+        else:
+            print("\n--- Stage 3: Delta Calculation + Context File ---")
+            delta = await runner.compute_and_write_context()
+
+        total_new_meetings = sum(d["new_meetings"] for d in delta.values())
+        total_new_docs = sum(d["new_documents"] for d in delta.values())
+
+        async with db.async_session() as session:
+            from app.models import PipelineRun as PR
+            run = await session.get(PR, run_id)
+            run.boards_collected = len(board_codes) if board_codes else await _count_boards()
+            run.new_meetings_found = total_new_meetings
+            run.new_documents_found = total_new_docs
+            await session.commit()
+
+        print(f"\n{'='*60}")
+        print(f"PIPELINE RUN #{run_id} — Layer 1 Complete")
+        print(f"{'='*60}")
+        print(f"  New meetings:  {total_new_meetings}")
+        print(f"  New documents: {total_new_docs}")
+        print(f"  Boards with new content: {len(delta)}")
+        if delta and not args.skip_report:
+            from app.config import REPORTS_DIR
+            context_path = REPORTS_DIR / f"run_{run_id}_context.md"
+            print(f"\n  Context file: {context_path}")
+            print(f"\n  Next: Have your AI assistant read the context file and follow the instructions.")
+        elif not delta:
+            print("\n  No new content found. Nothing to summarize.")
+            await runner.finalize()
+        print()
+
+    except Exception as e:
+        await runner.mark_failed(str(e))
+        print(f"\nPipeline failed: {e}")
+        sys.exit(1)
+
+
+async def _count_boards() -> int:
+    from sqlalchemy import func, select
+    import app.database as db
+    from app.models import Board
+    async with db.async_session() as session:
+        return (await session.execute(select(func.count(Board.id)))).scalar() or 0
+
+
+async def show_pipeline_status():
+    from sqlalchemy import select
+    import app.database as db
+    from app.models import PipelineRun
+
+    async with db.async_session() as session:
+        runs = (await session.execute(
+            select(PipelineRun).order_by(PipelineRun.started_at.desc()).limit(10)
+        )).scalars().all()
+
+    if not runs:
+        print("No pipeline runs found.")
+        return
+
+    print(f"{'ID':<5} {'Date':<12} {'Status':<12} {'Trigger':<10} "
+          f"{'Meetings':<10} {'Documents':<10} {'Summarized':<10}")
+    print("-" * 80)
+
+    for r in runs:
+        date_str = r.started_at.strftime("%Y-%m-%d") if r.started_at else "—"
+        print(f"{r.id:<5} {date_str:<12} {r.status:<12} {r.trigger:<10} "
+              f"{r.new_meetings_found:<10} {r.new_documents_found:<10} {r.boards_summarized:<10}")
 
 
 if __name__ == "__main__":
