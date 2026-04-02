@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block title %}Pipeline Runs — boardpulse{% endblock %}
+
+{% block body %}
+<div class="max-w-[1400px] mx-auto px-6 py-8">
+
+    <div class="flex items-center justify-between mb-8">
+        <div>
+            <h1 class="text-2xl font-bold text-bp-navy tracking-tight">Pipeline Runs</h1>
+            <p class="text-sm text-bp-steel mt-1">Automated intelligence collection and analysis history</p>
+        </div>
+        <div class="flex items-center gap-2">
+            <span class="text-[10px] font-mono text-bp-mist tracking-wider uppercase">{{ runs | length }} runs</span>
+        </div>
+    </div>
+
+    {% if runs %}
+    <div class="bg-white border border-bp-cloud rounded-xl overflow-hidden">
+        <table class="w-full text-sm">
+            <thead>
+                <tr class="border-b border-bp-cloud bg-bp-frost/50">
+                    <th class="text-left px-4 py-3 font-semibold text-bp-slate text-xs uppercase tracking-wider">Run</th>
+                    <th class="text-left px-4 py-3 font-semibold text-bp-slate text-xs uppercase tracking-wider">Date</th>
+                    <th class="text-left px-4 py-3 font-semibold text-bp-slate text-xs uppercase tracking-wider">Status</th>
+                    <th class="text-left px-4 py-3 font-semibold text-bp-slate text-xs uppercase tracking-wider">Trigger</th>
+                    <th class="text-right px-4 py-3 font-semibold text-bp-slate text-xs uppercase tracking-wider">New Meetings</th>
+                    <th class="text-right px-4 py-3 font-semibold text-bp-slate text-xs uppercase tracking-wider">New Documents</th>
+                    <th class="text-right px-4 py-3 font-semibold text-bp-slate text-xs uppercase tracking-wider">Summarized</th>
+                    <th class="text-right px-4 py-3 font-semibold text-bp-slate text-xs uppercase tracking-wider">Duration</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-bp-cloud/50">
+                {% for run in runs %}
+                <tr class="hover:bg-bp-frost/30 transition-colors cursor-pointer"
+                    onclick="window.location='/pipeline/{{ run.id }}'">
+                    <td class="px-4 py-3 font-mono text-bp-teal font-semibold">#{{ run.id }}</td>
+                    <td class="px-4 py-3 text-bp-navy">{{ run.started_at.strftime('%Y-%m-%d %H:%M') if run.started_at else '—' }}</td>
+                    <td class="px-4 py-3">
+                        {% if run.status == 'completed' %}
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Completed
+                        </span>
+                        {% elif run.status == 'running' %}
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                            <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span> Running
+                        </span>
+                        {% elif run.status == 'failed' %}
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-700 border border-red-200">
+                            <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span> Failed
+                        </span>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-bp-steel capitalize">{{ run.trigger }}</td>
+                    <td class="px-4 py-3 text-right font-mono text-bp-navy">{{ run.new_meetings_found }}</td>
+                    <td class="px-4 py-3 text-right font-mono text-bp-navy">{{ run.new_documents_found }}</td>
+                    <td class="px-4 py-3 text-right font-mono text-bp-navy">{{ run.boards_summarized }}</td>
+                    <td class="px-4 py-3 text-right text-bp-steel text-xs">{{ run.duration if run.duration else '—' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="text-center py-16 bg-bp-frost/30 rounded-xl border border-bp-cloud">
+        <i data-lucide="play-circle" class="w-12 h-12 text-bp-mist mx-auto mb-4"></i>
+        <h2 class="text-lg font-semibold text-bp-slate mb-2">No pipeline runs yet</h2>
+        <p class="text-sm text-bp-steel">Run <code class="bg-white px-2 py-0.5 rounded border border-bp-cloud text-xs font-mono">python cli.py pipeline</code> to start your first collection cycle.</p>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}

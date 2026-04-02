@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select, func, distinct
 
-from app.models import Board, Meeting, MeetingDocument
+from app.models import Board, Meeting, MeetingDocument, PipelineRun, PipelineEvent
 from app.config import SCREENSHOTS_DIR, DOCUMENTS_DIR, REPORTS_DIR, EXHIBITS_DIR
 import app.database as db
 
@@ -612,6 +612,36 @@ async def national_report(request: Request):
         "breadcrumbs": [
             {"label": "National", "url": "/"},
         ],
+    })
+
+
+# ---------------------------------------------------------------------------
+# Pages — Pipeline Runs
+# ---------------------------------------------------------------------------
+
+@app.get("/pipeline/", response_class=HTMLResponse)
+async def pipeline_list(request: Request):
+    """Pipeline runs list — history of all pipeline executions."""
+    async with db.async_session() as session:
+        runs = (await session.execute(
+            select(PipelineRun).order_by(PipelineRun.started_at.desc()).limit(50)
+        )).scalars().all()
+
+    for run in runs:
+        if run.started_at and run.completed_at:
+            delta = run.completed_at - run.started_at
+            minutes = int(delta.total_seconds() // 60)
+            seconds = int(delta.total_seconds() % 60)
+            run.duration = f"{minutes}m {seconds}s" if minutes else f"{seconds}s"
+        else:
+            run.duration = None
+
+    return templates.TemplateResponse(request, "pipeline_list.html", context={
+        "runs": runs,
+        "breadcrumbs": [
+            {"label": "National", "url": "/"},
+        ],
+        "page_title": "Pipeline",
     })
 
 
