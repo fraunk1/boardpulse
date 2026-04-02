@@ -227,40 +227,10 @@ async def national_overview(request: Request):
 # ---------------------------------------------------------------------------
 
 @app.get("/topic/{slug}", response_class=HTMLResponse)
-async def topic_view(request: Request, slug: str):
-    """Topic drill-down — all boards/meetings with this topic."""
-    display_name = slug.replace("-", " ").title()
-
-    async with db.async_session() as session:
-        meetings = (await session.execute(
-            select(Meeting, Board)
-            .join(Board, Meeting.board_id == Board.id)
-            .where(Meeting.topics.isnot(None))
-            .order_by(Meeting.meeting_date.desc())
-        )).all()
-
-    # Filter to meetings that have this topic
-    filtered = []
-    board_ids = set()
-    state_set = set()
-    for m, b in meetings:
-        tags = m.topics if isinstance(m.topics, list) else json.loads(m.topics or "[]")
-        if slug in tags:
-            filtered.append({"meeting": m, "board": b, "state_name": STATE_NAMES.get(b.state, b.state)})
-            board_ids.add(b.id)
-            state_set.add(b.state)
-
-    return templates.TemplateResponse(request, "topic.html", context={
-        "topic_slug": slug,
-        "topic_name": display_name,
-        "meetings": filtered,
-        "board_count": len(board_ids),
-        "state_count": len(state_set),
-        "meeting_count": len(filtered),
-        "breadcrumbs": [
-            {"label": "National", "url": "/"},
-        ],
-    })
+async def topic_redirect(slug: str):
+    """Redirect old /topic/{slug} URLs to unified search."""
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url=f"/search?topic={slug}", status_code=301)
 
 
 # ---------------------------------------------------------------------------
@@ -825,6 +795,122 @@ async def serve_page_thumb(page_id: int):
 
     return FileResponse(str(thumb_path), media_type="image/png",
                         headers={"Cache-Control": "public, max-age=86400"})
+
+
+# ---------------------------------------------------------------------------
+# Pages — Unified Search
+# ---------------------------------------------------------------------------
+
+@app.get("/search", response_class=HTMLResponse)
+async def search_page(
+    request: Request,
+    q: str = "",
+    state: str = "",
+    period: str = "12m",
+    doc_type: str = "",
+):
+    """Unified search — topics, free text, filters."""
+    from datetime import timedelta, date as date_type
+    from app.pipeline.fts import search_summaries
+    from app.pipeline.context import TOPIC_TAXONOMY
+
+    # Parse topic params (can appear multiple times in URL)
+    topic = request.query_params.getlist("topic") if hasattr(request.query_params, 'getlist') else []
+    if not topic:
+        # Try single value
+        single = request.query_params.get("topic", "")
+        if single:
+            topic = [single]
+
+    # Period filter
+    period_days = {"3m": 90, "6m": 180, "12m": 365, "all": 99999}
+    cutoff_days = period_days.get(period, 365)
+    cutoff_date = date_type.today() - timedelta(days=cutoff_days) if cutoff_days < 99999 else date_type(2000, 1, 1)
+
+    async with db.async_session() as session:
+        # Base query: pages joined through to boards
+        query = (
+            select(DocumentPage, MeetingDocument, Meeting, Board)
+            .join(MeetingDocument, DocumentPage.document_id == MeetingDocument.id)
+            .join(Meeting, MeetingDocument.meeting_id == Meeting.id)
+            .join(Board, Meeting.board_id == Board.id)
+            .where(Meeting.meeting_date >= cutoff_date)
+        )
+
+        # Topic filter
+        if topic:
+            from sqlalchemy import or_
+            conditions = [DocumentPage.topics.like(f'%"{t}"%') for t in topic]
+            query = query.where(or_(*conditions))
+        else:
+            query = query.where(DocumentPage.topics.isnot(None))
+
+        # State filter
+        if state:
+            query = query.where(Board.state == state.upper())
+
+        # Doc type filter
+        if doc_type:
+            query = query.where(MeetingDocument.doc_type == doc_type)
+
+        query = query.order_by(Meeting.meeting_date.desc(), DocumentPage.page_number)
+        rows = (await session.execute(query)).all()
+
+    # FTS search (if free text query)
+    fts_meeting_ids = None
+    fts_snippets = {}
+    if q:
+        fts_results = await search_summaries(q)
+        fts_meeting_ids = {r["meeting_id"] for r in fts_results}
+        fts_snippets = {r["meeting_id"]: r["snippet"] for r in fts_results}
+        if fts_meeting_ids:
+            rows = [r for r in rows if r[2].id in fts_meeting_ids]
+        else:
+            rows = []
+
+    # Group by meeting for hybrid view
+    meetings_grouped: dict[int, dict] = {}
+    for page, doc, meeting, board in rows:
+        mid = meeting.id
+        if mid not in meetings_grouped:
+            meetings_grouped[mid] = {
+                "meeting": meeting,
+                "board": board,
+                "doc": doc,
+                "state_name": STATE_NAMES.get(board.state, board.state),
+                "pages": [],
+                "snippet": fts_snippets.get(mid, ""),
+            }
+        meetings_grouped[mid]["pages"].append(page)
+
+    results = list(meetings_grouped.values())
+    total_pages = sum(len(r["pages"]) for r in results)
+
+    # Get all states for filter dropdown
+    async with db.async_session() as session:
+        states = (await session.execute(
+            select(distinct(Board.state)).order_by(Board.state)
+        )).scalars().all()
+
+    is_htmx = request.headers.get("HX-Request") == "true"
+    template = "partials/search_results.html" if is_htmx else "search.html"
+
+    return templates.TemplateResponse(request, template, context={
+        "q": q,
+        "active_topics": topic,
+        "all_topics": TOPIC_TAXONOMY,
+        "state_filter": state,
+        "period": period,
+        "doc_type": doc_type,
+        "results": results,
+        "total_pages": total_pages,
+        "total_meetings": len(results),
+        "states": states,
+        "breadcrumbs": [
+            {"label": "National", "url": "/"},
+        ],
+        "page_title": "Search",
+    })
 
 
 # ---------------------------------------------------------------------------

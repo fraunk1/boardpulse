@@ -120,7 +120,7 @@
                     </h2>
                     <div class="space-y-2 stagger-in">
                         {% for topic in topics %}
-                        <a href="/topic/{{ topic.name }}" class="topic-card block">
+                        <a href="/search?topic={{ topic.name }}" class="topic-card block">
                             <div class="flex items-center justify-between">
                                 <div>
                                     <div class="topic-name">{{ topic.name | replace("-", " ") | title }}</div>
