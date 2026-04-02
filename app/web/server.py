@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select, func, distinct
 
-from app.models import Board, Meeting, MeetingDocument, PipelineRun, PipelineEvent
+from app.models import Board, Meeting, MeetingDocument, PipelineRun, PipelineEvent, DocumentPage
 from app.config import SCREENSHOTS_DIR, DOCUMENTS_DIR, REPORTS_DIR, EXHIBITS_DIR
 import app.database as db
 
@@ -744,6 +744,38 @@ async def trigger_pipeline(request: Request):
         ''',
         status_code=202,
     )
+
+
+@app.get("/page-image/{page_id}")
+async def serve_page_image(page_id: int):
+    """Serve a pre-rendered full-res page image."""
+    async with db.async_session() as session:
+        page = await session.get(DocumentPage, page_id)
+        if not page:
+            raise HTTPException(status_code=404, detail="Page not found")
+
+    img_path = Path(page.image_path)
+    if not img_path.exists():
+        raise HTTPException(status_code=404, detail="Image not found")
+
+    return FileResponse(str(img_path), media_type="image/png",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
+@app.get("/page-thumb/{page_id}")
+async def serve_page_thumb(page_id: int):
+    """Serve a pre-rendered page thumbnail."""
+    async with db.async_session() as session:
+        page = await session.get(DocumentPage, page_id)
+        if not page:
+            raise HTTPException(status_code=404, detail="Page not found")
+
+    thumb_path = Path(page.thumb_path)
+    if not thumb_path.exists():
+        raise HTTPException(status_code=404, detail="Thumbnail not found")
+
+    return FileResponse(str(thumb_path), media_type="image/png",
+                        headers={"Cache-Control": "public, max-age=86400"})
 
 
 # ---------------------------------------------------------------------------
