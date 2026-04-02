@@ -192,3 +192,44 @@ async def test_compute_delta_no_changes():
     snap = {"TX_MD": {"meetings": 5, "documents": 8}}
     delta = compute_delta(snap, snap)
     assert delta == {}
+
+
+from app.pipeline.context import generate_context_file
+
+
+@pytest.mark.asyncio
+async def test_generate_context_file(tmp_path):
+    """Context file contains delta info and instructions."""
+    async with db.async_session() as session:
+        board = Board(
+            state="TX", code="TX_MD", name="Texas Medical Board",
+            board_type="combined", homepage="https://tmb.state.tx.us",
+            discovery_status="found",
+        )
+        session.add(board)
+        await session.commit()
+        await session.refresh(board)
+
+        m = Meeting(board_id=board.id, meeting_date=date(2026, 3, 15), title="March Meeting")
+        session.add(m)
+        await session.commit()
+
+    delta = {"TX_MD": {"new_meetings": 1, "new_documents": 2}}
+    no_change = ["AL_MD", "CA_MD"]
+
+    output_path = tmp_path / "run_1_context.md"
+    await generate_context_file(
+        run_id=1,
+        delta=delta,
+        no_change_boards=no_change,
+        output_path=output_path,
+        reports_dir=tmp_path,
+    )
+
+    content = output_path.read_text()
+    assert "Pipeline Run #1" in content
+    assert "TX_MD" in content
+    assert "Texas Medical Board" in content
+    assert "1 new meeting" in content
+    assert "AL_MD" in content
+    assert "Instructions" in content
