@@ -69,6 +69,7 @@ def main():
     pipe.add_argument("--report-path", type=str, help="Path to report file (for --finalize)")
     pipe.add_argument("--ingest-topics", action="store_true", help="Ingest topic tags from JSON")
     pipe.add_argument("--status", action="store_true", help="Show recent pipeline runs")
+    pipe.add_argument("--rebuild-fts", action="store_true", help="Rebuild the FTS5 search index")
 
     args = parser.parse_args()
 
@@ -304,18 +305,37 @@ async def handle_pipeline(args):
         await show_pipeline_status()
         return
 
+    if args.rebuild_fts:
+        from app.pipeline.fts import rebuild_fts_index
+        print("Rebuilding FTS5 search index...")
+        await rebuild_fts_index()
+        print("Done.")
+        return
+
     if args.ingest_topics:
         if not args.run_id:
             print("Error: --ingest-topics requires --run-id")
             sys.exit(1)
-        from app.pipeline.topics import ingest_topics_from_file
         from app.config import REPORTS_DIR
+        import json as _json
+
         topics_file = REPORTS_DIR / f"run_{args.run_id}_topics.json"
         if not topics_file.exists():
             print(f"Error: topics file not found: {topics_file}")
             sys.exit(1)
-        print(f"Ingesting topics from {topics_file}...")
-        await ingest_topics_from_file(topics_file)
+
+        data = _json.loads(topics_file.read_text())
+        first_value = next(iter(data.values()), None)
+        is_page_level = isinstance(first_value, dict)
+
+        if is_page_level:
+            from app.pipeline.topics import ingest_page_topics_from_file
+            print(f"Ingesting page-level topics from {topics_file}...")
+            await ingest_page_topics_from_file(topics_file)
+        else:
+            from app.pipeline.topics import ingest_topics_from_file
+            print(f"Ingesting document-level topics from {topics_file}...")
+            await ingest_topics_from_file(topics_file)
         print("Done.")
         return
 
@@ -371,12 +391,20 @@ async def handle_pipeline(args):
         print("\n--- Stage 2: Text Extraction ---")
         await runner.run_extraction()
 
+        # Stage 3: Render pages
+        print("\n--- Stage 3: Page Rendering ---")
+        await runner.run_rendering()
+
         if args.skip_report:
             print("\n--- Skipping prompt preparation (--skip-report) ---")
             delta = {}
         else:
-            print("\n--- Stage 3: Delta Calculation + Context File ---")
+            print("\n--- Stage 4: Delta Calculation + Context File ---")
             delta = await runner.compute_and_write_context()
+
+        # Rebuild FTS index
+        print("\n--- Rebuilding FTS index ---")
+        await runner.run_fts_rebuild()
 
         total_new_meetings = sum(d["new_meetings"] for d in delta.values())
         total_new_docs = sum(d["new_documents"] for d in delta.values())

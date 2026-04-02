@@ -100,6 +100,34 @@ class PipelineRunner:
         except Exception as e:
             await self.log_event(stage="extract", event_type="failed", detail=str(e))
 
+    async def run_rendering(self):
+        """Render pages for new PDF documents."""
+        from app.pipeline.renderer import render_all_new_pages
+
+        await self.log_event(stage="render", event_type="started")
+        try:
+            result = await render_all_new_pages()
+            await self.log_event(
+                stage="render", event_type="completed",
+                detail=f"{result['rendered']} pages rendered from {result['total']} documents",
+            )
+        except Exception as e:
+            await self.log_event(stage="render", event_type="failed", detail=str(e))
+
+    async def run_fts_rebuild(self):
+        """Rebuild the FTS5 search index."""
+        from app.pipeline.fts import rebuild_fts_index
+
+        await self.log_event(stage="fts", event_type="started")
+        try:
+            result = await rebuild_fts_index()
+            await self.log_event(
+                stage="fts", event_type="completed",
+                detail=f"{result['indexed']} meetings indexed",
+            )
+        except Exception as e:
+            await self.log_event(stage="fts", event_type="failed", detail=str(e))
+
     async def compute_and_write_context(self) -> dict:
         """Compute delta, write context file, prepare prompts. Returns delta dict."""
         snapshot_after = await snapshot_board_counts()
