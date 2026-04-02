@@ -35,9 +35,9 @@ Read the context file printed at the end of Step 1. It contains:
 - Prompt file locations
 - Step-by-step instructions
 
-### Step 3: Categorize Documents
+### Step 3: Categorize Document Pages
 
-For each new document listed in the context file, read its extracted text and assign topic tags from this taxonomy:
+For each new document listed in the context file, read its extracted text and assign topic tags **per page** from this taxonomy:
 
 `licensing`, `disciplinary`, `telehealth`, `scope-of-practice`, `rulemaking`, `legislation`, `opioids`, `controlled-substances`, `patient-safety`, `physician-wellness`, `AI`, `CME`, `IMLC`, `workforce`, `public-health`
 
@@ -45,13 +45,21 @@ Write results as JSON to `data/reports/run_{id}_topics.json`:
 
 ```json
 {
-    "42": ["licensing", "telehealth"],
-    "43": ["disciplinary", "controlled-substances"],
-    "44": ["rulemaking", "legislation"]
+    "document_42": {
+        "1": ["licensing"],
+        "3": ["telehealth", "AI"],
+        "7": ["telehealth"],
+        "14": ["opioids", "controlled-substances"]
+    },
+    "document_43": {
+        "2": ["rulemaking", "legislation"]
+    }
 }
 ```
 
-Keys are document IDs (from the prompt files). Values are lists of applicable tags.
+Keys are `document_{id}`. Values are objects mapping page numbers to topic tag arrays. Only include pages that have relevant topics — skip blank/procedural pages.
+
+**Batching:** Process 10-20 documents per call to manage token usage.
 
 Then ingest: `python cli.py pipeline --ingest-topics --run-id {id}`
 
@@ -63,6 +71,8 @@ For each board listed in the context file's Delta section:
 3. Write output to `data/reports/{code}_summary.md`
 
 Then ingest all summaries: `python cli.py summarize --ingest`
+
+**Note:** The FTS search index is rebuilt automatically during the pipeline. To rebuild manually: `python cli.py pipeline --rebuild-fts`
 
 ### Step 5: Write the "What's New" Digest
 
