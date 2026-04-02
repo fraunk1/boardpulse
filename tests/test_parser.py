@@ -3,9 +3,6 @@ import pytest
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
-import sys
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
 from app.extractor.parser import extract_text_from_file, extract_text_from_html
 
 

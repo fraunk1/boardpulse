@@ -2,18 +2,8 @@
 import pytest
 from datetime import date, datetime, timezone
 
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
 from app import database as db
 from app.models import Board, Meeting, MeetingDocument, DocumentPage
-
-
-@pytest.fixture(autouse=True)
-async def setup_db(tmp_path):
-    await db.init_db(url="sqlite+aiosqlite://")
-    yield
 
 
 @pytest.mark.asyncio

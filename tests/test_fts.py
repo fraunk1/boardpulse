@@ -2,19 +2,9 @@
 import pytest
 from datetime import date
 
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
 from app import database as db
 from app.models import Board, Meeting
 from app.pipeline.fts import rebuild_fts_index, search_summaries
-
-
-@pytest.fixture(autouse=True)
-async def setup_db(tmp_path):
-    await db.init_db(url="sqlite+aiosqlite://")
-    yield
 
 
 @pytest.fixture

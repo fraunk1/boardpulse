@@ -1,10 +1,6 @@
 """Test meeting minutes page discovery logic."""
 import pytest
 
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
 from app.scraper.discoverer import score_link, pick_best_links
 
 

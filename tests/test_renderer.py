@@ -3,18 +3,9 @@ import pytest
 from datetime import date, datetime, timezone
 from pathlib import Path
 
-import sys
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
 from app import database as db
 from app.models import Board, Meeting, MeetingDocument, DocumentPage
 from app.pipeline.renderer import render_document_pages
-
-
-@pytest.fixture(autouse=True)
-async def setup_db(tmp_path):
-    await db.init_db(url="sqlite+aiosqlite://")
-    yield
 
 
 def _create_test_pdf(path: Path, num_pages: int = 3):
