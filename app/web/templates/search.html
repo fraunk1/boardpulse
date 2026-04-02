@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+
+{% block title %}Search — boardpulse{% endblock %}
+
+{% block body %}
+<div class="max-w-[1400px] mx-auto px-6 py-8">
+
+    <div class="mb-6">
+        <h1 class="text-2xl font-bold text-bp-navy tracking-tight">Search</h1>
+        <p class="text-sm text-bp-steel mt-1">Find pages, topics, and meetings across all boards</p>
+    </div>
+
+    <div class="bg-white border border-bp-cloud rounded-xl p-4 mb-6"
+         x-data="{ activeTopics: {{ active_topics | tojson }} }">
+
+        <form hx-get="/search" hx-target="#search-results" hx-push-url="true"
+              class="flex gap-2 mb-3" id="search-form">
+            <div class="flex-1 relative">
+                <i data-lucide="search" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-bp-mist"></i>
+                <input type="text" name="q" value="{{ q }}" placeholder="Search meetings, keywords..."
+                       class="w-full pl-9 pr-4 py-2 border border-bp-cloud rounded-lg text-sm text-bp-navy placeholder:text-bp-mist focus:outline-none focus:ring-2 focus:ring-bp-teal/30 focus:border-bp-teal" />
+            </div>
+            <template x-for="t in activeTopics" :key="t">
+                <input type="hidden" name="topic" :value="t" />
+            </template>
+            <input type="hidden" name="state" value="{{ state_filter }}" id="state-input" />
+            <input type="hidden" name="period" value="{{ period }}" id="period-input" />
+            <input type="hidden" name="doc_type" value="{{ doc_type }}" id="doctype-input" />
+            <button type="submit"
+                    class="px-4 py-2 bg-bp-teal text-white text-sm font-semibold rounded-lg hover:bg-bp-teal-d transition-colors">
+                Search
+            </button>
+        </form>
+
+        <div class="flex flex-wrap gap-1.5 mb-3">
+            {% for t in all_topics %}
+            <button
+                @click="
+                    if (activeTopics.includes('{{ t }}')) {
+                        activeTopics = activeTopics.filter(x => x !== '{{ t }}');
+                    } else {
+                        activeTopics.push('{{ t }}');
+                    }
+                    $nextTick(() => document.getElementById('search-form').requestSubmit());
+                "
+                class="text-[11px] px-2.5 py-1 rounded-full font-medium transition-colors cursor-pointer"
+                :class="activeTopics.includes('{{ t }}')
+                    ? 'bg-bp-teal text-white'
+                    : 'bg-bp-frost text-bp-steel border border-bp-cloud hover:border-bp-teal hover:text-bp-teal'">
+                {{ t }}
+            </button>
+            {% endfor %}
+        </div>
+
+        <div class="flex items-center gap-3 pt-2 border-t border-bp-cloud/50">
+            <span class="text-[10px] text-bp-mist uppercase font-semibold tracking-wider">Filters:</span>
+            <select class="text-xs py-1 px-2 border border-bp-cloud rounded-md text-bp-slate bg-white"
+                    onchange="document.getElementById('state-input').value = this.value; document.getElementById('search-form').requestSubmit();">
+                <option value="">All States</option>
+                {% for s in states %}
+                <option value="{{ s }}" {% if state_filter == s %}selected{% endif %}>{{ STATE_NAMES.get(s, s) }}</option>
+                {% endfor %}
+            </select>
+            <select class="text-xs py-1 px-2 border border-bp-cloud rounded-md text-bp-slate bg-white"
+                    onchange="document.getElementById('period-input').value = this.value; document.getElementById('search-form').requestSubmit();">
+                <option value="3m" {% if period == '3m' %}selected{% endif %}>Last 3 months</option>
+                <option value="6m" {% if period == '6m' %}selected{% endif %}>Last 6 months</option>
+                <option value="12m" {% if period == '12m' %}selected{% endif %}>Last 12 months</option>
+                <option value="all" {% if period == 'all' %}selected{% endif %}>All time</option>
+            </select>
+            <select class="text-xs py-1 px-2 border border-bp-cloud rounded-md text-bp-slate bg-white"
+                    onchange="document.getElementById('doctype-input').value = this.value; document.getElementById('search-form').requestSubmit();">
+                <option value="">All types</option>
+                <option value="minutes" {% if doc_type == 'minutes' %}selected{% endif %}>Minutes</option>
+                <option value="agenda" {% if doc_type == 'agenda' %}selected{% endif %}>Agendas</option>
+            </select>
+            <span class="text-xs text-bp-steel ml-auto">
+                {{ total_pages }} page{{ 's' if total_pages != 1 else '' }} across {{ total_meetings }} meeting{{ 's' if total_meetings != 1 else '' }}
+            </span>
+        </div>
+    </div>
+
+    <div id="search-results">
+        {% include "partials/search_results.html" %}
+    </div>
+
+</div>
+{% endblock %}
