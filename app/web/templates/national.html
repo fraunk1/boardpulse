@@ -33,7 +33,7 @@
                     <div class="stat-icon"><i data-lucide="file-text" class="w-6 h-6"></i></div>
                     <div class="stat-number text-bp-navy">{{ stats.meetings_with_files }}</div>
                     <div class="stat-label">Minutes on File</div>
-                    <div class="text-[10px] text-bp-mist mt-1 font-mono">{{ ((stats.meetings_with_files / stats.total_meetings) * 100) | int }}% coverage</div>
+                    <div class="text-[10px] text-bp-mist mt-1 font-mono">{{ ((stats.meetings_with_files / stats.total_meetings) * 100) | int if stats.total_meetings else 0 }}% coverage</div>
                 </div>
                 <div class="stat-hero">
                     <div class="stat-icon"><i data-lucide="sparkles" class="w-6 h-6"></i></div>
