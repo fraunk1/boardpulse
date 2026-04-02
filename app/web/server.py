@@ -746,6 +746,55 @@ async def trigger_pipeline(request: Request):
     )
 
 
+# ---------------------------------------------------------------------------
+# Pages — Page Viewer
+# ---------------------------------------------------------------------------
+
+@app.get("/page/{page_id}", response_class=HTMLResponse)
+async def page_viewer(request: Request, page_id: int):
+    """Dedicated page viewer with context bar and filmstrip navigation."""
+    async with db.async_session() as session:
+        page = await session.get(DocumentPage, page_id)
+        if not page:
+            raise HTTPException(status_code=404, detail="Page not found")
+
+        doc = await session.get(MeetingDocument, page.document_id)
+        meeting = await session.get(Meeting, doc.meeting_id)
+        board = await session.get(Board, meeting.board_id)
+
+        all_pages = (await session.execute(
+            select(DocumentPage)
+            .where(DocumentPage.document_id == doc.id)
+            .order_by(DocumentPage.page_number)
+        )).scalars().all()
+
+    total_pages = len(all_pages)
+    state_name = STATE_NAMES.get(board.state, board.state)
+
+    current_idx = next(i for i, p in enumerate(all_pages) if p.id == page_id)
+    prev_page = all_pages[current_idx - 1] if current_idx > 0 else None
+    next_page = all_pages[current_idx + 1] if current_idx < total_pages - 1 else None
+
+    return templates.TemplateResponse(request, "page_viewer.html", context={
+        "page": page,
+        "doc": doc,
+        "meeting": meeting,
+        "board": board,
+        "all_pages": all_pages,
+        "total_pages": total_pages,
+        "prev_page": prev_page,
+        "next_page": next_page,
+        "state_name": state_name,
+        "breadcrumbs": [
+            {"label": "National", "url": "/"},
+            {"label": state_name, "url": f"/state/{board.state}"},
+            {"label": board.name, "url": f"/board/{board.code}"},
+            {"label": meeting.title or meeting.meeting_date.isoformat(), "url": f"/meeting/{meeting.id}"},
+        ],
+        "page_title": f"Page {page.page_number}",
+    })
+
+
 @app.get("/page-image/{page_id}")
 async def serve_page_image(page_id: int):
     """Serve a pre-rendered full-res page image."""

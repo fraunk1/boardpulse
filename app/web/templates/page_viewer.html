@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+
+{% block title %}Page {{ page.page_number }} — {{ board.code }} — boardpulse{% endblock %}
+
+{% block body %}
+<div class="max-w-[1200px] mx-auto px-6 py-6">
+
+    <!-- Context Bar -->
+    <div class="bg-white border border-bp-cloud rounded-xl p-4 mb-4 flex items-center justify-between">
+        <div>
+            <div class="text-sm font-semibold text-bp-navy">
+                {{ board.name }}
+            </div>
+            <div class="text-xs text-bp-steel">
+                {{ meeting.meeting_date.strftime('%B %d, %Y') }} · {{ doc.doc_type | capitalize }} · Page {{ page.page_number }} of {{ total_pages }}
+            </div>
+            {% if page.topics %}
+            <div class="flex gap-1.5 mt-2">
+                {% for topic in page.topics %}
+                <a href="/search?topic={{ topic }}"
+                   class="text-[10px] px-2 py-0.5 rounded-full bg-bp-teal text-white font-medium hover:bg-bp-teal-d transition-colors">
+                    {{ topic }}
+                </a>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+        <div class="flex items-center gap-2">
+            {% if prev_page %}
+            <a href="/page/{{ prev_page.id }}"
+               class="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium text-bp-steel bg-bp-frost hover:bg-bp-cloud border border-bp-cloud transition-colors">
+                <i data-lucide="chevron-left" class="w-3.5 h-3.5"></i> Prev
+            </a>
+            {% else %}
+            <span class="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs text-bp-mist bg-bp-frost/50 border border-bp-cloud/50 cursor-not-allowed">
+                <i data-lucide="chevron-left" class="w-3.5 h-3.5"></i> Prev
+            </span>
+            {% endif %}
+
+            <span class="text-xs font-mono text-bp-mist px-2">{{ page.page_number }} / {{ total_pages }}</span>
+
+            {% if next_page %}
+            <a href="/page/{{ next_page.id }}"
+               class="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium text-bp-steel bg-bp-frost hover:bg-bp-cloud border border-bp-cloud transition-colors">
+                Next <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+            </a>
+            {% else %}
+            <span class="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs text-bp-mist bg-bp-frost/50 border border-bp-cloud/50 cursor-not-allowed">
+                Next <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+            </span>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Page Image -->
+    <div class="bg-white border border-bp-cloud rounded-xl p-4 mb-4 flex justify-center">
+        <img src="/page-image/{{ page.id }}" alt="Page {{ page.page_number }}"
+             class="max-w-full shadow-lg rounded" loading="eager" />
+    </div>
+
+    <!-- Bottom Filmstrip -->
+    <div class="bg-white border border-bp-cloud rounded-xl p-3 overflow-x-auto">
+        <div class="flex gap-2 min-w-min" id="filmstrip">
+            {% for p in all_pages %}
+            <a href="/page/{{ p.id }}"
+               class="flex-shrink-0 rounded-lg overflow-hidden border-2 transition-all hover:shadow-md
+                      {% if p.id == page.id %}border-bp-teal shadow-md ring-2 ring-bp-teal/20
+                      {% elif p.topics %}border-bp-gold
+                      {% else %}border-bp-cloud hover:border-bp-mist{% endif %}"
+               style="width: 56px;"
+               title="Page {{ p.page_number }}{% if p.topics %} — {{ p.topics | join(', ') }}{% endif %}">
+                <img src="/page-thumb/{{ p.id }}" alt="Page {{ p.page_number }}"
+                     class="w-full h-auto" loading="lazy" />
+                <div class="text-center py-0.5 bg-bp-frost text-[8px] font-mono
+                            {% if p.id == page.id %}text-bp-teal font-bold{% else %}text-bp-mist{% endif %}">
+                    {{ p.page_number }}
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Auto-scroll filmstrip to current page
+    document.addEventListener('DOMContentLoaded', () => {
+        const strip = document.getElementById('filmstrip');
+        const current = strip.querySelector('.border-bp-teal');
+        if (current && strip) {
+            current.scrollIntoView({ inline: 'center', behavior: 'instant' });
+        }
+    });
+
+    // Keyboard navigation
+    document.addEventListener('keydown', (e) => {
+        {% if prev_page %}
+        if (e.key === 'ArrowLeft') { window.location = '/page/{{ prev_page.id }}'; }
+        {% endif %}
+        {% if next_page %}
+        if (e.key === 'ArrowRight') { window.location = '/page/{{ next_page.id }}'; }
+        {% endif %}
+    });
+</script>
+{% endblock %}
