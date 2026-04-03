@@ -17,6 +17,27 @@ def extract_text_from_html(html: str) -> str:
     return "\n".join(lines)
 
 
+def _ocr_pdf(doc) -> str:
+    """OCR a scanned PDF using Tesseract via pytesseract."""
+    try:
+        import io
+        from PIL import Image
+        import pytesseract
+    except ImportError:
+        return ""
+
+    pages_text = []
+    for page_idx in range(min(len(doc), 50)):  # cap at 50 pages
+        page = doc[page_idx]
+        pix = page.get_pixmap(dpi=200)
+        img = Image.open(io.BytesIO(pix.tobytes("png")))
+        text = pytesseract.image_to_string(img)
+        if text.strip():
+            pages_text.append(text.strip())
+
+    return "\n\n".join(pages_text)
+
+
 def extract_text_from_file(file_path: Path) -> str | None:
     """Extract text from a file using markitdown.
 
@@ -34,6 +55,22 @@ def extract_text_from_file(file_path: Path) -> str | None:
     if suffix == ".txt":
         return file_path.read_text(errors="ignore")
 
+    # Try PyMuPDF first for PDFs (most reliable)
+    if suffix == ".pdf":
+        try:
+            import fitz
+            doc = fitz.open(str(file_path))
+            text = "\n\n".join(page.get_text() for page in doc)
+            # If no text extracted but pages have images, try OCR
+            if not text.strip() and len(doc) > 0 and len(doc[0].get_images()) > 0:
+                text = _ocr_pdf(doc)
+            doc.close()
+            if text.strip():
+                return text.strip()
+        except Exception:
+            pass
+
+    # Fallback to markitdown for other formats
     try:
         result = subprocess.run(
             ["markitdown", str(file_path)],
