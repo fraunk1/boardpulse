@@ -49,14 +49,13 @@
         </div>
     </section>
 
-    <!-- MAIN CONTENT: Map + Topics + Feed -->
+    <!-- MAIN CONTENT: Map + Trending -->
     <section class="max-w-[1400px] mx-auto px-6 py-8">
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
-            <!-- LEFT COL: Map + State Directory -->
+            <!-- LEFT COL: Map -->
             <div class="lg:col-span-2">
-                <!-- Map -->
-                <div id="coverage-map" class="mb-6">
+                <div id="coverage-map">
                     <div class="flex items-center justify-between mb-3">
                         <h2 class="section-label flex items-center gap-1.5">
                             <i data-lucide="map" class="w-3.5 h-3.5"></i> Coverage Map
@@ -78,40 +77,9 @@
                         </svg>
                     </div>
                 </div>
-
-                <!-- State Directory Grid -->
-                <div>
-                    <div class="flex items-center justify-between mb-3">
-                        <h2 class="section-label flex items-center gap-1.5">
-                            <i data-lucide="list" class="w-3.5 h-3.5"></i> State Directory
-                        </h2>
-                        <div class="relative">
-                            <i data-lucide="search" class="w-3.5 h-3.5 text-bp-mist absolute left-2.5 top-1/2 -translate-y-1/2"></i>
-                            <input type="text" x-model="stateFilter" placeholder="Filter states..."
-                                   class="w-44 text-xs bg-bp-frost border border-bp-cloud rounded-lg pl-8 pr-3 py-1.5 text-bp-navy placeholder-bp-mist focus:outline-none focus:border-bp-teal focus:ring-1 focus:ring-bp-teal/20">
-                        </div>
-                    </div>
-                    <div class="grid grid-cols-4 xl:grid-cols-5 gap-1.5">
-                        {% for abbr, data in state_data.items() | sort %}
-                        <a href="/state/{{ abbr }}"
-                           class="flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs transition-all hover:bg-bp-frost border border-transparent hover:border-bp-cloud group"
-                           x-show="!stateFilter || '{{ abbr }}'.toLowerCase().includes(stateFilter.toLowerCase()) || '{{ data.name }}'.toLowerCase().includes(stateFilter.toLowerCase())">
-                            <span class="w-1.5 h-1.5 rounded-full flex-none
-                                {% if data.status == 'collected' %}bg-bp-teal
-                                {% elif data.status == 'discovered' %}bg-bp-gold
-                                {% else %}bg-bp-cloud{% endif %}"></span>
-                            <span class="font-mono font-semibold text-bp-navy w-6">{{ abbr }}</span>
-                            <span class="text-bp-steel group-hover:text-bp-navy truncate text-[11px]">{{ data.name }}</span>
-                            {% if data.total_meetings > 0 %}
-                            <span class="ml-auto text-[10px] font-mono text-bp-mist">{{ data.total_meetings }}</span>
-                            {% endif %}
-                        </a>
-                        {% endfor %}
-                    </div>
-                </div>
             </div>
 
-            <!-- RIGHT COL: Trending + Topics -->
+            <!-- RIGHT COL: Trending -->
             <div class="space-y-8">
                 <!-- Trending Topics (3-month velocity) -->
                 {% if trending %}
@@ -143,123 +111,153 @@
                     </div>
                 </div>
                 {% endif %}
-
-                <!-- Topic Intelligence -->
-                <div>
-                    <h2 class="section-label flex items-center gap-1.5 mb-3">
-                        <i data-lucide="tags" class="w-3.5 h-3.5"></i> Topic Intelligence
-                    </h2>
-                    <div class="space-y-2 stagger-in">
-                        {% for topic in topics %}
-                        <a href="/search?topic={{ topic.name }}" class="topic-card block">
-                            <div class="flex items-center justify-between">
-                                <div>
-                                    <div class="topic-name">{{ topic.name | replace("-", " ") | title }}</div>
-                                    <div class="topic-boards">{{ topic.board_count }} boards &bull; {{ topic.count }} mentions</div>
-                                </div>
-                                <div class="topic-count">{{ topic.count }}</div>
-                            </div>
-                        </a>
-                        {% endfor %}
-                    </div>
-                </div>
             </div>
 
         </div>
     </section>
 
-    <!-- DEPTH SECTIONS: Activity Feed + Cross-State Comparison -->
+    <!-- TOPIC PILLS -->
+    <section class="border-t border-bp-cloud/60 bg-bp-frost/40">
+        <div class="max-w-[1400px] mx-auto px-6 py-4">
+            <div class="flex items-center gap-3">
+                <h2 class="section-label flex items-center gap-1.5 flex-shrink-0">
+                    <i data-lucide="tags" class="w-3.5 h-3.5"></i> Topics
+                </h2>
+                <div class="flex flex-wrap gap-1.5">
+                    {% for topic in topics %}
+                    <a href="/search?topic={{ topic.name }}"
+                       class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium
+                              bg-white border border-bp-cloud text-bp-slate
+                              hover:border-bp-teal hover:text-bp-teal hover:bg-bp-teal/5 transition-all">
+                        {{ topic.name | replace("-", " ") | title }}
+                        <span class="text-[9px] font-mono text-bp-mist">{{ topic.count }}</span>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- HEATMAP + STATE DIRECTORY -->
     <section class="border-t border-bp-cloud bg-white">
         <div class="max-w-[1400px] mx-auto px-6 py-8">
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
 
-                <!-- Activity Feed -->
-                <div>
-                    <h2 class="section-label flex items-center gap-1.5 mb-4">
-                        <i data-lucide="activity" class="w-3.5 h-3.5"></i> Recent Board Activity
-                    </h2>
-                    <div class="space-y-0 stagger-in">
-                        {% for item in activity %}
-                        <a href="/meeting/{{ item.meeting.id }}" class="activity-feed-item block group">
-                            <div class="activity-feed-dot {% if loop.first %}dot-latest{% endif %}"></div>
-                            <div class="activity-feed-content">
-                                <div class="flex items-center gap-2 mb-0.5">
-                                    <span class="text-[10px] font-mono text-bp-mist tracking-wide">{{ item.meeting.meeting_date.strftime('%b %d, %Y') }}</span>
-                                    <span class="text-[10px] font-mono font-semibold text-bp-teal px-1.5 py-0 rounded bg-bp-teal/8">{{ item.board.code }}</span>
-                                </div>
-                                <div class="text-[13px] font-medium text-bp-navy group-hover:text-bp-teal transition-colors leading-snug">
-                                    {{ item.board.name }}
-                                </div>
-                                {% if item.summary_preview %}
-                                <div class="text-[11px] text-bp-steel mt-1 leading-relaxed line-clamp-2">
-                                    {{ item.summary_preview }}
-                                </div>
-                                {% endif %}
-                                {% if item.meeting.topics %}
-                                <div class="flex flex-wrap gap-1 mt-1.5">
-                                    {% for tag in item.meeting.topics[:4] %}
-                                    <span class="text-[9px] px-1.5 py-0.5 rounded-full bg-bp-frost text-bp-steel border border-bp-cloud/60 font-medium">{{ tag }}</span>
-                                    {% endfor %}
-                                    {% if item.meeting.topics | length > 4 %}
-                                    <span class="text-[9px] text-bp-mist">+{{ item.meeting.topics | length - 4 }}</span>
+            <!-- Cross-State Topic Heatmap (full width) -->
+            <div class="mb-8">
+                <h2 class="section-label flex items-center gap-1.5 mb-4">
+                    <i data-lucide="grid-3x3" class="w-3.5 h-3.5"></i> Cross-State Topic Heatmap
+                </h2>
+                <div class="bg-bp-frost/30 border border-bp-cloud rounded-xl p-4">
+                    <table class="w-full text-[10px]">
+                        <thead>
+                            <tr>
+                                <th class="text-left text-bp-mist font-semibold uppercase tracking-wider pb-2 pr-3 sticky left-0 bg-bp-frost/30">Topic</th>
+                                {% for state in topic_matrix.states %}
+                                <th class="text-center font-mono text-bp-mist pb-2 px-0.5 min-w-[22px]">
+                                    <a href="/state/{{ state }}" class="hover:text-bp-teal transition-colors">{{ state }}</a>
+                                </th>
+                                {% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for topic in topic_matrix.topics %}
+                            <tr class="border-t border-bp-cloud/40">
+                                <td class="py-1.5 pr-3 font-medium text-bp-slate whitespace-nowrap sticky left-0 bg-bp-frost/30">
+                                    <a href="/search?topic={{ topic }}&period=all" class="hover:text-bp-teal transition-colors">{{ topic }}</a>
+                                </td>
+                                {% for state in topic_matrix.states %}
+                                {% set count = topic_matrix.matrix[topic].get(state, 0) %}
+                                <td class="text-center py-1.5 px-0.5">
+                                    {% if count > 0 %}
+                                    <span class="inline-block w-4 h-4 rounded-sm text-[8px] font-bold leading-4 text-center
+                                        {% if count >= 20 %}bg-bp-teal text-white
+                                        {% elif count >= 10 %}bg-bp-teal/60 text-white
+                                        {% elif count >= 5 %}bg-bp-teal/30 text-bp-navy
+                                        {% else %}bg-bp-teal/12 text-bp-steel{% endif %}">
+                                        {{ count }}
+                                    </span>
+                                    {% else %}
+                                    <span class="text-bp-cloud">·</span>
                                     {% endif %}
-                                </div>
+                                </td>
+                                {% endfor %}
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <p class="text-[10px] text-bp-mist mt-2 italic">
+                    Showing top 8 topics across {{ topic_matrix.states | length }} states. Cell intensity = meeting frequency.
+                </p>
+            </div>
+
+            <!-- State Directory (full width, compact multi-column) -->
+            <div class="pt-6 border-t border-bp-cloud/60">
+                <div class="flex items-center gap-4 mb-3">
+                    <h2 class="section-label flex items-center gap-1.5 flex-shrink-0">
+                        <i data-lucide="list" class="w-3.5 h-3.5"></i> States
+                    </h2>
+                    <div class="relative w-48">
+                        <i data-lucide="search" class="w-3 h-3 text-bp-mist absolute left-2 top-1/2 -translate-y-1/2"></i>
+                        <input type="text" x-model="stateFilter" placeholder="Filter..."
+                               class="w-full text-[11px] bg-bp-frost border border-bp-cloud rounded-lg pl-7 pr-2 py-1.5 text-bp-navy placeholder-bp-mist focus:outline-none focus:border-bp-teal focus:ring-1 focus:ring-bp-teal/20">
+                    </div>
+                </div>
+                <div class="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-x-2 gap-y-0.5">
+                    {% for abbr, data in state_data.items() | sort %}
+                    <a href="/state/{{ abbr }}"
+                       class="flex items-center gap-1 px-1.5 py-1 rounded-md text-[11px] transition-all hover:bg-bp-frost border border-transparent hover:border-bp-cloud group"
+                       x-show="!stateFilter || '{{ abbr }}'.toLowerCase().includes(stateFilter.toLowerCase()) || '{{ data.name }}'.toLowerCase().includes(stateFilter.toLowerCase())">
+                        <span class="w-1.5 h-1.5 rounded-full flex-none
+                            {% if data.status == 'collected' %}bg-bp-teal
+                            {% elif data.status == 'discovered' %}bg-bp-gold
+                            {% else %}bg-bp-cloud{% endif %}"></span>
+                        <span class="font-mono font-semibold text-bp-navy text-[10px]">{{ abbr }}</span>
+                        <span class="text-bp-steel group-hover:text-bp-navy truncate text-[10px]">{{ data.name }}</span>
+                        {% if data.total_meetings > 0 %}
+                        <span class="ml-auto text-[9px] font-mono text-bp-mist">{{ data.total_meetings }}</span>
+                        {% endif %}
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- RECENT ACTIVITY (full width below) -->
+            <div class="mt-8 pt-8 border-t border-bp-cloud/60">
+                <h2 class="section-label flex items-center gap-1.5 mb-4">
+                    <i data-lucide="activity" class="w-3.5 h-3.5"></i> Recent Board Activity
+                </h2>
+                <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 stagger-in">
+                    {% for item in activity %}
+                    <a href="/meeting/{{ item.meeting.id }}" class="activity-feed-item block group">
+                        <div class="activity-feed-dot {% if loop.first %}dot-latest{% endif %}"></div>
+                        <div class="activity-feed-content">
+                            <div class="flex items-center gap-2 mb-0.5">
+                                <span class="text-[10px] font-mono text-bp-mist tracking-wide">{{ item.meeting.meeting_date.strftime('%b %d, %Y') }}</span>
+                                <span class="text-[10px] font-mono font-semibold text-bp-teal px-1.5 py-0 rounded bg-bp-teal/8">{{ item.board.code }}</span>
+                            </div>
+                            <div class="text-[13px] font-medium text-bp-navy group-hover:text-bp-teal transition-colors leading-snug">
+                                {{ item.board.name }}
+                            </div>
+                            {% if item.summary_preview %}
+                            <div class="text-[11px] text-bp-steel mt-1 leading-relaxed line-clamp-2">
+                                {{ item.summary_preview }}
+                            </div>
+                            {% endif %}
+                            {% if item.meeting.topics %}
+                            <div class="flex flex-wrap gap-1 mt-1.5">
+                                {% for tag in item.meeting.topics[:4] %}
+                                <span class="text-[9px] px-1.5 py-0.5 rounded-full bg-bp-frost text-bp-steel border border-bp-cloud/60 font-medium">{{ tag }}</span>
+                                {% endfor %}
+                                {% if item.meeting.topics | length > 4 %}
+                                <span class="text-[9px] text-bp-mist">+{{ item.meeting.topics | length - 4 }}</span>
                                 {% endif %}
                             </div>
-                        </a>
-                        {% endfor %}
-                    </div>
+                            {% endif %}
+                        </div>
+                    </a>
+                    {% endfor %}
                 </div>
-
-                <!-- Cross-State Topic Comparison -->
-                <div>
-                    <h2 class="section-label flex items-center gap-1.5 mb-4">
-                        <i data-lucide="grid-3x3" class="w-3.5 h-3.5"></i> Cross-State Topic Heatmap
-                    </h2>
-                    <div class="bg-bp-frost/30 border border-bp-cloud rounded-xl p-4 overflow-x-auto">
-                        <table class="w-full text-[10px]">
-                            <thead>
-                                <tr>
-                                    <th class="text-left text-bp-mist font-semibold uppercase tracking-wider pb-2 pr-3 sticky left-0 bg-bp-frost/30">Topic</th>
-                                    {% for state in topic_matrix.states %}
-                                    <th class="text-center font-mono text-bp-mist pb-2 px-0.5 min-w-[22px]">
-                                        <a href="/state/{{ state }}" class="hover:text-bp-teal transition-colors">{{ state }}</a>
-                                    </th>
-                                    {% endfor %}
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for topic in topic_matrix.topics %}
-                                <tr class="border-t border-bp-cloud/40">
-                                    <td class="py-1.5 pr-3 font-medium text-bp-slate whitespace-nowrap sticky left-0 bg-bp-frost/30">
-                                        <a href="/search?topic={{ topic }}&period=all" class="hover:text-bp-teal transition-colors">{{ topic }}</a>
-                                    </td>
-                                    {% for state in topic_matrix.states %}
-                                    {% set count = topic_matrix.matrix[topic].get(state, 0) %}
-                                    <td class="text-center py-1.5 px-0.5">
-                                        {% if count > 0 %}
-                                        <span class="inline-block w-4 h-4 rounded-sm text-[8px] font-bold leading-4 text-center
-                                            {% if count >= 20 %}bg-bp-teal text-white
-                                            {% elif count >= 10 %}bg-bp-teal/60 text-white
-                                            {% elif count >= 5 %}bg-bp-teal/30 text-bp-navy
-                                            {% else %}bg-bp-teal/12 text-bp-steel{% endif %}">
-                                            {{ count }}
-                                        </span>
-                                        {% else %}
-                                        <span class="text-bp-cloud">·</span>
-                                        {% endif %}
-                                    </td>
-                                    {% endfor %}
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                    <p class="text-[10px] text-bp-mist mt-2 italic">
-                        Showing top 8 topics across {{ topic_matrix.states | length }} states. Cell intensity = meeting frequency.
-                    </p>
-                </div>
-
             </div>
         </div>
     </section>

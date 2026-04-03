@@ -294,6 +294,23 @@ async def _get_topic_by_state_matrix() -> dict:
     }
 
 
+async def _get_activity_by_month(months: int = 12) -> list[dict]:
+    """Get meeting counts grouped by month for the last N months."""
+    from datetime import timedelta
+    cutoff = date.today().replace(day=1) - timedelta(days=months * 31)
+    async with db.async_session() as session:
+        rows = (await session.execute(
+            select(
+                func.strftime('%Y-%m', Meeting.meeting_date).label('month'),
+                func.count(Meeting.id).label('count')
+            )
+            .where(Meeting.meeting_date >= cutoff)
+            .group_by(func.strftime('%Y-%m', Meeting.meeting_date))
+            .order_by(func.strftime('%Y-%m', Meeting.meeting_date))
+        )).all()
+    return [{"month": r.month, "count": r.count} for r in rows]
+
+
 async def _get_recent_activity(limit: int = 12) -> list[dict]:
     """Get the most recent meetings with summaries — the activity feed."""
     async with db.async_session() as session:
@@ -326,6 +343,7 @@ async def national_overview(request: Request):
     trending = await _get_trending_topics()
     activity = await _get_recent_activity(limit=12)
     topic_matrix = await _get_topic_by_state_matrix()
+    activity_by_month = await _get_activity_by_month(months=12)
 
     # State colors for map
     state_colors = {s: d["status"] for s, d in state_data.items()}
@@ -339,6 +357,7 @@ async def national_overview(request: Request):
         "trending": trending,
         "activity": activity,
         "topic_matrix": topic_matrix,
+        "activity_by_month": activity_by_month,
         "breadcrumbs": [],
     })
 
