@@ -70,9 +70,20 @@ html { scroll-behavior: smooth; }
     overflow: hidden;
     transition: border-color 0.2s, box-shadow 0.2s;
 }
-.stat-hero:hover {
+a.stat-link {
+    display: block;
+    text-decoration: none;
+    color: inherit;
+    cursor: pointer;
+}
+a.stat-link:hover {
     border-color: #139AD0;
-    box-shadow: 0 4px 20px rgba(19, 154, 208, 0.08);
+    box-shadow: 0 4px 20px rgba(19, 154, 208, 0.12);
+    transform: translateY(-1px);
+}
+a.stat-link:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 8px rgba(19, 154, 208, 0.1);
 }
 .stat-hero .stat-number {
     font-size: 2.5rem;

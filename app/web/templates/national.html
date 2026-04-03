@@ -19,32 +19,32 @@
             </div>
 
             <div class="grid grid-cols-2 md:grid-cols-5 gap-4 stagger-in">
-                <div class="stat-hero">
+                <a href="#coverage-map" class="stat-hero stat-link">
                     <div class="stat-icon"><i data-lucide="building-2" class="w-6 h-6"></i></div>
                     <div class="stat-number text-bp-navy">{{ stats.boards_collected }}</div>
                     <div class="stat-label">Boards Collected</div>
-                </div>
-                <div class="stat-hero">
+                </a>
+                <a href="/search?period=all" class="stat-hero stat-link">
                     <div class="stat-icon"><i data-lucide="calendar-days" class="w-6 h-6"></i></div>
                     <div class="stat-number text-bp-teal">{{ stats.total_meetings }}</div>
                     <div class="stat-label">Meetings Tracked</div>
-                </div>
-                <div class="stat-hero">
+                </a>
+                <a href="/search?period=all" class="stat-hero stat-link">
                     <div class="stat-icon"><i data-lucide="file-text" class="w-6 h-6"></i></div>
                     <div class="stat-number text-bp-navy">{{ stats.meetings_with_files }}</div>
                     <div class="stat-label">Minutes on File</div>
                     <div class="text-[10px] text-bp-mist mt-1 font-mono">{{ ((stats.meetings_with_files / stats.total_meetings) * 100) | int if stats.total_meetings else 0 }}% coverage</div>
-                </div>
-                <div class="stat-hero">
+                </a>
+                <a href="/report" class="stat-hero stat-link">
                     <div class="stat-icon"><i data-lucide="sparkles" class="w-6 h-6"></i></div>
                     <div class="stat-number text-bp-gold">{{ stats.total_summaries }}</div>
                     <div class="stat-label">AI Summaries</div>
-                </div>
-                <div class="stat-hero">
+                </a>
+                <a href="/search?period=all&gaps=1" class="stat-hero stat-link">
                     <div class="stat-icon"><i data-lucide="alert-circle" class="w-6 h-6"></i></div>
                     <div class="stat-number text-amber-500">{{ stats.total_meetings - stats.meetings_with_files }}</div>
                     <div class="stat-label">Missing Documents</div>
-                </div>
+                </a>
             </div>
         </div>
     </section>
@@ -56,7 +56,7 @@
             <!-- LEFT COL: Map + State Directory -->
             <div class="lg:col-span-2">
                 <!-- Map -->
-                <div class="mb-6">
+                <div id="coverage-map" class="mb-6">
                     <div class="flex items-center justify-between mb-3">
                         <h2 class="section-label flex items-center gap-1.5">
                             <i data-lucide="map" class="w-3.5 h-3.5"></i> Coverage Map
