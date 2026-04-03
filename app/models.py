@@ -2,7 +2,7 @@
 from datetime import date, datetime, timezone
 from typing import Optional
 
-from sqlalchemy import String, Text, Date, DateTime, ForeignKey, JSON
+from sqlalchemy import String, Text, Date, DateTime, Float, Integer, ForeignKey, JSON
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -116,3 +116,58 @@ class DocumentPage(Base):
     rendered_at: Mapped[datetime] = mapped_column(DateTime)
 
     document: Mapped["MeetingDocument"] = relationship(back_populates="pages")
+
+
+class MeetingIntelligence(Base):
+    """Structured data extracted by AI from meeting minutes/agendas.
+    One row per meeting — populated during Layer 2 pipeline processing."""
+    __tablename__ = "meeting_intelligence"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    meeting_id: Mapped[int] = mapped_column(ForeignKey("meetings.id"), unique=True)
+
+    # Agenda & participation
+    agenda_item_count: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    public_comment: Mapped[Optional[bool]] = mapped_column(nullable=True)
+    attendance_count: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+
+    # Regulatory actions — structured from meeting content
+    actions: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    # e.g. [{"type": "rule_adopted", "topic": "telehealth", "detail": "Expanded telehealth prescribing scope", "vote": "8-1"}]
+
+    # Disciplinary actions
+    disciplinary_actions: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    # e.g. [{"type": "license_revoked", "count": 3}, {"type": "fine", "count": 1, "total_amount": 25000}]
+
+    # Topic posture — direction each topic is moving
+    topic_postures: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    # e.g. {"telehealth": "expanding", "opioids": "restricting", "AI": "exploring"}
+
+    # Legislative references
+    legislation_refs: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    # e.g. [{"bill": "HB 1234", "status": "discussed", "topic": "scope-of-practice"}]
+
+    # Key quotes or notable statements
+    key_takeaways: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    # e.g. ["Board voted to require AI disclosure for telehealth visits starting Jan 2027"]
+
+    # Processing metadata
+    extracted_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    extraction_model: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)  # "claude-sonnet", "cowork", etc.
+
+    meeting: Mapped["Meeting"] = relationship()
+
+
+class IntelligenceBrief(Base):
+    """Pre-generated intelligence briefs stored by the pipeline.
+    The dashboard reads the latest one — no real-time AI calls needed."""
+    __tablename__ = "intelligence_briefs"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    period_label: Mapped[str] = mapped_column(String(50))  # "90-day", "monthly-2026-03", "weekly-2026-W14"
+    brief_html: Mapped[str] = mapped_column(Text)
+    meetings_analyzed: Mapped[int] = mapped_column(Integer, default=0)
+    boards_covered: Mapped[int] = mapped_column(Integer, default=0)
+    generated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    generated_by: Mapped[str] = mapped_column(String(50), default="cowork")  # "cowork", "claude-api", "manual"
+    pipeline_run_id: Mapped[Optional[int]] = mapped_column(ForeignKey("pipeline_runs.id"), nullable=True)

@@ -1,6 +1,7 @@
 """boardpulse web dashboard — Palantir-style intelligence interface."""
 import json
 import os
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import FastAPI, Request, HTTPException
@@ -9,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select, func, distinct
 
-from app.models import Board, Meeting, MeetingDocument, PipelineRun, PipelineEvent, DocumentPage
+from app.models import Board, Meeting, MeetingDocument, PipelineRun, PipelineEvent, DocumentPage, IntelligenceBrief, MeetingIntelligence
 from app.config import SCREENSHOTS_DIR, DOCUMENTS_DIR, REPORTS_DIR, EXHIBITS_DIR
 import app.database as db
 
@@ -294,12 +295,19 @@ async def _get_topic_by_state_matrix() -> dict:
     }
 
 
-async def _get_activity_by_month(months: int = 12) -> list[dict]:
-    """Get meeting counts grouped by month for the last N months."""
-    from datetime import timedelta
-    cutoff = date.today().replace(day=1) - timedelta(days=months * 31)
+async def _get_activity_by_month(months: int = 12) -> dict:
+    """Get meeting counts grouped by month — total + per-topic breakdown.
+
+    Returns {"months": ["2025-05", ...], "total": [n, ...],
+             "series": [{"topic": "Discipline", "data": [n, ...]}, ...]}
+    """
+    from datetime import timedelta, date as _date
+    import json as _json
+    cutoff = _date.today().replace(day=1) - timedelta(days=months * 31)
+
     async with db.async_session() as session:
-        rows = (await session.execute(
+        # 1) Total meetings per month
+        total_rows = (await session.execute(
             select(
                 func.strftime('%Y-%m', Meeting.meeting_date).label('month'),
                 func.count(Meeting.id).label('count')
@@ -308,7 +316,41 @@ async def _get_activity_by_month(months: int = 12) -> list[dict]:
             .group_by(func.strftime('%Y-%m', Meeting.meeting_date))
             .order_by(func.strftime('%Y-%m', Meeting.meeting_date))
         )).all()
-    return [{"month": r.month, "count": r.count} for r in rows]
+
+        month_labels = [r.month for r in total_rows]
+        total_counts = [r.count for r in total_rows]
+
+        # 2) Per-topic counts via json_each (SQLite)
+        from sqlalchemy import text
+        topic_rows = (await session.execute(text("""
+            SELECT strftime('%Y-%m', m.meeting_date) AS month,
+                   j.value AS topic,
+                   COUNT(DISTINCT m.id) AS cnt
+            FROM meetings m, json_each(m.topics) j
+            WHERE m.topics IS NOT NULL
+              AND m.meeting_date >= :cutoff
+            GROUP BY month, topic
+            ORDER BY month, topic
+        """), {"cutoff": str(cutoff)})).all()
+
+    # Pivot: pick top 6 topics by overall volume in the window
+    from collections import defaultdict
+    topic_totals = defaultdict(int)
+    topic_month = defaultdict(lambda: defaultdict(int))
+    for r in topic_rows:
+        topic_totals[r.topic] += r.cnt
+        topic_month[r.topic][r.month] = r.cnt
+
+    top_topics = sorted(topic_totals, key=topic_totals.get, reverse=True)[:6]
+
+    series = []
+    for t in top_topics:
+        series.append({
+            "topic": t,
+            "data": [topic_month[t].get(m, 0) for m in month_labels]
+        })
+
+    return {"months": month_labels, "total": total_counts, "series": series}
 
 
 async def _get_recent_activity(limit: int = 12) -> list[dict]:
@@ -328,6 +370,64 @@ async def _get_recent_activity(limit: int = 12) -> list[dict]:
         "state_name": STATE_NAMES.get(b.state, b.state),
         "summary_preview": _clean_summary_preview(m.summary),
     } for m, b in rows]
+
+
+# ---------------------------------------------------------------------------
+# API — AI Intelligence Brief
+# ---------------------------------------------------------------------------
+
+@app.post("/api/generate-brief")
+async def generate_brief():
+    """Return the latest stored intelligence brief, or a data-driven fallback."""
+    from datetime import date, timedelta
+
+    # First: check for a stored brief
+    try:
+        async with db.async_session() as session:
+            latest = (await session.execute(
+                select(IntelligenceBrief)
+                .order_by(IntelligenceBrief.generated_at.desc())
+                .limit(1)
+            )).scalar_one_or_none()
+
+        if latest:
+            age_days = (datetime.now(timezone.utc) - latest.generated_at).days
+            meta = f'<p class="mt-3 text-[10px] text-bp-mist italic">Generated {latest.generated_at.strftime("%b %d, %Y at %I:%M %p")} by {latest.generated_by} · {latest.meetings_analyzed} meetings across {latest.boards_covered} boards</p>'
+            if age_days > 7:
+                meta += '<p class="text-[10px] text-amber-500 mt-1">This brief is over a week old. Run the pipeline to generate a fresh one.</p>'
+            return JSONResponse({"brief": latest.brief_html + meta})
+    except Exception:
+        pass  # Table may not exist yet
+
+    # Fallback: data-driven summary from raw meeting data
+    cutoff = date.today() - timedelta(days=90)
+    async with db.async_session() as session:
+        rows = (await session.execute(
+            select(Meeting.topics, Board.code)
+            .join(Board, Meeting.board_id == Board.id)
+            .where(Meeting.summary.isnot(None), Meeting.meeting_date >= cutoff)
+        )).all()
+
+    if not rows:
+        return JSONResponse({"brief": "<p>No meeting data available for the last 90 days. Run the pipeline to collect data.</p>"})
+
+    from collections import Counter
+    boards_seen = set(r[1] for r in rows)
+    topics_all = []
+    for topics, _ in rows:
+        tags = topics if isinstance(topics, list) else json.loads(topics or "[]")
+        topics_all.extend(tags)
+    top_topics = Counter(topics_all).most_common(5)
+    top_str = ", ".join(f"{t} ({c})" for t, c in top_topics)
+
+    brief_html = f"""
+    <p><strong>Last 90 days:</strong> {len(rows)} meetings with summaries across {len(boards_seen)} boards.
+    Top topics: {top_str}.</p>
+    <p class="mt-2">No AI-generated brief has been stored yet. When the pipeline runs,
+    Claude will analyze meeting content and write a full intelligence brief that appears here.</p>
+    <p class="mt-2 text-[10px] text-bp-mist italic">Briefs are generated during scheduled pipeline runs — not on-demand.</p>
+    """
+    return JSONResponse({"brief": brief_html})
 
 
 # ---------------------------------------------------------------------------
