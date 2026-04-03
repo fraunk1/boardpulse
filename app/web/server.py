@@ -66,6 +66,26 @@ async def startup():
 # Helpers
 # ---------------------------------------------------------------------------
 
+def _clean_summary_preview(summary: str | None, max_len: int = 180) -> str:
+    """Strip YAML frontmatter, markdown headers, and metadata from summary preview."""
+    if not summary:
+        return ""
+    import re
+    text = summary
+    # Strip YAML frontmatter
+    text = re.sub(r'^---\s*\n.*?\n---\s*\n', '', text, flags=re.DOTALL)
+    # Strip markdown headers
+    text = re.sub(r'^#+\s+.*$', '', text, flags=re.MULTILINE)
+    # Strip bold field labels like **Period:** ...
+    text = re.sub(r'\*\*[A-Za-z ]+:\*\*\s*[^\n]*', '', text)
+    # Collapse whitespace
+    text = re.sub(r'\s+', ' ', text).strip()
+    # Trim to length
+    if len(text) > max_len:
+        text = text[:max_len].rsplit(' ', 1)[0] + "..."
+    return text
+
+
 async def _get_all_topics_with_counts() -> list[dict]:
     """Get all unique topics across meetings with their counts."""
     async with db.async_session() as session:
@@ -182,6 +202,117 @@ async def _get_state_coverage() -> dict[str, dict]:
     return state_data
 
 
+async def _get_trending_topics() -> list[dict]:
+    """Compare topic frequency in last 3 months vs prior 3 months to find trends."""
+    from datetime import date, timedelta
+
+    now = date.today()
+    recent_start = now - timedelta(days=90)
+    prior_start = now - timedelta(days=180)
+
+    async with db.async_session() as session:
+        # Recent period meetings with topics
+        recent_meetings = (await session.execute(
+            select(Meeting.topics)
+            .where(Meeting.topics.isnot(None))
+            .where(Meeting.meeting_date >= recent_start)
+        )).scalars().all()
+
+        # Prior period meetings with topics
+        prior_meetings = (await session.execute(
+            select(Meeting.topics)
+            .where(Meeting.topics.isnot(None))
+            .where(Meeting.meeting_date >= prior_start)
+            .where(Meeting.meeting_date < recent_start)
+        )).scalars().all()
+
+    def count_topics(meetings):
+        counts = {}
+        for topics_raw in meetings:
+            tags = topics_raw if isinstance(topics_raw, list) else json.loads(topics_raw or "[]")
+            for t in tags:
+                counts[t] = counts.get(t, 0) + 1
+        return counts
+
+    recent_counts = count_topics(recent_meetings)
+    prior_counts = count_topics(prior_meetings)
+
+    trends = []
+    all_topics = set(list(recent_counts.keys()) + list(prior_counts.keys()))
+    for topic in all_topics:
+        recent = recent_counts.get(topic, 0)
+        prior = prior_counts.get(topic, 0)
+        if prior > 0:
+            change_pct = round(((recent - prior) / prior) * 100)
+        elif recent > 0:
+            change_pct = 100  # new topic
+        else:
+            change_pct = 0
+        trends.append({
+            "name": topic,
+            "recent": recent,
+            "prior": prior,
+            "change_pct": change_pct,
+            "direction": "up" if change_pct > 5 else ("down" if change_pct < -5 else "flat"),
+        })
+
+    # Sort by absolute change, biggest movers first
+    trends.sort(key=lambda x: abs(x["change_pct"]), reverse=True)
+    return trends[:8]
+
+
+async def _get_topic_by_state_matrix() -> dict:
+    """Build a topic × state matrix for cross-state comparison."""
+    async with db.async_session() as session:
+        rows = (await session.execute(
+            select(Board.state, Meeting.topics)
+            .join(Board, Meeting.board_id == Board.id)
+            .where(Meeting.topics.isnot(None))
+        )).all()
+
+    # Count topic occurrences per state
+    matrix: dict[str, dict[str, int]] = {}
+    for state, topics_raw in rows:
+        tags = topics_raw if isinstance(topics_raw, list) else json.loads(topics_raw or "[]")
+        for t in tags:
+            if t not in matrix:
+                matrix[t] = {}
+            matrix[t][state] = matrix[t].get(state, 0) + 1
+
+    # Pick top 8 topics by total mentions
+    topic_totals = {t: sum(states.values()) for t, states in matrix.items()}
+    top_topics = sorted(topic_totals, key=topic_totals.get, reverse=True)[:8]
+
+    # Get all states that have data
+    all_states = sorted({s for states in matrix.values() for s in states})
+
+    return {
+        "topics": top_topics,
+        "states": all_states,
+        "matrix": {t: matrix[t] for t in top_topics},
+        "totals": {t: topic_totals[t] for t in top_topics},
+    }
+
+
+async def _get_recent_activity(limit: int = 12) -> list[dict]:
+    """Get the most recent meetings with summaries — the activity feed."""
+    async with db.async_session() as session:
+        rows = (await session.execute(
+            select(Meeting, Board)
+            .join(Board, Meeting.board_id == Board.id)
+            .where(Meeting.summary.isnot(None))
+            .order_by(Meeting.meeting_date.desc())
+            .limit(limit)
+        )).all()
+
+    return [{
+        "meeting": m,
+        "board": b,
+        "state_name": STATE_NAMES.get(b.state, b.state),
+        "summary_preview": _clean_summary_preview(m.summary),
+    } for m, b in rows]
+
+
 # ---------------------------------------------------------------------------
 # Pages — National Overview
 # ---------------------------------------------------------------------------
@@ -192,22 +323,9 @@ async def national_overview(request: Request):
     stats = await _get_national_stats()
     topics = await _get_all_topics_with_counts()
     state_data = await _get_state_coverage()
-
-    # Recent summaries (latest 8 meetings with summaries)
-    async with db.async_session() as session:
-        recent = (await session.execute(
-            select(Meeting, Board)
-            .join(Board, Meeting.board_id == Board.id)
-            .where(Meeting.summary.isnot(None))
-            .order_by(Meeting.meeting_date.desc())
-            .limit(8)
-        )).all()
-
-    recent_summaries = [{
-        "meeting": m,
-        "board": b,
-        "state_name": STATE_NAMES.get(b.state, b.state),
-    } for m, b in recent]
+    trending = await _get_trending_topics()
+    activity = await _get_recent_activity(limit=12)
+    topic_matrix = await _get_topic_by_state_matrix()
 
     # State colors for map
     state_colors = {s: d["status"] for s, d in state_data.items()}
@@ -217,7 +335,10 @@ async def national_overview(request: Request):
         "topics": topics,
         "state_data": state_data,
         "state_colors": state_colors,
-        "recent_summaries": recent_summaries,
+        "recent_summaries": activity[:8],
+        "trending": trending,
+        "activity": activity,
+        "topic_matrix": topic_matrix,
         "breadcrumbs": [],
     })
 
