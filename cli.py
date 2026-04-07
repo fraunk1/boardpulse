@@ -42,6 +42,26 @@ def main():
         "--national", action="store_true",
         help="Prepare national landscape synthesis prompt (requires per-board summaries)",
     )
+    summ.add_argument(
+        "--narrative", action="store_true",
+        help="Prepare/ingest per-meeting narrative summaries (200-400 word prose recaps)",
+    )
+    summ.add_argument(
+        "--tldr", action="store_true",
+        help="Prepare/ingest per-meeting TLDR summaries (2-3 sentences)",
+    )
+    summ.add_argument(
+        "--generate", action="store_true",
+        help="Run prompts through local LLM (Ollama/LM Studio) and write output files",
+    )
+    summ.add_argument(
+        "--source", type=str, choices=["ollama", "subagent"], default=None,
+        help="Provenance label when ingesting (default: 'ollama' if --generate was used, else 'subagent')",
+    )
+    summ.add_argument(
+        "--force", action="store_true",
+        help="Re-prepare/regenerate even if outputs already exist",
+    )
 
     # serve
     srv = sub.add_parser("serve", help="Start the web dashboard (port 8099)")
@@ -57,11 +77,19 @@ def main():
     classify = sub.add_parser("classify", help="Classify documents/pages into topic categories")
     classify.add_argument("--pages", action="store_true", help="Also classify individual pages")
     classify.add_argument("--force", action="store_true", help="Re-classify even if topics exist")
-    classify.add_argument("--min-matches", type=int, default=2, help="Min keyword hits per topic (default: 2)")
+    classify.add_argument("--min-matches", type=int, default=2, help="Min keyword hits per topic (regex backend, default: 2)")
+    classify.add_argument("--llm", action="store_true", help="Use local LLM (Ollama) instead of regex classifier")
 
     # render
     rend = sub.add_parser("render", help="Render PDF pages as images")
     rend.add_argument("--doc-id", type=int, help="Render a specific document ID")
+
+    # briefs
+    br = sub.add_parser("briefs", help="Prepare/ingest AI period briefs (quarter/half-year/year) for boards")
+    br.add_argument("--board", type=str, help="Board code (e.g., MO_MD) — one board only")
+    br.add_argument("--generate", action="store_true", help="Run prompts through local LLM (Ollama/LM Studio) and write output files")
+    br.add_argument("--ingest", action="store_true", help="Ingest completed brief files back into DB")
+    br.add_argument("--force", action="store_true", help="Re-prepare/regenerate even if outputs already exist")
 
     # status
     sub.add_parser("status", help="Show collection status for all boards")
@@ -121,6 +149,28 @@ async def dispatch(args):
 
     elif args.command == "render":
         await handle_render(args)
+
+    elif args.command == "briefs":
+        if args.ingest:
+            from app.extractor.summarizer import ingest_board_briefs
+            await ingest_board_briefs(board_code=args.board)
+        elif args.generate:
+            from app.extractor.local_generator import process_prompt_files
+            from app.config import REPORTS_DIR
+            pattern = f"{args.board}_brief_*.prompt.md" if args.board else "*_brief_*.prompt.md"
+            process_prompt_files(
+                REPORTS_DIR,
+                pattern=pattern,
+                max_tokens=600,
+                skip_existing=not args.force,
+            )
+        else:
+            from app.extractor.summarizer import prepare_board_briefs
+            paths = await prepare_board_briefs(board_code=args.board, skip_existing=not args.force)
+            if paths:
+                print(f"\nPrompt files ready. Next:")
+                print(f"  python3 cli.py briefs --generate{' --board ' + args.board if args.board else ''}")
+                print(f"  python3 cli.py briefs --ingest{' --board ' + args.board if args.board else ''}")
 
     elif args.command == "summarize":
         await handle_summarize(args)
@@ -202,48 +252,139 @@ async def handle_summarize(args):
     )
     from app.config import REPORTS_DIR
 
+    # Default source: 'ollama' if --generate was used, else 'subagent'
+    source = args.source or ("ollama" if args.generate else "subagent")
+
+    if args.narrative:
+        # Narrative mode: per-meeting verbose summaries (200-400 words)
+        if args.ingest:
+            from app.extractor.summarizer import ingest_narrative_summaries
+            await ingest_narrative_summaries(board_code=args.board, source=source)
+        elif args.generate:
+            from app.extractor.local_generator import process_prompt_files
+            from app.config import REPORTS_DIR
+            pattern = f"{args.board}_*.prompt.md" if args.board else "*.prompt.md"
+            process_prompt_files(
+                REPORTS_DIR / "narrative",
+                pattern=pattern,
+                max_tokens=800,
+                skip_existing=not args.force,
+            )
+        else:
+            from app.extractor.summarizer import prepare_narrative_prompts
+            await prepare_narrative_prompts(board_code=args.board, skip_existing=not args.force)
+        return
+
+    if args.tldr:
+        # TLDR mode: prepare/ingest short meeting summaries
+        if args.ingest:
+            from app.extractor.summarizer import ingest_tldr_summaries
+            await ingest_tldr_summaries(board_code=args.board, source=source)
+        elif args.generate:
+            from app.extractor.local_generator import process_prompt_files
+            from app.config import REPORTS_DIR
+            pattern = f"{args.board}_*.prompt.md" if args.board else "*.prompt.md"
+            process_prompt_files(
+                REPORTS_DIR / "tldr",
+                pattern=pattern,
+                max_tokens=300,
+                skip_existing=not args.force,
+            )
+        else:
+            from app.extractor.summarizer import prepare_tldr_prompts
+            await prepare_tldr_prompts(board_code=args.board, skip_existing=not args.force)
+        return
+
     if args.ingest:
         # Ingest mode: read completed summary files back into DB
         if args.board:
-            await ingest_board_summary(args.board)
+            await ingest_board_summary(args.board, source=source)
         else:
-            await ingest_all_summaries()
+            await ingest_all_summaries(source=source)
         return
 
     if args.national:
         # National synthesis mode: build synthesis prompt from per-board summaries
         path = await prepare_national_bundle()
-        if path:
-            print(f"\n{'='*60}")
-            print("NATIONAL SYNTHESIS PROMPT READY")
-            print(f"{'='*60}")
-            print(f"Prompt file: {path}")
-            print(f"\nTo generate the report, have a Claude Code subagent:")
-            print(f"  1. Read: {path}")
-            print(f"  2. Write output to: {REPORTS_DIR}/{{date}}-board-landscape.md")
+        if not path:
+            return
+
+        if args.generate:
+            from app.extractor.local_generator import generate
+            from datetime import date as _date
+            print(f"\nRunning national synthesis through local LLM...")
+            prompt_text = path.read_text(encoding="utf-8")
+            try:
+                result = generate(
+                    prompt_text,
+                    max_tokens=4000,
+                    temperature=0.3,
+                )
+                output_path = REPORTS_DIR / f"{_date.today().isoformat()}-board-landscape.md"
+                output_path.write_text(result, encoding="utf-8")
+                print(f"  → {output_path} ({len(result)} chars)")
+            except Exception as e:
+                print(f"  ERROR: {e}")
+            return
+
+        print(f"\n{'='*60}")
+        print("NATIONAL SYNTHESIS PROMPT READY")
+        print(f"{'='*60}")
+        print(f"Prompt file: {path}")
+        print(f"\nTo generate the report:")
+        print(f"  • Local LLM: python cli.py summarize --national --generate")
+        print(f"  • Sub-agent: dispatch a Claude Code subagent to read the prompt")
+        print(f"               and write to {REPORTS_DIR}/{{date}}-board-landscape.md")
         return
 
     # Default: prepare per-board data bundles
     prompt_paths = await prepare_all_bundles(board_code=args.board)
 
-    if prompt_paths:
-        print(f"\n{'='*60}")
-        print("SUMMARIZATION PROMPTS READY")
-        print(f"{'='*60}")
-        print(f"\nPrompt files written to: {REPORTS_DIR}/")
-        print(f"Files: {len(prompt_paths)}")
-        print()
-        for p in prompt_paths:
-            board_code = p.stem.replace("_prompt", "")
-            print(f"  {board_code}:")
-            print(f"    Read:  {p}")
-            print(f"    Write: {REPORTS_DIR}/{board_code}_summary.md")
-        print()
-        print("Next steps:")
-        print("  1. Dispatch Claude Code subagents to process each prompt file")
-        print("  2. Each subagent reads the prompt and writes the summary file")
-        print("  3. Run 'python cli.py summarize --ingest' to store summaries in the DB")
-        print("  4. Run 'python cli.py summarize --national' to prepare the synthesis prompt")
+    if not prompt_paths:
+        return
+
+    if args.generate:
+        from app.extractor.local_generator import generate
+        print(f"\nRunning {len(prompt_paths)} per-board summaries through local LLM...")
+        generated = 0
+        skipped = 0
+        errors = 0
+        for i, prompt_path in enumerate(prompt_paths, 1):
+            board_code = prompt_path.stem.replace("_prompt", "")
+            output_path = REPORTS_DIR / f"{board_code}_summary.md"
+            if not args.force and output_path.exists() and output_path.stat().st_size > 0:
+                skipped += 1
+                continue
+            try:
+                prompt_text = prompt_path.read_text(encoding="utf-8")
+                result = generate(prompt_text, max_tokens=2000, temperature=0.3)
+                output_path.write_text(result, encoding="utf-8")
+                generated += 1
+                print(f"  [{i}/{len(prompt_paths)}] {board_code} → {len(result)} chars")
+            except Exception as e:
+                errors += 1
+                print(f"  [{i}/{len(prompt_paths)}] {board_code} → ERROR: {e}")
+        print(f"\nGenerated {generated}, skipped {skipped}, errors {errors}.")
+        print(f"Next: python cli.py summarize --ingest --source ollama")
+        return
+
+    print(f"\n{'='*60}")
+    print("SUMMARIZATION PROMPTS READY")
+    print(f"{'='*60}")
+    print(f"\nPrompt files written to: {REPORTS_DIR}/")
+    print(f"Files: {len(prompt_paths)}")
+    print()
+    for p in prompt_paths:
+        board_code = p.stem.replace("_prompt", "")
+        print(f"  {board_code}:")
+        print(f"    Read:  {p}")
+        print(f"    Write: {REPORTS_DIR}/{board_code}_summary.md")
+    print()
+    print("Next steps (pick one):")
+    print("  • Local LLM:  python cli.py summarize --generate")
+    print("  • Sub-agents: dispatch Claude Code subagents to process each prompt file")
+    print("  Then:        python cli.py summarize --ingest")
+    print("  Then:        python cli.py summarize --national  (or --national --generate)")
 
 
 async def handle_exhibits(args):
@@ -279,17 +420,21 @@ async def handle_classify(args):
 
     await init_db()
 
-    print("=== Document Classification ===")
+    backend = "llm" if args.llm else "regex"
+
+    print(f"=== Document Classification (backend={backend}) ===")
     result = await classify_all_documents(
         force=args.force,
         min_matches=args.min_matches,
+        backend=backend,
     )
 
     if args.pages:
-        print("\n=== Page-Level Classification ===")
+        print(f"\n=== Page-Level Classification (backend={backend}) ===")
         page_result = await classify_all_pages(
             force=args.force,
             min_matches=max(1, args.min_matches - 1),  # lower threshold for pages
+            backend=backend,
         )
 
     # Rebuild FTS after classification

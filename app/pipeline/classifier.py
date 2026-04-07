@@ -1,8 +1,8 @@
-"""Classify documents into topic categories using keyword matching + optional AI enhancement.
+"""Classify documents into topic categories using keyword matching or local LLM.
 
-Two-tier approach:
-  1. Fast keyword classifier — instant, no AI needed, good for 80%+ of content
-  2. AI classifier (Ollama) — optional second pass for better accuracy on ambiguous docs
+Two backends:
+  1. Regex classifier (default) — fast keyword matching, no AI, good for 80%+ of content
+  2. LLM classifier (--llm flag) — local Ollama call for higher accuracy on ambiguous text
 
 Topic taxonomy is tailored to state medical board meeting minutes.
 """
@@ -92,8 +92,11 @@ TOPIC_PATTERNS: list[tuple[str, re.Pattern]] = [
 ]
 
 
+TOPIC_NAMES: list[str] = [name for name, _ in TOPIC_PATTERNS]
+
+
 def classify_text(text: str, min_matches: int = 2) -> list[str]:
-    """Classify a document's text into topic categories.
+    """Classify a document's text into topic categories using regex patterns.
 
     Args:
         text: Document content text.
@@ -114,15 +117,79 @@ def classify_text(text: str, min_matches: int = 2) -> list[str]:
     return sorted(topics)
 
 
+def _llm_classify_prompt(text: str, max_chars: int = 5000) -> str:
+    """Build a topic-classification prompt for a local LLM."""
+    topics_list = "\n".join(f"- {t}" for t in TOPIC_NAMES)
+    snippet = text[:max_chars]
+    return (
+        "You are classifying a page from a state medical board meeting document into topic categories.\n\n"
+        f"TOPIC CATEGORIES (pick 0 to 4 that apply, exact spelling):\n{topics_list}\n\n"
+        "Rules:\n"
+        "- Only pick topics that are clearly discussed on this page.\n"
+        "- It is OK to pick zero topics if the page is administrative boilerplate or table-of-contents only.\n"
+        "- Pick at most 4 — focus on the most relevant.\n"
+        "- Output ONLY a comma-separated list of topic names. No prose, no explanation, no markdown.\n\n"
+        f"PAGE TEXT:\n{snippet}\n\n"
+        "CLASSIFICATION:"
+    )
+
+
+def classify_text_llm(text: str, model: str | None = None) -> list[str]:
+    """Classify text into topics using a local LLM (Ollama by default).
+
+    Returns canonical topic names from TOPIC_PATTERNS — names that don't match
+    the canonical list are dropped, so output is always trustworthy.
+
+    Args:
+        text: Document or page text content.
+        model: Override LLM model name (default: BOARDPULSE_LLM_MODEL).
+
+    Returns:
+        Sorted list of topic names from the canonical taxonomy.
+    """
+    if not text or len(text) < 50:
+        return []
+
+    from app.extractor.local_generator import generate
+
+    prompt = _llm_classify_prompt(text)
+    try:
+        response = generate(
+            prompt,
+            max_tokens=80,
+            temperature=0.1,
+            model=model,
+            think=False,
+        )
+    except Exception as e:
+        print(f"    LLM classification error: {e}")
+        return []
+
+    # Parse comma-separated topics; validate against canonical taxonomy.
+    canonical = {name.lower(): name for name in TOPIC_NAMES}
+    raw_parts = [t.strip().strip("-").strip("*").strip() for t in response.split(",")]
+    valid: set[str] = set()
+    for part in raw_parts:
+        if not part:
+            continue
+        # Some models prefix with bullets or numbers — strip them.
+        cleaned = part.lstrip("0123456789. )").strip()
+        if cleaned.lower() in canonical:
+            valid.add(canonical[cleaned.lower()])
+    return sorted(valid)
+
+
 async def classify_all_documents(
     force: bool = False,
     min_matches: int = 2,
+    backend: str = "regex",
 ) -> dict:
     """Classify all documents with extracted text and store topics.
 
     Args:
         force: Re-classify even if topics already exist.
-        min_matches: Minimum keyword hits per topic.
+        min_matches: Minimum keyword hits per topic (regex backend only).
+        backend: 'regex' (default, fast) or 'llm' (local Ollama, more accurate).
 
     Returns:
         Summary dict with counts.
@@ -139,14 +206,17 @@ async def classify_all_documents(
         query = query.where(MeetingDocument.content_text.isnot(None))
         docs = (await session.execute(query)).all()
 
-    print(f"  Classifying {len(docs)} documents...")
+    print(f"  Classifying {len(docs)} documents (backend={backend})...")
 
     classified = 0
     topics_json: dict[str, list[str]] = {}
     meetings_to_rollup: set[int] = set()
 
     for doc_id, content_text, existing_topics in docs:
-        topics = classify_text(content_text, min_matches=min_matches)
+        if backend == "llm":
+            topics = classify_text_llm(content_text)
+        else:
+            topics = classify_text(content_text, min_matches=min_matches)
         if not topics:
             continue
 
@@ -205,10 +275,20 @@ async def classify_all_documents(
     }
 
 
-async def classify_pages_for_document(document_id: int, min_matches: int = 1) -> int:
+async def classify_pages_for_document(
+    document_id: int,
+    min_matches: int = 1,
+    backend: str = "regex",
+) -> int:
     """Extract text per page via PyMuPDF and classify each page.
 
-    Returns number of pages tagged.
+    Args:
+        document_id: ID of the MeetingDocument.
+        min_matches: Min keyword hits per topic (regex backend only).
+        backend: 'regex' (default) or 'llm' (Ollama).
+
+    Returns:
+        Number of pages tagged.
     """
     import fitz
     from app.config import PROJECT_ROOT
@@ -251,7 +331,10 @@ async def classify_pages_for_document(document_id: int, min_matches: int = 1) ->
             continue
 
         page_text = pdf[page_idx].get_text()
-        topics = classify_text(page_text, min_matches=min_matches)
+        if backend == "llm":
+            topics = classify_text_llm(page_text)
+        else:
+            topics = classify_text(page_text, min_matches=min_matches)
 
         if topics:
             async with db.async_session() as session:
@@ -265,12 +348,17 @@ async def classify_pages_for_document(document_id: int, min_matches: int = 1) ->
     return tagged
 
 
-async def classify_all_pages(force: bool = False, min_matches: int = 1) -> dict:
+async def classify_all_pages(
+    force: bool = False,
+    min_matches: int = 1,
+    backend: str = "regex",
+) -> dict:
     """Classify all rendered pages by extracting text per page from PDFs.
 
     Args:
         force: Re-classify even if topics already exist.
-        min_matches: Minimum keyword hits per topic (lower for pages since less text).
+        min_matches: Minimum keyword hits per topic (regex backend only).
+        backend: 'regex' (default, fast) or 'llm' (local Ollama, slower but more accurate).
 
     Returns:
         Summary dict.
@@ -296,13 +384,16 @@ async def classify_all_pages(force: bool = False, min_matches: int = 1) -> dict:
             )
         doc_ids = [row[0] for row in (await session.execute(query)).all()]
 
-    print(f"  Tagging pages for {len(doc_ids)} documents...")
+    print(f"  Tagging pages for {len(doc_ids)} documents (backend={backend})...")
 
     total_tagged = 0
+    progress_step = 10 if backend == "llm" else 100
     for i, doc_id in enumerate(doc_ids, 1):
-        tagged = await classify_pages_for_document(doc_id, min_matches=min_matches)
+        tagged = await classify_pages_for_document(
+            doc_id, min_matches=min_matches, backend=backend,
+        )
         total_tagged += tagged
-        if i % 100 == 0:
+        if i % progress_step == 0:
             print(f"    ... processed {i}/{len(doc_ids)} documents ({total_tagged} pages tagged)")
 
     # Rollup page topics to documents and meetings

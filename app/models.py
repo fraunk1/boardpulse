@@ -21,8 +21,13 @@ class Board(Base):
     homepage: Mapped[str] = mapped_column(Text)
     minutes_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     phone: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
+    fax: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
+    toll_free: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
     email: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     address: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    contact_name: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    contact_title: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    complaint_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     discovery_status: Mapped[str] = mapped_column(String(20), default="pending")
     last_scraped_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
@@ -40,6 +45,9 @@ class Meeting(Base):
     source_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     screenshot_path: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     summary: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    summary_source: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    tldr: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    tldr_source: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     topics: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     pipeline_run_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("pipeline_runs.id"), nullable=True
@@ -111,6 +119,7 @@ class DocumentPage(Base):
     page_number: Mapped[int] = mapped_column()
     image_path: Mapped[str] = mapped_column(Text)
     thumb_path: Mapped[str] = mapped_column(Text)
+    text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     topics: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     tagged_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     rendered_at: Mapped[datetime] = mapped_column(DateTime)
@@ -156,6 +165,24 @@ class MeetingIntelligence(Base):
     extraction_model: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)  # "claude-sonnet", "cowork", etc.
 
     meeting: Mapped["Meeting"] = relationship()
+
+
+class BoardBrief(Base):
+    """Pre-generated period briefs per board (quarter, half-year, year).
+    Displayed on the board detail page above the meeting timeline."""
+    __tablename__ = "board_briefs"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    board_id: Mapped[int] = mapped_column(ForeignKey("boards.id"))
+    period: Mapped[str] = mapped_column(String(20))  # "quarter", "half-year", "year"
+    brief_text: Mapped[str] = mapped_column(Text)
+    meetings_analyzed: Mapped[int] = mapped_column(Integer, default=0)
+    period_start: Mapped[date] = mapped_column(Date)
+    period_end: Mapped[date] = mapped_column(Date)
+    generated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    generated_by: Mapped[str] = mapped_column(String(50), default="claude")
+
+    board: Mapped["Board"] = relationship()
 
 
 class IntelligenceBrief(Base):

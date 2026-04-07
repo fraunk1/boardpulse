@@ -57,6 +57,19 @@ def _relative_screenshot_path(absolute_path: str) -> str:
 templates.env.globals["relative_screenshot"] = _relative_screenshot_path
 
 
+def _llm_backend_info() -> dict:
+    """Expose current local-LLM config to templates for the header indicator."""
+    import os
+    return {
+        "model": os.environ.get("BOARDPULSE_LLM_MODEL", "gemma4:e2b"),
+        "url": os.environ.get("BOARDPULSE_LLM_URL", "http://localhost:11434/v1"),
+        "think": os.environ.get("BOARDPULSE_LLM_THINK", "").lower() in ("1", "true", "yes"),
+    }
+
+
+templates.env.globals["llm_backend"] = _llm_backend_info()
+
+
 @app.on_event("startup")
 async def startup():
     from app.database import init_db
@@ -602,12 +615,63 @@ async def board_view(request: Request, code: str):
             topic_counts[tag] = topic_counts.get(tag, 0) + 1
     topics_sorted = sorted(topic_counts.items(), key=lambda x: -x[1])
 
+    # Period briefs (quarter / half-year / year)
+    from app.models import BoardBrief
+    import json as _json
+    async with db.async_session() as session:
+        briefs_rows = (await session.execute(
+            select(BoardBrief)
+            .where(BoardBrief.board_id == board.id)
+            .order_by(BoardBrief.period)
+        )).scalars().all()
+    briefs = {b.period: b for b in briefs_rows}
+
+    # Build citation reference map for briefs: {ref_num: "/meeting/{id}#doc-{doc_id}-p{PAGE}"}
+    # Mirrors the numbering in board_brief_prompt()
+    from datetime import date, timedelta
+    brief_refs = {}
+    for period_label, days in [("quarter", 90), ("half-year", 180), ("year", 365)]:
+        if period_label not in briefs:
+            continue
+        cutoff = date.today() - timedelta(days=days)
+        period_meetings = [
+            item for item in meeting_data
+            if item["meeting"].meeting_date >= cutoff
+        ]
+        # Sort descending by date to match prompt order
+        period_meetings.sort(key=lambda x: x["meeting"].meeting_date, reverse=True)
+        ref_num = 1
+        period_ref = {}
+        for item in period_meetings:
+            m = item["meeting"]
+            docs = item.get("documents", [])
+            for doc in docs:
+                period_ref[str(ref_num)] = {
+                    "url": f"/meeting/{m.id}",
+                    "doc_id": doc.id,
+                    "date": m.meeting_date.isoformat(),
+                    "doc_type": doc.doc_type,
+                }
+                ref_num += 1
+            if not docs:
+                # Meeting without docs — still create a ref to the meeting
+                period_ref[str(ref_num)] = {
+                    "url": f"/meeting/{m.id}",
+                    "doc_id": None,
+                    "date": m.meeting_date.isoformat(),
+                    "doc_type": None,
+                }
+                ref_num += 1
+        brief_refs[period_label] = period_ref
+
     state_name = STATE_NAMES.get(board.state, board.state)
 
     return templates.TemplateResponse(request, "board.html", context={
         "board": board,
         "meeting_data": meeting_data,
         "topic_counts": topics_sorted,
+        "briefs": briefs,
+        "brief_refs_json": _json.dumps(brief_refs),
         "state_name": state_name,
         "breadcrumbs": [
             {"label": "National", "url": "/"},
@@ -665,10 +729,22 @@ async def meeting_view(request: Request, meeting_id: int):
 
     state_name = STATE_NAMES.get(board.state, board.state)
 
+    # Build doc_type → doc_id map for citation linking
+    import json as _json
+    doc_map = {}
+    for d in docs:
+        doc_map[d.doc_type] = d.id
+        # Also store as capitalized for matching "Minutes p.3"
+        doc_map[d.doc_type.capitalize()] = d.id
+    # If single doc, set default
+    if len(docs) == 1:
+        doc_map["_default"] = docs[0].id
+
     return templates.TemplateResponse(request, "meeting.html", context={
         "meeting": meeting,
         "board": board,
         "doc_pages": doc_pages,
+        "doc_map_json": _json.dumps(doc_map),
         "state_name": state_name,
         "breadcrumbs": [
             {"label": "National", "url": "/"},
