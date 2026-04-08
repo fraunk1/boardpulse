@@ -336,12 +336,14 @@ async def classify_pages_for_document(
         else:
             topics = classify_text(page_text, min_matches=min_matches)
 
+        # Always persist the attempt — empty list is a terminal "tried, no topics"
+        # marker so the next run doesn't reprocess scanned/blank pages forever.
+        async with db.async_session() as session:
+            dp = await session.get(DocumentPage, page_obj.id)
+            dp.topics = topics
+            dp.tagged_at = now
+            await session.commit()
         if topics:
-            async with db.async_session() as session:
-                dp = await session.get(DocumentPage, page_obj.id)
-                dp.topics = topics
-                dp.tagged_at = now
-                await session.commit()
             tagged += 1
 
     pdf.close()

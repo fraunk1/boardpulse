@@ -615,9 +615,21 @@ async def board_view(request: Request, code: str):
             topic_counts[tag] = topic_counts.get(tag, 0) + 1
     topics_sorted = sorted(topic_counts.items(), key=lambda x: -x[1])
 
-    # Period briefs (quarter / half-year / year)
-    from app.models import BoardBrief
+    # Per-board rollup summary (one row per board, populated by ingest_board_summary)
+    from app.models import BoardBrief, BoardSummary
+    from app.extractor.summarizer import _parse_summary_frontmatter
     import json as _json
+    async with db.async_session() as session:
+        board_summary = (await session.execute(
+            select(BoardSummary).where(BoardSummary.board_id == board.id)
+        )).scalar_one_or_none()
+    # Strip YAML frontmatter for display — the topics in it are already in the
+    # board_summary.topics column and the `---` lines render as horizontal rules.
+    board_summary_body = ""
+    if board_summary and board_summary.summary_text:
+        _, board_summary_body = _parse_summary_frontmatter(board_summary.summary_text)
+
+    # Period briefs (quarter / half-year / year)
     async with db.async_session() as session:
         briefs_rows = (await session.execute(
             select(BoardBrief)
@@ -668,6 +680,8 @@ async def board_view(request: Request, code: str):
 
     return templates.TemplateResponse(request, "board.html", context={
         "board": board,
+        "board_summary": board_summary,
+        "board_summary_body": board_summary_body,
         "meeting_data": meeting_data,
         "topic_counts": topics_sorted,
         "briefs": briefs,

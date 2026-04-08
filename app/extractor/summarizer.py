@@ -22,7 +22,7 @@ from sqlalchemy.orm import selectinload
 
 import app.database as db
 from app.config import REPORTS_DIR
-from app.models import Board, BoardBrief, Meeting, MeetingDocument
+from app.models import Board, BoardBrief, BoardSummary, Meeting, MeetingDocument
 from app.extractor.prompts import (
     per_board_prompt,
     national_synthesis_prompt,
@@ -172,10 +172,12 @@ def _parse_summary_frontmatter(text: str) -> tuple[list[str], str]:
 
 
 async def ingest_board_summary(board_code: str, source: str = "subagent") -> bool:
-    """Read a completed summary file and store it in the database.
+    """Read a completed summary file and upsert it into board_summaries.
 
-    Parses YAML frontmatter for topic tags, then stores the summary text
-    and topics on all meetings for that board in the collection window.
+    Stores the per-board summary in its own row (one per board, UNIQUE on
+    board_id). Also propagates the parsed topics to meetings in the
+    collection window so per-meeting topic filtering still works — but does
+    NOT touch meetings.summary, which is reserved for per-meeting narratives.
 
     Args:
         board_code: Board to ingest.
@@ -196,7 +198,7 @@ async def ingest_board_summary(board_code: str, source: str = "subagent") -> boo
         return False
 
     # Parse frontmatter for topics
-    topics, body = _parse_summary_frontmatter(summary_text)
+    topics, _body = _parse_summary_frontmatter(summary_text)
 
     cutoff = date.today() - timedelta(days=365)
 
@@ -215,16 +217,45 @@ async def ingest_board_summary(board_code: str, source: str = "subagent") -> boo
             .where(Meeting.meeting_date >= cutoff)
         )).scalars().all()
 
-        # Store the board-level summary and topics on all meetings in the period
-        for meeting in meetings:
-            meeting.summary = summary_text
-            meeting.summary_source = source
-            if topics:
+        dates = [m.meeting_date for m in meetings if m.meeting_date]
+        period_start = min(dates) if dates else None
+        period_end = max(dates) if dates else None
+
+        # Upsert the per-board summary into board_summaries (one row per board)
+        existing = (await session.execute(
+            select(BoardSummary).where(BoardSummary.board_id == board.id)
+        )).scalar_one_or_none()
+
+        if existing:
+            existing.summary_text = summary_text
+            existing.topics = topics
+            existing.period_start = period_start
+            existing.period_end = period_end
+            existing.meetings_analyzed = len(meetings)
+            existing.source = source
+            existing.generated_at = datetime.now(timezone.utc)
+        else:
+            session.add(BoardSummary(
+                board_id=board.id,
+                summary_text=summary_text,
+                topics=topics,
+                period_start=period_start,
+                period_end=period_end,
+                meetings_analyzed=len(meetings),
+                source=source,
+                generated_at=datetime.now(timezone.utc),
+            ))
+
+        # Topics still propagate to meetings — they're per-meeting metadata
+        # used by topic filters on the dashboard.
+        if topics:
+            for meeting in meetings:
                 meeting.topics = topics
+
         await session.commit()
 
     topic_str = f", topics={topics}" if topics else ""
-    print(f"  Ingested summary for {board_code} ({len(meetings)} meetings updated{topic_str})")
+    print(f"  Ingested board summary for {board_code} ({len(meetings)} meetings in period{topic_str})")
     return True
 
 

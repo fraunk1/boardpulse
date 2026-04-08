@@ -35,9 +35,8 @@
             </div>
             <div id="collect-status" class="mt-3"></div>
 
-            <!-- Board Info Grid -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
-                <!-- Stats -->
+            <!-- Stats -->
+            <div class="grid grid-cols-2 gap-4 mt-6 max-w-md">
                 <div class="flex items-center gap-3 p-3 bg-white rounded-lg border border-bp-cloud">
                     <i data-lucide="calendar-days" class="w-5 h-5 text-bp-teal"></i>
                     <div>
@@ -48,29 +47,94 @@
                 <div class="flex items-center gap-3 p-3 bg-white rounded-lg border border-bp-cloud">
                     <i data-lucide="sparkles" class="w-5 h-5 text-bp-gold"></i>
                     <div>
-                        <div class="text-lg font-bold text-bp-navy">{{ meeting_data | selectattr('meeting.summary') | list | length }}</div>
+                        <div class="text-lg font-bold text-bp-navy">{{ meeting_data | selectattr('meeting.tldr') | list | length or meeting_data | selectattr('meeting.summary') | list | length }}</div>
                         <div class="text-[10px] text-bp-mist uppercase tracking-wider">Summaries</div>
                     </div>
                 </div>
+            </div>
 
-                <!-- Contact -->
-                {% if board.homepage %}
-                <a href="{{ board.homepage }}" target="_blank" rel="noopener"
-                   class="flex items-center gap-3 p-3 bg-white rounded-lg border border-bp-cloud hover:border-bp-teal/30 transition-colors">
-                    <i data-lucide="globe" class="w-5 h-5 text-bp-steel"></i>
-                    <div class="text-xs text-bp-steel truncate">Homepage</div>
-                    <i data-lucide="external-link" class="w-3 h-3 text-bp-cloud ml-auto"></i>
-                </a>
-                {% endif %}
-                {% if board.minutes_url %}
-                <a href="{{ board.minutes_url }}" target="_blank" rel="noopener"
-                   class="flex items-center gap-3 p-3 bg-white rounded-lg border border-bp-cloud hover:border-bp-teal/30 transition-colors">
-                    <i data-lucide="file-text" class="w-5 h-5 text-bp-steel"></i>
-                    <div class="text-xs text-bp-steel truncate">Minutes Page</div>
-                    <i data-lucide="external-link" class="w-3 h-3 text-bp-cloud ml-auto"></i>
-                </a>
+            <!-- Contact Information -->
+            {% if board.contact_name or board.phone or board.address %}
+            <div class="mt-5 rounded-lg border border-bp-cloud bg-white overflow-hidden">
+                <div class="px-4 py-2.5 bg-bp-frost border-b border-bp-cloud flex items-center gap-2">
+                    <i data-lucide="contact" class="w-4 h-4 text-bp-teal"></i>
+                    <span class="text-xs font-semibold text-bp-navy uppercase tracking-wider">Contact Information</span>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-0 divide-y sm:divide-y-0 sm:divide-x divide-bp-cloud">
+                    {% if board.contact_name %}
+                    <div class="px-4 py-3">
+                        <div class="text-[10px] text-bp-mist uppercase tracking-wider mb-1">Executive Director</div>
+                        <div class="text-sm font-medium text-bp-navy">{{ board.contact_name }}</div>
+                        {% if board.contact_title %}
+                        <div class="text-xs text-bp-steel">{{ board.contact_title }}</div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+
+                    <div class="px-4 py-3 space-y-2">
+                        {% if board.phone %}
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="phone" class="w-3.5 h-3.5 text-bp-mist flex-none"></i>
+                            <a href="tel:{{ board.phone }}" class="text-sm text-bp-steel hover:text-bp-teal transition-colors">{{ board.phone }}</a>
+                        </div>
+                        {% endif %}
+                        {% if board.toll_free %}
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="phone-forwarded" class="w-3.5 h-3.5 text-bp-mist flex-none"></i>
+                            <a href="tel:{{ board.toll_free }}" class="text-sm text-bp-steel hover:text-bp-teal transition-colors">{{ board.toll_free }} <span class="text-[10px] text-bp-mist">(toll-free)</span></a>
+                        </div>
+                        {% endif %}
+                        {% if board.fax %}
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="printer" class="w-3.5 h-3.5 text-bp-mist flex-none"></i>
+                            <span class="text-sm text-bp-steel">{{ board.fax }} <span class="text-[10px] text-bp-mist">(fax)</span></span>
+                        </div>
+                        {% endif %}
+                        {% if board.email %}
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="mail" class="w-3.5 h-3.5 text-bp-mist flex-none"></i>
+                            <a href="mailto:{{ board.email }}" class="text-sm text-bp-steel hover:text-bp-teal transition-colors">{{ board.email }}</a>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    {% if board.address %}
+                    <div class="px-4 py-3">
+                        <div class="flex items-start gap-2">
+                            <i data-lucide="map-pin" class="w-3.5 h-3.5 text-bp-mist flex-none mt-0.5"></i>
+                            <div class="text-sm text-bp-steel leading-relaxed whitespace-pre-line">{{ board.address.split(' | ')[0] }}</div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+
+                {% if board.homepage or board.minutes_url or board.complaint_url %}
+                <div class="px-4 py-2.5 bg-bp-frost/50 border-t border-bp-cloud flex flex-wrap items-center gap-x-5 gap-y-2">
+                    {% if board.homepage %}
+                    <a href="{{ board.homepage }}" target="_blank" rel="noopener"
+                       class="inline-flex items-center gap-1.5 text-xs font-medium text-bp-teal hover:text-bp-teal-d transition-colors">
+                        <i data-lucide="globe" class="w-3.5 h-3.5"></i> Homepage
+                        <i data-lucide="external-link" class="w-3 h-3"></i>
+                    </a>
+                    {% endif %}
+                    {% if board.minutes_url %}
+                    <a href="{{ board.minutes_url }}" target="_blank" rel="noopener"
+                       class="inline-flex items-center gap-1.5 text-xs font-medium text-bp-teal hover:text-bp-teal-d transition-colors">
+                        <i data-lucide="file-text" class="w-3.5 h-3.5"></i> Minutes Page
+                        <i data-lucide="external-link" class="w-3 h-3"></i>
+                    </a>
+                    {% endif %}
+                    {% if board.complaint_url %}
+                    <a href="{{ board.complaint_url }}" target="_blank" rel="noopener"
+                       class="inline-flex items-center gap-1.5 text-xs font-medium text-red-600 hover:text-red-700 transition-colors">
+                        <i data-lucide="alert-triangle" class="w-3.5 h-3.5"></i> File a Complaint
+                        <i data-lucide="external-link" class="w-3 h-3"></i>
+                    </a>
+                    {% endif %}
+                </div>
                 {% endif %}
             </div>
+            {% endif %}
 
             <!-- Topics -->
             {% if topic_counts %}
@@ -85,6 +149,95 @@
             {% endif %}
         </div>
     </section>
+
+    <!-- Board Summary (rollup of all collected meetings) -->
+    {% if board_summary %}
+    <section class="max-w-[1400px] mx-auto px-6 pt-6">
+        <div class="bg-white border border-bp-cloud rounded-xl overflow-hidden">
+            <div class="flex items-center justify-between px-5 py-3 bg-bp-frost/60 border-b border-bp-cloud">
+                <div class="flex items-center gap-2">
+                    <i data-lucide="file-text" class="w-4 h-4 text-bp-navy"></i>
+                    <span class="text-xs font-semibold text-bp-navy uppercase tracking-wider">Board Summary</span>
+                </div>
+                <div class="flex items-center gap-3 text-[10px] text-bp-mist">
+                    {% if board_summary.period_start and board_summary.period_end %}
+                    <span class="flex items-center gap-1">
+                        <i data-lucide="calendar-range" class="w-3 h-3"></i>
+                        {{ board_summary.period_start.strftime('%b %d, %Y') }} — {{ board_summary.period_end.strftime('%b %d, %Y') }}
+                    </span>
+                    {% endif %}
+                    <span class="flex items-center gap-1">
+                        <i data-lucide="layers" class="w-3 h-3"></i>
+                        {{ board_summary.meetings_analyzed }} meetings
+                    </span>
+                    {% if board_summary.source %}
+                    <span class="px-1.5 py-0.5 rounded {% if board_summary.source == 'ollama' %}bg-emerald-50 text-emerald-700{% else %}bg-indigo-50 text-indigo-700{% endif %}">
+                        {{ board_summary.source }}
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="px-5 py-4">
+                <div class="summary-content text-sm text-bp-navy leading-relaxed max-w-none prose prose-sm"
+                     data-markdown="{{ board_summary_body | e }}"></div>
+            </div>
+        </div>
+    </section>
+    {% endif %}
+
+    <!-- Period Briefs -->
+    {% if briefs %}
+    <section class="max-w-[1400px] mx-auto px-6 pt-6" x-data="{ activePeriod: '{{ 'quarter' if briefs.get('quarter') else ('half-year' if briefs.get('half-year') else 'year') }}' }">
+        <div class="bg-white border border-bp-cloud rounded-xl overflow-hidden">
+            <!-- Brief header + period tabs -->
+            <div class="flex items-center justify-between px-5 py-3 bg-bp-frost/60 border-b border-bp-cloud">
+                <div class="flex items-center gap-2">
+                    <i data-lucide="brain" class="w-4 h-4 text-bp-gold"></i>
+                    <span class="text-xs font-semibold text-bp-navy uppercase tracking-wider">AI Intelligence Brief</span>
+                </div>
+                <div class="flex gap-1">
+                    {% for period_key, period_label in [('quarter', '90 Days'), ('half-year', '6 Months'), ('year', '12 Months')] %}
+                    {% if briefs.get(period_key) %}
+                    <button @click="activePeriod = '{{ period_key }}'"
+                            class="px-3 py-1 text-[11px] font-medium rounded-full transition-all"
+                            :class="activePeriod === '{{ period_key }}'
+                                ? 'bg-bp-navy text-white shadow-sm'
+                                : 'text-bp-steel hover:bg-bp-cloud/60'">
+                        {{ period_label }}
+                    </button>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Brief content panels -->
+            {% for period_key in ['quarter', 'half-year', 'year'] %}
+            {% if briefs.get(period_key) %}
+            {% set brief = briefs[period_key] %}
+            <div x-show="activePeriod === '{{ period_key }}'" x-transition:enter="transition ease-out duration-200"
+                 x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+                 class="px-5 py-4">
+                <p class="text-sm text-bp-navy leading-relaxed brief-text" data-period="{{ period_key }}">{{ brief.brief_text }}</p>
+                <div class="flex items-center gap-4 mt-3 text-[10px] text-bp-mist">
+                    <span class="flex items-center gap-1">
+                        <i data-lucide="calendar-range" class="w-3 h-3"></i>
+                        {{ brief.period_start.strftime('%b %d, %Y') }} — {{ brief.period_end.strftime('%b %d, %Y') }}
+                    </span>
+                    <span class="flex items-center gap-1">
+                        <i data-lucide="layers" class="w-3 h-3"></i>
+                        {{ brief.meetings_analyzed }} meetings analyzed
+                    </span>
+                    <span class="flex items-center gap-1">
+                        <i data-lucide="clock" class="w-3 h-3"></i>
+                        Generated {{ brief.generated_at.strftime('%b %d, %Y') }}
+                    </span>
+                </div>
+            </div>
+            {% endif %}
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
 
     <!-- Meetings Timeline -->
     <section class="max-w-[1400px] mx-auto px-6 py-8">
@@ -142,7 +295,7 @@
                             <i data-lucide="file-x" class="w-3 h-3"></i> No document on file
                         </span>
                         {% endif %}
-                        {% if m.summary %}
+                        {% if m.tldr or m.summary %}
                         <button @click="collapsedMeetings[{{ m.id }}] = !collapsedMeetings[{{ m.id }}]"
                                 class="p-2 rounded-lg hover:bg-bp-frost transition-colors"
                                 :class="collapsedMeetings[{{ m.id }}] ? 'text-bp-mist hover:text-bp-teal' : 'text-bp-teal'"
@@ -156,14 +309,18 @@
                     </div>
                 </div>
 
-                {% if m.summary %}
+                {% if m.tldr or m.summary %}
                 <div class="summary-accordion" :class="{ 'open': !collapsedMeetings[{{ m.id }}] }">
                     <div class="px-5 pb-4 border-t border-bp-cloud pt-4">
-                        <div class="flex items-center gap-1.5 mb-2 text-[10px] uppercase tracking-wider text-bp-gold font-semibold">
-                            <i data-lucide="sparkles" class="w-3 h-3"></i> AI Summary
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-bp-gold font-semibold">
+                                <i data-lucide="sparkles" class="w-3 h-3"></i> TLDR
+                            </div>
+                            <a href="/meeting/{{ m.id }}" class="text-[10px] text-bp-teal hover:text-bp-teal-d font-medium transition-colors">
+                                Full detail →
+                            </a>
                         </div>
-                        <div class="summary-content text-xs text-bp-steel leading-relaxed max-w-none"
-                             data-markdown="{{ m.summary | e }}"></div>
+                        <p class="text-xs text-bp-steel leading-relaxed">{{ m.tldr or m.summary }}</p>
                     </div>
                 </div>
                 {% endif %}
@@ -199,8 +356,32 @@
 
 {% block scripts %}
 <script>
+    // Brief citation reference map (period → ref_num → {url, doc_id, date, doc_type})
+    var briefRefs = {{ brief_refs_json | safe }};
+
     document.addEventListener('DOMContentLoaded', () => {
         renderMarkdownSummaries();
+
+        // Render brief citations: {N} or {N:p.X} → superscript link
+        document.querySelectorAll('.brief-text').forEach(function(el) {
+            var period = el.dataset.period;
+            var refs = briefRefs[period] || {};
+            el.innerHTML = el.innerHTML.replace(
+                /\{(\d+)(?::p\.(\d+))?\}/g,
+                function(match, refNum, page) {
+                    var ref = refs[refNum];
+                    if (!ref) return match;
+                    var url = ref.url;
+                    if (page && ref.doc_id) {
+                        url = url + '#doc-' + ref.doc_id + '-p' + page;
+                    } else if (ref.doc_id) {
+                        url = url + '#doc-' + ref.doc_id + '-p1';
+                    }
+                    var title = ref.date + (ref.doc_type ? ' ' + ref.doc_type : '') + (page ? ' p.' + page : '');
+                    return '<a href="' + url + '" title="' + title + '" class="text-bp-teal hover:text-bp-teal-d font-semibold text-[10px] align-super ml-0.5 no-underline hover:underline">[' + refNum + (page ? '·' + page : '') + ']</a>';
+                }
+            );
+        });
 
         // If page has a date hash (from report citations), scroll to and highlight that meeting
         const hash = window.location.hash.replace('#', '');

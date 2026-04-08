@@ -167,6 +167,29 @@ class MeetingIntelligence(Base):
     meeting: Mapped["Meeting"] = relationship()
 
 
+class BoardSummary(Base):
+    """Per-board rollup summary covering the current collection window.
+    One row per board (UNIQUE on board_id, upsert pattern). The summary text
+    is the YAML-frontmatter Markdown that ingest_board_summary parses from
+    data/reports/{CODE}_summary.md. Replaces the old pattern of stamping the
+    same board summary into every meeting.summary on that board."""
+    __tablename__ = "board_summaries"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    board_id: Mapped[int] = mapped_column(ForeignKey("boards.id"), unique=True)
+    summary_text: Mapped[str] = mapped_column(Text)
+    topics: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    period_start: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    period_end: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    meetings_analyzed: Mapped[int] = mapped_column(Integer, default=0)
+    source: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    generated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
+
+    board: Mapped["Board"] = relationship()
+
+
 class BoardBrief(Base):
     """Pre-generated period briefs per board (quarter, half-year, year).
     Displayed on the board detail page above the meeting timeline."""
