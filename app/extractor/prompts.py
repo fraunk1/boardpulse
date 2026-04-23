@@ -108,6 +108,193 @@ Code: {board_code}
 """
 
 
+def per_meeting_summary_prompt(
+    board_name: str,
+    meeting_date: str,
+    meeting_title: str,
+    doc_sections: list[dict],
+) -> str:
+    """Build a prompt for generating a narrative meeting summary with page citations.
+
+    Produces a 200-400 word prose recap with inline page citations like (p.3)
+    that link to the source document page.
+
+    Args:
+        board_name: Full board name
+        meeting_date: ISO date string
+        meeting_title: Meeting title
+        doc_sections: List of dicts with keys:
+            - doc_id: Document ID
+            - doc_type: "minutes", "agenda", etc.
+            - filename: Document filename
+            - pages: list of dicts with keys: page_number, text
+    """
+    # Build page-segmented text
+    sections = []
+    doc_count = len(doc_sections)
+    for doc in doc_sections:
+        label = doc["doc_type"].upper()
+        if doc_count > 1:
+            doc_header = f"=== DOCUMENT: [{label}] {doc['filename']} (doc_id={doc['doc_id']}) ==="
+        else:
+            doc_header = f"=== DOCUMENT: [{label}] {doc['filename']} ==="
+        page_texts = []
+        for pg in doc["pages"]:
+            text = pg["text"].strip()
+            if text:
+                page_texts.append(f"--- PAGE {pg['page_number']} ---\n{text}")
+        if page_texts:
+            sections.append(doc_header + "\n\n" + "\n\n".join(page_texts))
+
+    combined = "\n\n".join(sections) if sections else "(no document text available)"
+    if len(combined) > 40000:
+        combined = combined[:40000] + "\n\n[... truncated ...]"
+
+    # Citation format depends on number of documents
+    if doc_count <= 1:
+        cite_instruction = 'Cite specific pages inline using the format (p.3) — just the page number.'
+        cite_example = '"The board voted to adopt the rule amendment (p.7)."'
+    else:
+        cite_instruction = (
+            'Cite specific pages inline using the format (Minutes p.3) or (Agenda p.2) — '
+            'use the document type to disambiguate when the meeting has multiple documents.'
+        )
+        cite_example = '"The board voted to adopt the rule amendment (Minutes p.7), as outlined in the proposed agenda (Agenda p.2)."'
+
+    return f"""Summarize this {board_name} meeting ({meeting_date}) as a narrative recap with page citations.
+
+Write 200-400 words of prose. Cover:
+- What was discussed and decided
+- Specific actions taken (votes, rule adoptions, policy changes)
+- Disciplinary cases (names, case numbers, outcomes if available)
+- Committee reports or notable public comments
+- Anything unusual or first-of-its-kind
+
+Citation rules:
+- {cite_instruction}
+- Every factual claim should cite the page where it appears.
+- Example: {cite_example}
+- Only cite pages that actually contain the referenced content.
+
+Writing rules:
+- Past tense, third person, professional tone
+- Plain prose paragraphs only — no bullet points, no headers, no markdown formatting
+- Do not include the meeting date, board name, meeting type, or topic tags — those are stored separately
+- Do not speculate or editorialize — only report what the documents say
+- If the documents are mostly closed-session notices with little public content, say so briefly
+
+## Document Text (page-segmented)
+
+{combined}"""
+
+
+def board_brief_prompt(
+    board_name: str,
+    board_code: str,
+    state: str,
+    period_label: str,
+    meeting_summaries: list[dict],
+) -> str:
+    """Build a prompt for generating a period brief (quarter/half-year/year) with citations.
+
+    Args:
+        board_name: Full board name
+        board_code: Board code (e.g., "CA_MD")
+        state: Two-letter state code
+        period_label: "quarter", "half-year", or "year"
+        meeting_summaries: List of dicts with keys:
+            meeting_id, meeting_date, title, summary,
+            docs: list of {doc_id, doc_type}
+    """
+    meeting_lines = []
+    ref_lines = []
+    ref_num = 1
+
+    for m in meeting_summaries:
+        summary = m.get("summary") or "(no summary available)"
+        date_str = m["meeting_date"]
+        docs = m.get("docs", [])
+
+        # Build reference entries for this meeting
+        meeting_refs = []
+        for doc in docs:
+            ref_lines.append(
+                f"[{ref_num}] {date_str} {doc['doc_type'].capitalize()} → "
+                f"/meeting/{m['meeting_id']}#doc-{doc['doc_id']}-p{{PAGE}}"
+            )
+            meeting_refs.append(f"(ref {ref_num} = {doc['doc_type'].capitalize()})")
+            ref_num += 1
+
+        refs_label = " ".join(meeting_refs) if meeting_refs else ""
+        meeting_lines.append(
+            f"**{date_str}** — {m.get('title') or 'Board Meeting'} {refs_label}\n{summary}"
+        )
+
+    meetings_text = "\n\n---\n\n".join(meeting_lines)
+    ref_table = "\n".join(ref_lines) if ref_lines else "(no references available)"
+    count = len(meeting_summaries)
+
+    return f"""Summarize the recent activity for {board_name} ({state}) over the past {period_label}.
+
+You are given {count} meeting summaries below. Produce a brief overview in 3-5 sentences that:
+- Highlights the most important actions or trends
+- Notes any recurring themes
+- Tells a regulatory affairs reviewer whether deeper investigation is warranted
+
+## Citation Rules
+
+Every factual claim MUST include a superscript citation number. Use the reference table below.
+
+Format: Write the citation as {{N}} immediately after the claim, where N is the reference number.
+Example: "The board voted to eliminate jurisprudence exams{{3}} and adopted a nutrition CME requirement{{4}}."
+
+When citing a specific page, write {{N:p.X}} — for example {{3:p.4}} means reference 3, page 4.
+When no specific page is needed, just use {{N}}.
+
+## Reference Table
+
+{ref_table}
+
+## Writing Rules
+
+- Plain text paragraphs only — no markdown, no bullet points, no headers
+- Every factual claim needs a citation
+- 3-5 sentences total
+
+## Meeting Summaries ({period_label})
+
+{meetings_text}"""
+
+
+def per_meeting_tldr_prompt(
+    board_name: str,
+    meeting_date: str,
+    meeting_title: str,
+    doc_texts: list[str],
+) -> str:
+    """Build a prompt for generating a short TLDR meeting summary.
+
+    Args:
+        board_name: Full board name
+        meeting_date: ISO date string
+        meeting_title: Meeting title
+        doc_texts: List of extracted document texts for this meeting
+    """
+    combined = "\n\n---\n\n".join(doc_texts) if doc_texts else "(no document text available)"
+    # Truncate to avoid blowing context on huge docs
+    if len(combined) > 15000:
+        combined = combined[:15000] + "\n\n[... truncated ...]"
+
+    return f"""Summarize this {board_name} meeting ({meeting_date}) in 2-3 sentences.
+
+Focus on: what happened, any notable actions taken, and whether further review is warranted.
+Write plain text only. No markdown, no bullet points, no headers, no citations.
+
+## Meeting: {meeting_title or 'Board Meeting'} — {meeting_date}
+
+{combined}"""
+
+
 def national_synthesis_prompt(
     board_summaries: list[dict],
     report_date: date,
