@@ -1,6 +1,13 @@
 """Prompt templates for AI summarization."""
 from datetime import date
 
+# Cap per-document text so a board's full prompt fits in a standard subagent
+# context window with balanced coverage across all its meetings. Board minutes
+# front-load the substantive actions (agenda, votes, disciplinary decisions),
+# so this preserves summary quality while bounding the largest boards
+# (e.g. VT_MD with 47 documents) to a workable size.
+MAX_DOC_CHARS = 12_000
+
 
 def per_board_prompt(
     board_name: str,
@@ -25,7 +32,10 @@ def per_board_prompt(
         for doc in m.get("documents", []):
             if doc.get("content_text"):
                 label = f"[{doc['doc_type'].upper()}] {doc['filename']}"
-                doc_texts.append(f"**{label}**\n\n{doc['content_text']}")
+                text = doc["content_text"]
+                if len(text) > MAX_DOC_CHARS:
+                    text = text[:MAX_DOC_CHARS] + "\n\n*[document truncated for length]*"
+                doc_texts.append(f"**{label}**\n\n{text}")
         if doc_texts:
             meeting_sections.append(header + "\n\n" + "\n\n---\n\n".join(doc_texts))
         else:
@@ -144,7 +154,8 @@ Synthesize the per-board summaries provided below into a comprehensive national 
 5. Include a **Bibliography** section at the end with numbered footnotes linking to the original board websites.
 6. Be specific — name states and boards when citing examples.
 7. Write in a professional, analytical tone suitable for FSMB leadership.
-8. Target 3000-5000 words depending on volume of source material.
+8. Be DESCRIPTIVE and analytical, NOT prescriptive. Do not write "FSMB should..." or issue directives. Frame the closing section as considerations and open questions the federation may wish to weigh — surface patterns, tensions, and questions for further discussion, never recommended actions.
+9. Target 3000-5000 words depending on volume of source material.
 
 ## Output Format
 
@@ -181,7 +192,9 @@ Write the report as a Markdown document:
 
 ...
 
-## Recommendations for FSMB
+## Considerations and Open Questions for FSMB
+
+*(Descriptive and analytical only — patterns, tensions, and questions for further discussion. No prescriptive "FSMB should..." directives.)*
 
 ...
 
