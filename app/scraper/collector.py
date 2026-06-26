@@ -5,11 +5,12 @@ links, identifies meeting entries by date, and downloads associated
 documents (PDFs, DOCX, etc.) for later text extraction.
 """
 import asyncio
+import hashlib
 import logging
 import re
 from datetime import date, datetime, timedelta
 from pathlib import Path
-from urllib.parse import urljoin, urlparse
+from urllib.parse import parse_qs, urljoin, urlparse
 
 import httpx
 from playwright.async_api import async_playwright
@@ -127,7 +128,10 @@ _EXTRACT_LINKS_JS = """() => {
         // Strip query string and fragment for extension check (CMS URLs
         // like ...minutes.pdf?rev=abc&hash=def must still match)
         const hrefPath = lowerHref.split('?')[0].split('#')[0];
-        const isDoc = docExts.some(ext => hrefPath.endsWith(ext));
+        let isDoc = docExts.some(ext => hrefPath.endsWith(ext));
+        // Portal endpoints carry the type in a query param instead of the path,
+        // e.g. /document?filekey=ABC&filetype=pdf (Montana DLI and similar CMS viewers)
+        if (!isDoc && /filetype=(pdf|docx?|xlsx?)(&|$)/i.test(lowerHref)) isDoc = true;
 
         // Walk up to 8 ancestor levels to find context with a date.
         // Two strategies:
@@ -179,6 +183,36 @@ def _infer_doc_type(filename: str) -> str:
     if "attachment" in lower or "exhibit" in lower:
         return "attachment"
     return "minutes"
+
+
+def _doc_filename(full_url: str) -> str:
+    """Derive a download filename with a real extension.
+
+    Handles portal endpoints that carry the document type in the query string
+    (e.g. .../document?filekey=ABC&filetype=pdf) where the URL path has no
+    extension — otherwise every such link collapses to the same name
+    ("document") and only the first one survives the dedup check.
+    """
+    parsed = urlparse(full_url)
+    name = Path(parsed.path).name
+    if name and Path(name).suffix.lower() in DOCUMENT_EXTENSIONS:
+        return name
+
+    qs = {k.lower(): v for k, v in parse_qs(parsed.query).items()}
+
+    def _first(*keys):
+        for k in keys:
+            if qs.get(k):
+                return qs[k][0]
+        return ""
+
+    ftype = _first("filetype", "type", "format").lower().lstrip(".")
+    if ftype in {"pdf", "docx", "doc", "xlsx", "xls"}:
+        key = _first("filekey", "file", "id", "documentid", "docid")
+        stem = re.sub(r"[^A-Za-z0-9_-]", "", key)[:40] or hashlib.md5(
+            full_url.encode()).hexdigest()[:10]
+        return f"{stem}.{ftype}"
+    return name or "document"
 
 
 # ---------------------------------------------------------------------------
@@ -350,8 +384,7 @@ async def collect_board(board: Board, page) -> dict:
 
                     # Resolve relative URLs
                     full_url = urljoin(board.minutes_url, href)
-                    parsed = urlparse(full_url)
-                    filename = Path(parsed.path).name or "document"
+                    filename = _doc_filename(full_url)
 
                     # Prefix with date for uniqueness
                     safe_date = meeting_date.isoformat()
