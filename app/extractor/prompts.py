@@ -8,6 +8,12 @@ from datetime import date
 # (e.g. VT_MD with 47 documents) to a workable size.
 MAX_DOC_CHARS = 12_000
 
+# Total per-board prompt budget (chars). Boards with many sub-committee meetings
+# (e.g. NE_MD: 58 meetings / 142 docs in 12 months) can blow past a subagent's
+# context window even with the per-doc cap. Meetings arrive newest-first, so we
+# keep the most recent ones within this budget (~120K tokens).
+MAX_PROMPT_CHARS = 480_000
+
 
 def per_board_prompt(
     board_name: str,
@@ -26,6 +32,8 @@ def per_board_prompt(
                   Each document has keys: doc_type, filename, content_text.
     """
     meeting_sections = []
+    running_chars = 0
+    omitted_meetings = 0
     for m in meetings:
         header = f"### {m['meeting_date']} — {m.get('title') or 'Board Meeting'}"
         doc_texts = []
@@ -37,11 +45,23 @@ def per_board_prompt(
                     text = text[:MAX_DOC_CHARS] + "\n\n*[document truncated for length]*"
                 doc_texts.append(f"**{label}**\n\n{text}")
         if doc_texts:
-            meeting_sections.append(header + "\n\n" + "\n\n---\n\n".join(doc_texts))
+            section = header + "\n\n" + "\n\n---\n\n".join(doc_texts)
         else:
-            meeting_sections.append(header + "\n\n*(No extracted text available)*")
+            section = header + "\n\n*(No extracted text available)*"
+        # Keep the most-recent meetings within a total budget so the prompt fits
+        # a subagent context window (meetings arrive newest-first).
+        if meeting_sections and running_chars + len(section) > MAX_PROMPT_CHARS:
+            omitted_meetings = len(meetings) - len(meeting_sections)
+            break
+        meeting_sections.append(section)
+        running_chars += len(section)
 
     all_meetings_text = "\n\n---\n\n".join(meeting_sections)
+    if omitted_meetings:
+        all_meetings_text += (
+            f"\n\n---\n\n*[{omitted_meetings} older meeting(s) omitted to fit the "
+            "context budget.]*"
+        )
 
     # Build a meeting date reference table for citations
     meeting_refs = []

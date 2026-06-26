@@ -131,7 +131,17 @@ def render_full_document(
         logger.warning(f"No PDF found for {board_code} {meeting_date}")
         return None
 
-    doc = fitz.open(str(pdf_path))
+    try:
+        doc = fitz.open(str(pdf_path))
+    except Exception as exc:
+        # Invalid/corrupt download (e.g. a portal error stub saved as .pdf)
+        logger.warning(f"Cannot open PDF {pdf_path.name} for {board_code} {meeting_date}: {exc}")
+        return None
+    if doc.page_count == 0:
+        doc.close()
+        logger.warning(f"Empty PDF {pdf_path.name} for {board_code} {meeting_date}")
+        return None
+
     best_page = _find_best_page(doc, claim_text)
 
     exhibit_dir = EXHIBITS_DIR / board_code / f"exhibit_{exhibit_number:03d}"
@@ -230,17 +240,23 @@ def generate_all_exhibits(report_path: Path) -> list[dict]:
 
     results = []
     for cite in citations:
-        result = render_full_document(
-            board_code=cite["board_code"],
-            meeting_date=cite["meeting_date"],
-            claim_text=cite["claim_text"],
-            exhibit_number=cite["exhibit_number"],
-        )
+        try:
+            result = render_full_document(
+                board_code=cite["board_code"],
+                meeting_date=cite["meeting_date"],
+                claim_text=cite["claim_text"],
+                exhibit_number=cite["exhibit_number"],
+            )
+        except Exception as exc:
+            # One bad document must not abort the whole exhibit run
+            print(f"  Exhibit {cite['exhibit_number']:3d}: "
+                  f"{cite['board_code']} {cite['meeting_date']} — render error ({exc}), skipping")
+            result = None
         if result:
             results.append(result)
         else:
             print(f"  Exhibit {cite['exhibit_number']:3d}: "
-                  f"{cite['board_code']} {cite['meeting_date']} — no PDF found, skipping")
+                  f"{cite['board_code']} {cite['meeting_date']} — no/invalid PDF, skipping")
 
     print(f"\nGenerated {len(results)}/{len(citations)} exhibits")
     return results
