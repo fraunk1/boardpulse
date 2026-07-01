@@ -17,6 +17,7 @@ from playwright.async_api import async_playwright
 from sqlalchemy import select
 
 from app.scraper.browser_provider import launch_browser
+from app.scraper.strategies import get_strategy
 import app.database as db
 from app.models import Board, Meeting, MeetingDocument
 from app.config import SCRAPE_DELAY_SECONDS, SCREENSHOTS_DIR, DOCUMENTS_DIR, USER_AGENT
@@ -595,8 +596,20 @@ async def collect_all(board_code: str | None = None):
             if i > 0:
                 await asyncio.sleep(SCRAPE_DELAY_SECONDS)
 
+            strategy = get_strategy(board.code)
             try:
-                stats = await collect_board(board, page)
+                if strategy.headed or strategy.browser == "chromium":
+                    # Dedicated browser: headed window (WAF bypass) and/or
+                    # guaranteed real Chromium for session-carrying downloads.
+                    b2, c2, p2 = await launch_browser(
+                        pw, site_id=board.code, headed=strategy.headed,
+                    )
+                    try:
+                        stats = await collect_board(board, p2)
+                    finally:
+                        await b2.close()
+                else:
+                    stats = await collect_board(board, page)
                 extra = ""
                 if stats.get("rejected"):
                     extra += f"  rejected={stats['rejected']}"

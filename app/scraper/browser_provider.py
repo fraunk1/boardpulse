@@ -16,10 +16,16 @@ LIGHTPANDA_URL = "ws://127.0.0.1:9222"
 
 # Sites that must use Chromium (add state codes or adapter names as needed).
 # Use this when a site breaks on Lightpanda due to missing Web APIs or crashes.
-CHROMIUM_ONLY: set[str] = set()
+# Seeded from per-board strategies (headed / browser="chromium" boards).
+from app.scraper.strategies import chromium_only_codes
+
+CHROMIUM_ONLY: set[str] = chromium_only_codes()
 
 
-async def launch_browser(pw, *, site_id: str = "", headless: bool = True, slow_mo: int = 0):
+async def launch_browser(
+    pw, *, site_id: str = "", headless: bool = True, slow_mo: int = 0,
+    headed: bool = False,
+):
     """Launch a browser — Lightpanda via CDP if available, else Chromium.
 
     Args:
@@ -28,12 +34,17 @@ async def launch_browser(pw, *, site_id: str = "", headless: bool = True, slow_m
                  adapter name like "seek"). Checked against CHROMIUM_ONLY.
         headless: Run Chromium in headless mode (ignored for Lightpanda).
         slow_mo: Milliseconds delay between Chromium actions (ignored for Lightpanda).
+        headed: Force a VISIBLE Chromium window (WAF bypass). Overrides
+                headless and always skips Lightpanda.
 
     Returns:
         (browser, context, page) tuple — same interface regardless of backend.
     """
-    # Try Lightpanda unless this site is blocklisted
-    if site_id not in CHROMIUM_ONLY:
+    if headed:
+        headless = False
+
+    # Try Lightpanda unless this site is blocklisted or a window is required
+    if site_id not in CHROMIUM_ONLY and not headed:
         try:
             browser = await pw.chromium.connect_over_cdp(LIGHTPANDA_URL)
             browser._is_lightpanda = True
