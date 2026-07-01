@@ -57,6 +57,12 @@ source venv/bin/activate
 pip install -r requirements.txt
 playwright install chromium
 
+# Re-scrape everything — the one command to run any time (incremental,
+# idempotent, prints a per-board diff of what changed)
+python refresh.py
+python refresh.py --include-headed   # also run WAF boards (visible windows)
+python refresh.py --board TX_MD      # one board only
+
 # Start the dashboard
 python cli.py serve
 # → http://localhost:8099
