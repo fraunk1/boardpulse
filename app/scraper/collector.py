@@ -216,8 +216,48 @@ def _doc_filename(full_url: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Download helper
+# Download helpers — validation + escalation ladder
 # ---------------------------------------------------------------------------
+
+# Magic-byte signatures per extension. A download that doesn't match is an
+# error page or portal stub (e.g. Montana's 95-byte "Unable to retrieve
+# document" response) and must never be written to disk or the DB.
+_MAGIC_SIGNATURES: dict[str, tuple[bytes, ...]] = {
+    ".pdf": (b"%PDF",),
+    ".docx": (b"PK\x03\x04",),
+    ".xlsx": (b"PK\x03\x04",),
+    ".doc": (b"\xd0\xcf\x11\xe0",),   # OLE compound file
+    ".xls": (b"\xd0\xcf\x11\xe0",),
+}
+
+_MIN_DOCUMENT_BYTES = 500
+
+
+def validate_document_bytes(data: bytes, ext: str) -> tuple[bool, str]:
+    """Check that *data* plausibly IS a document of type *ext*.
+
+    Returns (valid, reason). Rejects tiny bodies and HTML error pages;
+    for known extensions, requires the file-format magic bytes.
+    """
+    if not data:
+        return False, "empty body"
+    if len(data) < _MIN_DOCUMENT_BYTES:
+        return False, f"too small ({len(data)} bytes)"
+
+    head = data[:1024].lstrip()
+    if head[:1] == b"<":
+        return False, "html body"
+
+    sigs = _MAGIC_SIGNATURES.get(ext.lower())
+    if sigs:
+        if any(data.startswith(s) for s in sigs):
+            return True, ""
+        # Rare: PDFs with a byte-order mark or junk prefix before %PDF
+        if ext.lower() == ".pdf" and b"%PDF" in data[:1024]:
+            return True, ""
+        return False, f"missing {ext} signature"
+
+    return True, ""
 
 
 async def _download_file(
@@ -225,7 +265,7 @@ async def _download_file(
     url: str,
     dest: Path,
 ) -> bool:
-    """Download *url* to *dest*. Returns True on success."""
+    """Legacy plain-httpx download (kept for recollect_docs.py compat)."""
     try:
         resp = await client.get(url, follow_redirects=True, timeout=60)
         if resp.status_code != 200:
@@ -238,6 +278,72 @@ async def _download_file(
     except Exception as exc:
         logger.warning("Failed to download %s: %s", url, exc)
         return False
+
+
+async def _download_document(
+    page,
+    client: httpx.AsyncClient,
+    url: str,
+    dest: Path,
+    referer: str | None = None,
+) -> str:
+    """Download *url* to *dest* with byte validation.
+
+    Escalation ladder:
+      1. plain httpx (fast, no session)
+      2. the Playwright browser context's request client — carries the
+         page's cookies/session, which portal sites (Montana DLI etc.)
+         require. Skipped on Lightpanda (CDP cookie sync is unreliable).
+
+    Returns "ok" (written), "rejected" (got bytes but they failed
+    validation on every rung), or "error" (no response at all).
+    """
+    best_reason = "no response"
+    got_bytes = False
+
+    # Rung 1 — plain httpx
+    data: bytes | None = None
+    try:
+        resp = await client.get(url, follow_redirects=True, timeout=60)
+        if resp.status_code == 200:
+            data = resp.content
+    except Exception as exc:
+        logger.debug("httpx download failed for %s: %s", url, exc)
+
+    if data is not None:
+        got_bytes = True
+        valid, reason = validate_document_bytes(data, dest.suffix)
+        if valid:
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_bytes(data)
+            logger.info("Downloaded %s → %s", url, dest)
+            return "ok"
+        best_reason = reason
+
+    # Rung 2 — browser-context request (session-carrying)
+    browser = getattr(page.context, "browser", None)
+    if not getattr(browser, "_is_lightpanda", False):
+        try:
+            headers = {"Referer": referer} if referer else {}
+            r = await page.context.request.get(url, headers=headers, timeout=60_000)
+            if r.ok:
+                data2 = await r.body()
+                got_bytes = True
+                valid, reason = validate_document_bytes(data2, dest.suffix)
+                if valid:
+                    dest.parent.mkdir(parents=True, exist_ok=True)
+                    dest.write_bytes(data2)
+                    logger.info("Downloaded (browser session) %s → %s", url, dest)
+                    return "ok"
+                best_reason = reason
+        except Exception as exc:
+            logger.debug("context.request download failed for %s: %s", url, exc)
+
+    if got_bytes:
+        logger.warning("REJECT [%s] %s", best_reason, url)
+        return "rejected"
+    logger.warning("Download failed (no response): %s", url)
+    return "error"
 
 
 # ---------------------------------------------------------------------------
@@ -255,7 +361,13 @@ async def collect_board(board: Board, page) -> dict:
     Returns:
         Stats dict with keys: meetings_found, documents_downloaded, errors.
     """
-    stats = {"meetings_found": 0, "documents_downloaded": 0, "errors": 0}
+    stats = {
+        "meetings_found": 0,
+        "documents_downloaded": 0,
+        "errors": 0,
+        "rejected": 0,
+        "docs_registered_existing": 0,
+    }
 
     if not board.minutes_url:
         logger.info("Skipping %s — no minutes_url", board.code)
@@ -346,32 +458,38 @@ async def collect_board(board: Board, page) -> dict:
             for meeting_date in sorted(meetings_map):
                 meeting_links = meetings_map[meeting_date]
 
-                # Idempotent — skip if meeting already recorded
+                # Idempotent at the DOCUMENT level, not the meeting level:
+                # boards post agendas first and minutes weeks later under the
+                # same date, so an existing meeting must still have its links
+                # processed. Existing docs are deduped by source_url/filename.
                 existing = await session.execute(
                     select(Meeting).where(
                         Meeting.board_id == board.id,
                         Meeting.meeting_date == meeting_date,
                     )
                 )
-                if existing.scalars().first():
-                    logger.debug(
-                        "Meeting %s %s already exists — skipping",
-                        board.code,
-                        meeting_date,
-                    )
-                    continue
+                meeting = existing.scalars().first()
 
-                # Create Meeting record
-                meeting = Meeting(
-                    board_id=board.id,
-                    meeting_date=meeting_date,
-                    title=f"{board.name} — {meeting_date.strftime('%B %d, %Y')}",
-                    source_url=board.minutes_url,
-                    screenshot_path=str(ss_path),
-                )
-                session.add(meeting)
-                await session.flush()  # get meeting.id
-                stats["meetings_found"] += 1
+                if meeting is not None:
+                    doc_rows = (await session.execute(
+                        select(MeetingDocument).where(
+                            MeetingDocument.meeting_id == meeting.id
+                        )
+                    )).scalars().all()
+                    known_urls = {d.source_url for d in doc_rows if d.source_url}
+                    known_files = {d.filename for d in doc_rows}
+                else:
+                    meeting = Meeting(
+                        board_id=board.id,
+                        meeting_date=meeting_date,
+                        title=f"{board.name} — {meeting_date.strftime('%B %d, %Y')}",
+                        source_url=board.minutes_url,
+                        screenshot_path=str(ss_path),
+                    )
+                    session.add(meeting)
+                    await session.flush()  # get meeting.id
+                    stats["meetings_found"] += 1
+                    known_urls, known_files = set(), set()
 
                 # Download document links associated with this date
                 doc_dir = DOCUMENTS_DIR / board.code
@@ -391,12 +509,10 @@ async def collect_board(board: Board, page) -> dict:
                     dest_filename = f"{safe_date}_{filename}"
                     dest_path = doc_dir / dest_filename
 
-                    if dest_path.exists():
-                        logger.debug("File already exists: %s", dest_path)
+                    if full_url in known_urls or dest_filename in known_files:
                         continue
 
-                    ok = await _download_file(client, full_url, dest_path)
-                    if ok:
+                    def _register(status_key: str):
                         doc = MeetingDocument(
                             meeting_id=meeting.id,
                             doc_type=_infer_doc_type(filename),
@@ -405,7 +521,34 @@ async def collect_board(board: Board, page) -> dict:
                             source_url=full_url,
                         )
                         session.add(doc)
-                        stats["documents_downloaded"] += 1
+                        stats[status_key] += 1
+                        known_urls.add(full_url)
+                        known_files.add(dest_filename)
+
+                    if dest_path.exists():
+                        # A file on disk without a DB row (post-reset state).
+                        # Validate it: good file -> register the missing row;
+                        # stub/corrupt -> delete and fall through to re-download.
+                        valid, reason = validate_document_bytes(
+                            dest_path.read_bytes(), dest_path.suffix
+                        )
+                        if valid:
+                            _register("docs_registered_existing")
+                            continue
+                        logger.info(
+                            "Replacing invalid on-disk file (%s): %s",
+                            reason, dest_path.name,
+                        )
+                        dest_path.unlink(missing_ok=True)
+
+                    result = await _download_document(
+                        page, client, full_url, dest_path,
+                        referer=board.minutes_url,
+                    )
+                    if result == "ok":
+                        _register("documents_downloaded")
+                    elif result == "rejected":
+                        stats["rejected"] += 1
                     else:
                         stats["errors"] += 1
 
@@ -454,10 +597,15 @@ async def collect_all(board_code: str | None = None):
 
             try:
                 stats = await collect_board(board, page)
+                extra = ""
+                if stats.get("rejected"):
+                    extra += f"  rejected={stats['rejected']}"
+                if stats.get("docs_registered_existing"):
+                    extra += f"  registered={stats['docs_registered_existing']}"
                 print(
                     f"  [{board.code}] meetings={stats['meetings_found']}  "
                     f"docs={stats['documents_downloaded']}  "
-                    f"errors={stats['errors']}"
+                    f"errors={stats['errors']}{extra}"
                 )
             except Exception as exc:
                 logger.error("Unexpected error collecting %s: %s", board.code, exc)
