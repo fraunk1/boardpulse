@@ -1,11 +1,39 @@
 {
+  "AK_MD": {
+    "date": "2026-07-01",
+    "status": "blocked"
+  },
   "AR_MD": {
     "date": "2026-07-01",
     "status": "none_published"
   },
+  "AZ_DO": {
+    "date": "2026-07-01",
+    "status": "blocked"
+  },
+  "KS_MD": {
+    "date": "2026-07-01",
+    "status": "blocked"
+  },
   "KY_MD": {
     "date": "2026-07-01",
     "status": "none_published"
+  },
+  "MN_MD": {
+    "date": "2026-07-01",
+    "status": "blocked"
+  },
+  "MO_MD": {
+    "date": "2026-07-01",
+    "status": "blocked"
+  },
+  "OR_MD": {
+    "date": "2026-07-01",
+    "status": "blocked"
+  },
+  "RI_MD": {
+    "date": "2026-07-01",
+    "status": "blocked"
   },
   "VT_DO": {
     "date": "2026-07-01",

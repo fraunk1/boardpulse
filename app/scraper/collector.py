@@ -5,6 +5,7 @@ links, identifies meeting entries by date, and downloads associated
 documents (PDFs, DOCX, etc.) for later text extraction.
 """
 import asyncio
+import base64
 import hashlib
 import logging
 import re
@@ -486,6 +487,46 @@ async def _download_document(
                 best_reason = reason
         except Exception as exc:
             logger.debug("context.request download failed for %s: %s", url, exc)
+
+    # Rung 3 — page-initiated fetch: runs inside the loaded page itself, so
+    # it carries the complete browser fingerprint + cookies. Needed where
+    # servers reject any non-page request (NH hotlink protection, mass.gov
+    # Akamai). Same-origin only — cross-origin reads are CORS-blocked.
+    try:
+        page_host = urlparse(page.url).netloc.split(":")[0].lower()
+        target_host = urlparse(url).netloc.split(":")[0].lower()
+        if page_host and page_host.removeprefix("www.") == \
+                target_host.removeprefix("www."):
+            b64 = await page.evaluate(
+                """async (u) => {
+                    try {
+                        const r = await fetch(u, {credentials: 'include'});
+                        if (!r.ok) return null;
+                        const buf = await r.arrayBuffer();
+                        const bytes = new Uint8Array(buf);
+                        let s = '';
+                        const chunk = 0x8000;
+                        for (let i = 0; i < bytes.length; i += chunk) {
+                            s += String.fromCharCode.apply(
+                                null, bytes.subarray(i, i + chunk));
+                        }
+                        return btoa(s);
+                    } catch (e) { return null; }
+                }""",
+                url,
+            )
+            if b64:
+                data3 = base64.b64decode(b64)
+                got_bytes = True
+                valid, reason = validate_document_bytes(data3, dest.suffix)
+                if valid:
+                    dest.parent.mkdir(parents=True, exist_ok=True)
+                    dest.write_bytes(data3)
+                    logger.info("Downloaded (page fetch) %s → %s", url, dest)
+                    return "ok"
+                best_reason = reason
+    except Exception as exc:
+        logger.debug("page-fetch download failed for %s: %s", url, exc)
 
     if got_bytes:
         logger.warning("REJECT [%s] %s", best_reason, url)
