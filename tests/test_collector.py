@@ -6,8 +6,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.scraper.collector import (  # noqa: E402
     validate_document_bytes,
+    transform_download_url,
     _doc_filename,
     _infer_doc_type,
+    _passes_filter,
+    _should_visit_detail,
+    _site_key,
 )
 
 
@@ -109,6 +113,134 @@ def test_doc_filename_filetype_query_param():
 def test_doc_filename_plain_path_no_extension():
     # No filetype hint: falls back to the path segment name
     assert _doc_filename("https://x.gov/documents/board-page") == "board-page"
+
+
+def test_doc_filename_download_resource_asp():
+    url = "https://www.ndbom.org/download_resource.asp?id=1234"
+    assert _doc_filename(url) == "resource_1234.pdf"
+
+
+def test_doc_filename_getfile_cfm_with_file_param():
+    url = (r"https://townhall.virginia.gov/L/GetFile.cfm"
+           r"?File=E:%5Ctownhall%5Cdocroot%5Cminutes%5C2024%5Cfeb_minutes.pdf")
+    assert _doc_filename(url) == "feb_minutes.pdf"
+
+
+def test_doc_filename_getfile_cfm_opaque_hashes_unique():
+    a = _doc_filename("https://townhall.virginia.gov/L/GetFile.cfm?logid=1&fid=9")
+    b = _doc_filename("https://townhall.virginia.gov/L/GetFile.cfm?logid=2&fid=7")
+    assert a.endswith(".pdf") and b.endswith(".pdf")
+    assert a != b  # distinct URLs must not collapse to one filename
+
+
+def test_doc_filename_download_attachment_guid():
+    url = "https://publicmeetings.wi.gov/download-attachment/285c4839-ab12-cd34"
+    assert _doc_filename(url) == "285c4839-ab12-cd34.pdf"
+
+
+def test_doc_filename_massgov_doc_download():
+    url = "https://www.mass.gov/doc/borim-minutes-august-2024/download"
+    assert _doc_filename(url) == "borim-minutes-august-2024.pdf"
+
+
+def test_doc_filename_georgia_cms_document_download():
+    url = ("https://medicalboard.georgia.gov/document/document/"
+           "december-2024-minutes/download")
+    assert _doc_filename(url) == "december-2024-minutes.pdf"
+
+
+def test_doc_filename_drive_file():
+    url = "https://drive.google.com/file/d/1YZknFrlLcjxzoEOeugO3ljZVaQbXlfio/view"
+    assert _doc_filename(url) == "drive_1YZknFrlLcjxzoEOeugO3ljZVaQbXlfio.pdf"
+
+
+# ---------------------------------------------------------------------------
+# transform_download_url
+# ---------------------------------------------------------------------------
+
+def test_transform_drive_file_url():
+    url = "https://drive.google.com/file/d/1AbC_dEf-123/view?usp=drive_link"
+    assert transform_download_url(url) == (
+        "https://drive.google.com/uc?export=download&id=1AbC_dEf-123"
+    )
+
+
+def test_transform_drive_open_url():
+    url = "https://drive.google.com/open?id=1AbC_dEf-123"
+    assert transform_download_url(url) == (
+        "https://drive.google.com/uc?export=download&id=1AbC_dEf-123"
+    )
+
+
+def test_transform_docs_google_export():
+    url = "https://docs.google.com/document/d/1XyZ/edit"
+    assert transform_download_url(url) == (
+        "https://docs.google.com/document/d/1XyZ/export?format=pdf"
+    )
+
+
+def test_transform_non_drive_url_unchanged():
+    url = "https://www.ndbom.org/download_resource.asp?id=1234"
+    assert transform_download_url(url) == url
+
+
+# ---------------------------------------------------------------------------
+# _passes_filter (strategy filter_text)
+# ---------------------------------------------------------------------------
+
+def test_filter_text_keeps_matching_rows():
+    assert _passes_filter(
+        "Iowa Board of Medicine — May 2, 2025 Minutes", "Board of Medicine"
+    )
+
+
+def test_filter_text_case_insensitive():
+    assert _passes_filter("iowa BOARD OF MEDICINE minutes", "Board of Medicine")
+
+
+def test_filter_text_drops_non_matching_rows():
+    assert not _passes_filter(
+        "Iowa Board of Nursing — May 2, 2025 Minutes", "Board of Medicine"
+    )
+
+
+def test_filter_text_none_keeps_all():
+    assert _passes_filter("anything at all", None)
+
+
+# ---------------------------------------------------------------------------
+# Depth-1 guards
+# ---------------------------------------------------------------------------
+
+def test_site_key_strips_www_and_port():
+    assert _site_key("https://www.tmb.texas.gov:443/x") == "texas.gov"
+    assert _site_key("https://flboardofmedicine.gov/y") == "flboardofmedicine.gov"
+
+
+def test_should_visit_detail_same_site():
+    assert _should_visit_detail(
+        "https://www.tmb.texas.gov/meetings/2024-june",
+        "https://www.tmb.texas.gov/about-us/events", set(),
+    )
+
+
+def test_should_visit_detail_rejects_cross_site():
+    assert not _should_visit_detail(
+        "https://example.com/meeting",
+        "https://www.tmb.texas.gov/about-us/events", set(),
+    )
+
+
+def test_should_visit_detail_rejects_junk_links():
+    base = "https://www.tmb.texas.gov/events"
+    assert not _should_visit_detail("https://www.zoomgov.com/j/123", base, set())
+    assert not _should_visit_detail(
+        "https://www.tmb.texas.gov/photo.jpg", base, set())
+
+
+def test_should_visit_detail_rejects_visited():
+    url = "https://www.tmb.texas.gov/meetings/2024-june"
+    assert not _should_visit_detail(url, "https://www.tmb.texas.gov/", {url})
 
 
 # ---------------------------------------------------------------------------

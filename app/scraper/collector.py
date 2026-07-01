@@ -133,6 +133,19 @@ _EXTRACT_LINKS_JS = """() => {
         // Portal endpoints carry the type in a query param instead of the path,
         // e.g. /document?filekey=ABC&filetype=pdf (Montana DLI and similar CMS viewers)
         if (!isDoc && /filetype=(pdf|docx?|xlsx?)(&|$)/i.test(lowerHref)) isDoc = true;
+        // Known document-endpoint shapes with no file extension. Kept narrow:
+        // a misclassified link is rejected at download by byte validation.
+        if (!isDoc) {
+            const docUrlPatterns = [
+                /getfile\.cfm/i,                              // VA townhall
+                /download_resource\.asp\?/i,                  // ND/WV boards
+                /\/download-attachment\//i,                   // WI publicmeetings
+                /\/(doc|document)s?\/[^?#]*\/download\/?([?#]|$)/i,  // mass.gov, georgia.gov CMS
+                /drive\.google\.com\/(file\/d\/|open\?id=|uc\?)/i,   // IA (Drive-hosted)
+                /docs\.google\.com\/document\/d\//i,
+            ];
+            if (docUrlPatterns.some(re => re.test(href))) isDoc = true;
+        }
 
         // Walk up to 8 ancestor levels to find context with a date.
         // Two strategies:
@@ -186,13 +199,68 @@ def _infer_doc_type(filename: str) -> str:
     return "minutes"
 
 
+def _sanitize_name(raw: str, limit: int = 80) -> str:
+    return re.sub(r"[^A-Za-z0-9._-]", "_", raw)[:limit]
+
+
+def transform_download_url(url: str) -> str:
+    """Rewrite viewer URLs to their direct-download form.
+
+    Google Drive/Docs viewer links render an HTML page; the export endpoints
+    return the file bytes. Non-matching URLs pass through unchanged.
+    """
+    m = re.search(r"drive\.google\.com/file/d/([A-Za-z0-9_-]+)", url)
+    if m:
+        return f"https://drive.google.com/uc?export=download&id={m.group(1)}"
+    m = re.search(r"drive\.google\.com/open\?id=([A-Za-z0-9_-]+)", url)
+    if m:
+        return f"https://drive.google.com/uc?export=download&id={m.group(1)}"
+    m = re.search(r"docs\.google\.com/document/d/([A-Za-z0-9_-]+)", url)
+    if m:
+        return (f"https://docs.google.com/document/d/{m.group(1)}"
+                f"/export?format=pdf")
+    return url
+
+
+def _passes_filter(combined_text: str, filter_text: str | None) -> bool:
+    """Strategy filter_text: keep only rows mentioning the board's name
+    (case-insensitive) — for multi-board index pages like Iowa DIAL."""
+    return not filter_text or filter_text.lower() in combined_text.lower()
+
+
+def _site_key(url: str) -> str:
+    """Coarse registrable-domain key (last two labels) for same-site checks."""
+    host = urlparse(url).netloc.lower().split(":")[0]
+    if host.startswith("www."):
+        host = host[4:]
+    labels = host.split(".")
+    return ".".join(labels[-2:]) if len(labels) >= 2 else host
+
+
+# Links that are dated but never lead to documents — skip in depth-1 crawls.
+_DETAIL_SKIP_RE = re.compile(
+    r"(zoom(gov)?\.com|webex\.com|youtube\.com|facebook\.com|twitter\.com"
+    r"|calendar\.google|maps\.google|mailto:|\.(?:jpg|jpeg|png|gif|mp3|mp4|m4a)$)",
+    re.IGNORECASE,
+)
+
+
+def _should_visit_detail(url: str, base_url: str, visited: set[str]) -> bool:
+    """Depth-1 guard: same site, not junk, not already visited."""
+    if not url or url in visited:
+        return False
+    if _DETAIL_SKIP_RE.search(url):
+        return False
+    return _site_key(url) == _site_key(base_url)
+
+
 def _doc_filename(full_url: str) -> str:
     """Derive a download filename with a real extension.
 
-    Handles portal endpoints that carry the document type in the query string
-    (e.g. .../document?filekey=ABC&filetype=pdf) where the URL path has no
-    extension — otherwise every such link collapses to the same name
-    ("document") and only the first one survives the dedup check.
+    Handles portal/viewer endpoints where the URL path has no extension —
+    otherwise every such link collapses to the same name ("document") and
+    only the first one survives the dedup check. When the type can't be
+    known, .pdf is assumed; byte validation confirms or rejects at download.
     """
     parsed = urlparse(full_url)
     name = Path(parsed.path).name
@@ -207,12 +275,53 @@ def _doc_filename(full_url: str) -> str:
                 return qs[k][0]
         return ""
 
+    # A query value that is itself a file path (e.g. townhall.virginia.gov
+    # GetFile.cfm?File=E:\docroot\...\minutes.pdf) → use its basename.
+    for values in qs.values():
+        for v in values:
+            v_name = Path(v.replace("\\", "/")).name
+            if v_name and Path(v_name).suffix.lower() in DOCUMENT_EXTENSIONS:
+                return _sanitize_name(v_name)
+
+    # Explicit type in the query (e.g. Montana DLI ?filekey=ABC&filetype=pdf)
     ftype = _first("filetype", "type", "format").lower().lstrip(".")
     if ftype in {"pdf", "docx", "doc", "xlsx", "xls"}:
         key = _first("filekey", "file", "id", "documentid", "docid")
         stem = re.sub(r"[^A-Za-z0-9_-]", "", key)[:40] or hashlib.md5(
             full_url.encode()).hexdigest()[:10]
         return f"{stem}.{ftype}"
+
+    path_lower = parsed.path.lower()
+
+    # download_resource.asp?id=123 (ND/WV boards) → resource_123.pdf
+    if "download_resource" in path_lower:
+        rid = _first("id", "resourceid")
+        if rid:
+            return f"resource_{re.sub(r'[^A-Za-z0-9_-]', '', rid)[:40]}.pdf"
+
+    # /download-attachment/<guid> (WI publicmeetings) → <guid>.pdf
+    m = re.search(r"/download-attachment/([A-Za-z0-9-]+)", parsed.path, re.I)
+    if m:
+        return f"{m.group(1)[:60]}.pdf"
+
+    # /doc/<slug>/download, /document/.../<slug>/download (mass.gov, georgia.gov)
+    m = re.search(r"/(?:doc|document)s?/(?:[^?#]*/)?([^/?#]+)/download/?$",
+                  parsed.path, re.I)
+    if m:
+        return f"{_sanitize_name(m.group(1), 60)}.pdf"
+
+    # Google Drive file links → drive_<id>.pdf
+    m = re.search(r"drive\.google\.com/(?:file/d/|open\?id=|uc\?.*\bid=)"
+                  r"([A-Za-z0-9_-]+)", full_url, re.I)
+    if m:
+        return f"drive_{m.group(1)[:44]}.pdf"
+
+    # Script endpoints (GetFile.cfm etc.) with nothing recognizable: hash the
+    # URL so each distinct document gets a unique name; assume pdf.
+    if Path(name).suffix.lower() in {".cfm", ".asp", ".aspx", ".php", ".jsp"}:
+        return (f"{_sanitize_name(Path(name).stem, 20)}_"
+                f"{hashlib.md5(full_url.encode()).hexdigest()[:10]}.pdf")
+
     return name or "document"
 
 
@@ -370,6 +479,8 @@ async def collect_board(board: Board, page) -> dict:
         "docs_registered_existing": 0,
     }
 
+    strategy = get_strategy(board.code)
+
     if not board.minutes_url:
         logger.info("Skipping %s — no minutes_url", board.code)
         return stats
@@ -428,6 +539,32 @@ async def collect_board(board: Board, page) -> dict:
         stats["errors"] += 1
         return stats
 
+    # 4b. Pagination: harvest additional index pages (?page=1..N-1, Drupal
+    # convention where page=0 is the first page — e.g. WA Medical Commission).
+    if strategy.paginate > 1:
+        sep = "&" if "?" in board.minutes_url else "?"
+        for i in range(1, strategy.paginate):
+            page_url = f"{board.minutes_url}{sep}page={i}"
+            try:
+                await page.goto(page_url, wait_until="domcontentloaded",
+                                timeout=30000)
+                await asyncio.sleep(2)
+                links.extend(await page.evaluate(_EXTRACT_LINKS_JS))
+                logger.info("[%s] pagination: harvested %s", board.code, page_url)
+            except Exception as exc:
+                logger.debug("[%s] pagination page %s failed: %s",
+                             board.code, page_url, exc)
+
+    # Per-board escape hatch: strategy include_patterns force isDoc for link
+    # shapes the global heuristics miss (byte validation still gates writes).
+    if strategy.include_patterns:
+        pats = [re.compile(p, re.IGNORECASE) for p in strategy.include_patterns]
+        for link in links:
+            if not link.get("isDoc") and any(
+                pat.search(link.get("href") or "") for pat in pats
+            ):
+                link["isDoc"] = True
+
     # 4. Identify meeting entries — group links by date
     #    Each link may carry date context in its text or parent text.
     meetings_map: dict[date, list[dict]] = {}
@@ -439,6 +576,8 @@ async def collect_board(board: Board, page) -> dict:
             f"{link.get('ancestorText', '')} "
             f"{link.get('href', '')}"  # href often contains YYYY_MM_DD or YYYY-MM-DD
         )
+        if not _passes_filter(combined_text, strategy.filter_text):
+            continue
         d = parse_date(combined_text)
         if d is None:
             continue
@@ -449,6 +588,63 @@ async def collect_board(board: Board, page) -> dict:
     if not meetings_map:
         logger.info("No dated meeting links found for %s", board.code)
         return stats
+
+    # 4c. Depth-1: dated links that are NOT documents often lead to meeting
+    # detail pages holding the PDFs (TX, FL, UT-PMN, MN, DE, AK...). Visit
+    # them and attach harvested doc links to the PARENT link's date. Dates
+    # whose meetings already have documents in the DB are skipped, so
+    # repeated refresh runs work through the backlog within the cap.
+    if strategy.depth >= 1:
+        detail_cap = 40
+        visited: set[str] = set()
+
+        async with db.async_session() as session:
+            rows = await session.execute(
+                select(Meeting.meeting_date)
+                .join(MeetingDocument, MeetingDocument.meeting_id == Meeting.id)
+                .where(Meeting.board_id == board.id)
+            )
+            dates_with_docs = {r[0] for r in rows}
+
+        for meeting_date in sorted(meetings_map, reverse=True):  # newest first
+            if len(visited) >= detail_cap:
+                break
+            if meeting_date in dates_with_docs:
+                continue
+            for link in list(meetings_map[meeting_date]):
+                if len(visited) >= detail_cap:
+                    break
+                if link.get("isDoc"):
+                    continue
+                detail_url = urljoin(
+                    board.minutes_url, (link.get("href") or "")
+                ).split("#")[0]
+                if not _should_visit_detail(detail_url, board.minutes_url, visited):
+                    continue
+                visited.add(detail_url)
+                try:
+                    await page.goto(detail_url, wait_until="domcontentloaded",
+                                    timeout=30000)
+                    await asyncio.sleep(1.5)
+                    child_links = await page.evaluate(_EXTRACT_LINKS_JS)
+                except Exception as exc:
+                    logger.debug("[%s] depth-1 visit failed %s: %s",
+                                 board.code, detail_url, exc)
+                    continue
+
+                child_docs = [cl for cl in child_links if cl.get("isDoc")]
+                if strategy.include_patterns:
+                    pats = [re.compile(p, re.IGNORECASE)
+                            for p in strategy.include_patterns]
+                    for cl in child_links:
+                        if not cl.get("isDoc") and any(
+                            pat.search(cl.get("href") or "") for pat in pats
+                        ):
+                            child_docs.append(cl)
+                if child_docs:
+                    meetings_map[meeting_date].extend(child_docs)
+                    logger.info("[%s] depth-1: +%d doc link(s) from %s",
+                                board.code, len(child_docs), detail_url)
 
     # 5. Persist meetings and download documents
     async with db.async_session() as session:
@@ -543,8 +739,8 @@ async def collect_board(board: Board, page) -> dict:
                         dest_path.unlink(missing_ok=True)
 
                     result = await _download_document(
-                        page, client, full_url, dest_path,
-                        referer=board.minutes_url,
+                        page, client, transform_download_url(full_url),
+                        dest_path, referer=board.minutes_url,
                     )
                     if result == "ok":
                         _register("documents_downloaded")
