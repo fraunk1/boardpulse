@@ -293,6 +293,16 @@ def test_parse_date_mmddyyyy_requires_separators():
     assert parse_date("case number 20250612345") is None
 
 
+def test_is_within_window_rejects_far_future():
+    from datetime import date, timedelta
+    from app.scraper.collector import is_within_window
+    today = date.today()
+    assert is_within_window(today)
+    assert is_within_window(today + timedelta(days=200))   # scheduled meeting
+    assert not is_within_window(date(2050, 3, 4))          # mis-parsed typo
+    assert not is_within_window(today - timedelta(days=800))  # too old
+
+
 # ---------------------------------------------------------------------------
 # _infer_doc_type
 # ---------------------------------------------------------------------------

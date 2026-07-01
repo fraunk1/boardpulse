@@ -111,9 +111,14 @@ def parse_date(text: str) -> date | None:
 
 
 def is_within_window(d: date, months: int = 24) -> bool:
-    """Return True if *d* is within the last *months* months from today."""
-    cutoff = date.today() - timedelta(days=months * 30)
-    return d >= cutoff
+    """Return True if *d* is within the last *months* months from today,
+    or a plausibly-scheduled future meeting (≤ ~13 months out). Guards
+    against mis-parsed far-future dates (a source typo once yielded 2050,
+    which sat on top of the dashboard's Latest Intelligence feed)."""
+    today = date.today()
+    cutoff = today - timedelta(days=months * 30)
+    horizon = today + timedelta(days=400)
+    return cutoff <= d <= horizon
 
 
 # ---------------------------------------------------------------------------
