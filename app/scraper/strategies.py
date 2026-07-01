@@ -66,6 +66,29 @@ STRATEGIES: dict[str, BoardStrategy] = {
     "WA_MD": BoardStrategy(depth=1, paginate=3),
     # oregon.gov 404s to non-browser fetches — force real Chromium
     "OR_MD": BoardStrategy(depth=1, browser="chromium"),
+
+    # Headed Chromium: WAF-fronted sites that 403 headless/automated fetches
+    # (this trick beat the KS/NH Akamai WAF in a prior incarnation). These
+    # boards are skipped by unattended refresh runs (window pops up).
+    "CO_MD": BoardStrategy(headed=True, depth=1),
+    "KS_MD": BoardStrategy(headed=True, depth=1),
+    "NH_MD": BoardStrategy(headed=True),
+    "AZ_DO": BoardStrategy(headed=True),
+    # mass.gov Akamai rejects both httpx and headless context.request
+    "MA_MD": BoardStrategy(headed=True),
+
+    # No usable index page — probe guessable dated URLs (url_probe.py)
+    "NJ_MD": BoardStrategy(url_probes=(
+        "https://www.njconsumeraffairs.gov/bme/Agendas/bme-agenda-%m%d%y.pdf",
+    )),
+    "TN_MD": BoardStrategy(url_probes=(
+        "https://www.tn.gov/content/dam/tn/health/healthprofboards/"
+        "medicalexaminers/BMEMIN%m%d%y.pdf",
+    )),
+    "MO_MD": BoardStrategy(url_probes=(
+        "https://pr.mo.gov/boards/healingarts/meetings/%Y-%m-%d-Minutes.pdf",
+        "https://pr.mo.gov/boards/healingarts/meetings/%Y-%m-%d-Notice.pdf",
+    )),
 }
 
 

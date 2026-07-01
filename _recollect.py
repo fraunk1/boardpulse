@@ -24,7 +24,13 @@ for n in ("httpx", "httpcore", "asyncio", "playwright"):
 DB = Path(__file__).resolve().parent / "boardpulse.db"
 
 
-def reset(codes):
+def reset(codes, purge_files: bool = False):
+    """Clear a board's meetings + documents rows; optionally its files too.
+
+    purge_files removes data/documents/<CODE>/ entirely — use when the
+    downloaded files themselves are bad (portal stubs, wrong documents),
+    otherwise valid on-disk files are revalidated and re-registered.
+    """
     con = sqlite3.connect(DB, timeout=30)
     cur = con.cursor()
     for code in codes:
@@ -37,6 +43,14 @@ def reset(codes):
             "DELETE FROM meeting_documents WHERE meeting_id IN "
             "(SELECT id FROM meetings WHERE board_id=?)", (bid,))
         cur.execute("DELETE FROM meetings WHERE board_id=?", (bid,))
+        if purge_files:
+            import shutil
+            from app.config import DOCUMENTS_DIR
+            board_dir = DOCUMENTS_DIR / code
+            if board_dir.exists():
+                shutil.rmtree(board_dir)
+                print(f"  {code}: cleared (files purged)")
+                continue
         print(f"  {code}: cleared")
     con.commit()
     con.close()
@@ -44,11 +58,12 @@ def reset(codes):
 
 async def main():
     codes = [c for c in sys.argv[1:] if not c.startswith("-")]
+    purge = "--purge-files" in sys.argv
     if not codes:
-        print("usage: _recollect.py CODE [CODE ...]")
+        print("usage: _recollect.py [--purge-files] CODE [CODE ...]")
         return
-    print("Resetting:", ", ".join(codes))
-    reset(codes)
+    print("Resetting:", ", ".join(codes), "(purging files)" if purge else "")
+    reset(codes, purge_files=purge)
     from app.scraper.collector import collect_all
     for code in codes:
         await collect_all(board_code=code)

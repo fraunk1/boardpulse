@@ -244,6 +244,40 @@ def test_should_visit_detail_rejects_visited():
 
 
 # ---------------------------------------------------------------------------
+# URL-probe candidate generation
+# ---------------------------------------------------------------------------
+
+def test_url_probe_candidates_nj_pattern():
+    from datetime import date
+    from app.scraper.url_probe import candidate_urls
+    out = candidate_urls(
+        ("https://www.njconsumeraffairs.gov/bme/Agendas/bme-agenda-%m%d%y.pdf",),
+        [date(2025, 1, 8), date(2024, 12, 4)],
+    )
+    urls = [u for _, u in out]
+    assert urls[0].endswith("bme-agenda-010825.pdf")  # newest first
+    assert urls[1].endswith("bme-agenda-120424.pdf")
+
+
+def test_url_probe_candidates_mo_pattern_dedupes():
+    from datetime import date
+    from app.scraper.url_probe import candidate_urls
+    out = candidate_urls(
+        ("https://pr.mo.gov/boards/healingarts/meetings/%Y-%m-%d-Minutes.pdf",),
+        [date(2025, 6, 2), date(2025, 6, 2)],  # duplicate date
+    )
+    assert len(out) == 1
+    assert out[0][1].endswith("2025-06-02-Minutes.pdf")
+
+
+def test_url_probe_daily_grid_bounded():
+    from app.scraper.url_probe import daily_grid, WINDOW_DAYS
+    grid = daily_grid()
+    assert len(grid) == WINDOW_DAYS
+    assert grid[0] > grid[-1]  # newest first
+
+
+# ---------------------------------------------------------------------------
 # _infer_doc_type
 # ---------------------------------------------------------------------------
 

@@ -759,13 +759,18 @@ async def collect_board(board: Board, page) -> dict:
 # ---------------------------------------------------------------------------
 
 
-async def collect_all(board_code: str | None = None):
+async def collect_all(
+    board_code: str | None = None,
+    exclude_codes: set[str] | None = None,
+):
     """Run document collection for discovered boards.
 
     Args:
         board_code: If provided, only collect for this specific board.
                     Otherwise collect for all boards with discovery_status
                     in ('found', 'manual').
+        exclude_codes: Board codes to skip (e.g. headed-strategy boards
+                    during unattended refresh runs).
     """
     await db.init_db()
 
@@ -778,6 +783,12 @@ async def collect_all(board_code: str | None = None):
             stmt = stmt.where(Board.discovery_status.in_(("found", "manual")))
         result = await session.execute(stmt)
         boards = list(result.scalars().all())
+
+    if exclude_codes:
+        skipped = [b.code for b in boards if b.code in exclude_codes]
+        if skipped:
+            print(f"Skipping (excluded): {', '.join(skipped)}")
+        boards = [b for b in boards if b.code not in exclude_codes]
 
     if not boards:
         print("No boards ready for collection.")
