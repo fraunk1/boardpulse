@@ -55,7 +55,9 @@ STRATEGIES: dict[str, BoardStrategy] = {
     "IA_MD": BoardStrategy(filter_text="IBM"),
 
     # Depth-1 boards: the index lists meetings; PDFs live on detail pages.
-    "TX_MD": BoardStrategy(depth=1),
+    # TX front page shows only UPCOMING events; past meetings (the ones with
+    # minutes) live on ?page=1..3.
+    "TX_MD": BoardStrategy(depth=1, paginate=4),
     "FL_MD": BoardStrategy(depth=1),
     "FL_DO": BoardStrategy(depth=1),
     "UT_MD": BoardStrategy(depth=1),   # utah.gov/pmn notice pages
@@ -67,8 +69,8 @@ STRATEGIES: dict[str, BoardStrategy] = {
     "AK_MD": BoardStrategy(depth=1, headed=True),
     "RI_MD": BoardStrategy(depth=1),   # OpenGov dashboard (attempt)
     "WA_MD": BoardStrategy(depth=1, paginate=3),
-    # oregon.gov 404s to non-browser fetches — force real Chromium
-    "OR_MD": BoardStrategy(depth=1, browser="chromium"),
+    # oregon.gov renders its minutes list only for real interactive sessions
+    "OR_MD": BoardStrategy(depth=1, headed=True),
 
     # Headed Chromium: WAF-fronted sites that 403 headless/automated fetches
     # (this trick beat the KS/NH Akamai WAF in a prior incarnation). These

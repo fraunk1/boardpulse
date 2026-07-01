@@ -141,12 +141,12 @@ _EXTRACT_LINKS_JS = """() => {
         // a misclassified link is rejected at download by byte validation.
         if (!isDoc) {
             const docUrlPatterns = [
-                /getfile\.cfm/i,                              // VA townhall
-                /download_resource\.asp\?/i,                  // ND/WV boards
-                /\/download-attachment\//i,                   // WI publicmeetings
-                /\/(doc|document)s?\/[^?#]*\/download\/?([?#]|$)/i,  // mass.gov, georgia.gov CMS
-                /drive\.google\.com\/(file\/d\/|open\?id=|uc\?)/i,   // IA (Drive-hosted)
-                /docs\.google\.com\/document\/d\//i,
+                /getfile\\.cfm/i,                              // VA townhall
+                /download_resource\\.asp\\?/i,                 // ND/WV boards
+                /\\/download-attachment\\//i,                  // WI publicmeetings
+                /\\/(doc|document)s?\\/[^?#]*\\/download\\/?([?#]|$)/i,  // mass.gov, georgia.gov CMS
+                /drive\\.google\\.com\\/(file\\/d\\/|open\\?id=|uc\\?)/i,   // IA (Drive-hosted)
+                /docs\\.google\\.com\\/document\\/d\\//i,
             ];
             if (docUrlPatterns.some(re => re.test(href))) isDoc = true;
         }
@@ -353,6 +353,14 @@ _MAGIC_SIGNATURES: dict[str, tuple[bytes, ...]] = {
 
 _MIN_DOCUMENT_BYTES = 500
 
+# State file hosts with broken TLS chains (missing intermediates) that
+# reject verified connections. Downloads from EXACTLY these hosts may
+# retry without TLS verification — see the rung-1b comment in
+# _download_document for the risk acceptance rationale.
+TLS_RELAXED_HOSTS = {
+    "ww10.doh.state.fl.us",   # Florida DOH document server (FL_MD, FL_DO)
+}
+
 
 def validate_document_bytes(data: bytes, ext: str) -> tuple[bool, str]:
     """Check that *data* plausibly IS a document of type *ext*.
@@ -430,6 +438,25 @@ async def _download_document(
             data = resp.content
     except Exception as exc:
         logger.debug("httpx download failed for %s: %s", url, exc)
+        # Rung 1b — explicit allowlist of state file hosts with broken TLS
+        # chains (incomplete intermediates). Verification is relaxed ONLY for
+        # these named hosts — a deliberate, narrow risk acceptance: the files
+        # are public records, magic-byte validation gates every write, and
+        # the content is human-reviewed downstream. Never relax globally.
+        host = urlparse(url).netloc.lower()
+        if host in TLS_RELAXED_HOSTS:
+            try:
+                async with httpx.AsyncClient(
+                    headers={"User-Agent": USER_AGENT},
+                    follow_redirects=True, verify=False,
+                ) as insecure:
+                    resp = await insecure.get(url, timeout=60)
+                    if resp.status_code == 200:
+                        data = resp.content
+                        logger.info("TLS-relaxed download (allowlisted host "
+                                    "%s): %s", host, url)
+            except Exception as exc2:
+                logger.debug("TLS-relaxed download failed for %s: %s", url, exc2)
 
     if data is not None:
         got_bytes = True
