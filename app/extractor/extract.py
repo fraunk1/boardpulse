@@ -29,14 +29,20 @@ async def extract_all():
     for doc in docs:
         file_path = Path(doc.file_path)
         text = extract_text_from_file(file_path)
-        if text:
-            async with db.async_session() as session:
-                db_doc = await session.get(MeetingDocument, doc.id)
+        async with db.async_session() as session:
+            db_doc = await session.get(MeetingDocument, doc.id)
+            if text:
                 db_doc.content_text = text
-                await session.commit()
-            success += 1
-        else:
-            failed += 1
-            print(f"  Failed: {doc.filename}")
+                success += 1
+            else:
+                # Mark permanently-failed extractions (scanned/image PDFs)
+                # with an empty string so they are not retried on every
+                # refresh run. NULL = "not yet attempted"; "" = "no text".
+                # To force a retry: UPDATE meeting_documents
+                #   SET content_text = NULL WHERE content_text = ''
+                db_doc.content_text = ""
+                failed += 1
+                print(f"  Failed: {doc.filename}")
+            await session.commit()
 
     print(f"Extraction complete: {success} succeeded, {failed} failed")
