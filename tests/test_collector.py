@@ -278,6 +278,22 @@ def test_url_probe_daily_grid_bounded():
 
 
 # ---------------------------------------------------------------------------
+# Date parsing additions
+# ---------------------------------------------------------------------------
+
+def test_parse_date_mmddyyyy_filename_run():
+    from datetime import date
+    from app.scraper.collector import parse_date
+    assert parse_date("Medical Board_06182026_Audio.mp3") == date(2026, 6, 18)
+
+
+def test_parse_date_mmddyyyy_requires_separators():
+    from app.scraper.collector import parse_date
+    # A bare 8-digit number without separators must NOT parse as a date
+    assert parse_date("case number 20250612345") is None
+
+
+# ---------------------------------------------------------------------------
 # _infer_doc_type
 # ---------------------------------------------------------------------------
 

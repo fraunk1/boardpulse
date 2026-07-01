@@ -51,6 +51,9 @@ DATE_PATTERNS = [
     re.compile(r'(\d{1,2}\.\d{1,2}\.\d{2,4})'),
     # "8-7-2025" or "12-04-25" — dashes between M-D-Y (MI, OH boards)
     re.compile(r'(\d{1,2}-\d{1,2}-\d{2,4})'),
+    # "_06182026_" — MMDDYYYY run embedded in filenames (UT PMN audio/PDF
+    # names). Bounded by separators to avoid matching arbitrary numbers.
+    re.compile(r'[_\-.](\d{2}\d{2}20\d{2})[_\-.]'),
     # "January 2026" or "Jan 2026" — month+year only (e.g. MS_MD "January 2026 Board Meeting Minutes")
     re.compile(
         r'((?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?'
@@ -95,6 +98,7 @@ def parse_date(text: str) -> date | None:
             "%m.%d.%y",    # 01.15.26 (2-digit year, e.g. HI Medical Board)
             "%m-%d-%Y",    # 8-7-2025 (dashes, e.g. MI_DO filenames)
             "%m-%d-%y",    # 8-7-25 (dashes, 2-digit year)
+            "%m%d%Y",      # 06182026 (MMDDYYYY filename runs, e.g. UT PMN)
             "%B %Y",       # January 2026 (month+year only — assign day=1)
             "%b %Y",       # Jan 2026 (month+year only)
         ):
@@ -236,6 +240,13 @@ def _site_key(url: str) -> str:
     labels = host.split(".")
     return ".".join(labels[-2:]) if len(labels) >= 2 else host
 
+
+# Politeness limits: some boards' detail pages link entire document archives,
+# which would attribute hundreds of files to every meeting and hammer the
+# host (Florida DOH served 5,609 failed attempts in one run before these).
+MAX_NEW_DOWNLOADS_PER_RUN = 200     # per board per run; refresh runs catch up
+MAX_CONSECUTIVE_FAILURES = 25       # circuit breaker: stop the board's downloads
+MAX_CHILD_DOCS_PER_MEETING = 15     # depth-1 doc links attributed to one date
 
 # Links that are dated but never lead to documents — skip in depth-1 crawls.
 _DETAIL_SKIP_RE = re.compile(
@@ -496,6 +507,10 @@ async def collect_board(board: Board, page) -> dict:
         stats["errors"] += 1
         return stats
 
+    # The FINAL page URL — sites redirect to new domains (tmb.state.tx.us ->
+    # tmb.texas.gov); same-site checks must use where we actually landed.
+    base_url = page.url or board.minutes_url
+
     # 2. Full-page screenshot
     ss_dir = SCREENSHOTS_DIR / board.code
     ss_dir.mkdir(parents=True, exist_ok=True)
@@ -617,9 +632,9 @@ async def collect_board(board: Board, page) -> dict:
                 if link.get("isDoc"):
                     continue
                 detail_url = urljoin(
-                    board.minutes_url, (link.get("href") or "")
+                    base_url, (link.get("href") or "")
                 ).split("#")[0]
-                if not _should_visit_detail(detail_url, board.minutes_url, visited):
+                if not _should_visit_detail(detail_url, base_url, visited):
                     continue
                 visited.add(detail_url)
                 try:
@@ -642,6 +657,8 @@ async def collect_board(board: Board, page) -> dict:
                         ):
                             child_docs.append(cl)
                 if child_docs:
+                    # Cap per meeting: some detail pages link entire archives
+                    child_docs = child_docs[:MAX_CHILD_DOCS_PER_MEETING]
                     meetings_map[meeting_date].extend(child_docs)
                     logger.info("[%s] depth-1: +%d doc link(s) from %s",
                                 board.code, len(child_docs), detail_url)
@@ -652,7 +669,13 @@ async def collect_board(board: Board, page) -> dict:
             headers={"User-Agent": USER_AGENT},
             follow_redirects=True,
         ) as client:
+            downloads_this_run = 0
+            consecutive_failures = 0
+            budget_exhausted = False
+
             for meeting_date in sorted(meetings_map):
+                if budget_exhausted:
+                    break
                 meeting_links = meetings_map[meeting_date]
 
                 # Idempotent at the DOCUMENT level, not the meeting level:
@@ -738,16 +761,37 @@ async def collect_board(board: Board, page) -> dict:
                         )
                         dest_path.unlink(missing_ok=True)
 
+                    if downloads_this_run >= MAX_NEW_DOWNLOADS_PER_RUN:
+                        logger.warning(
+                            "[%s] download budget (%d) reached — remaining "
+                            "documents will be picked up by the next refresh",
+                            board.code, MAX_NEW_DOWNLOADS_PER_RUN,
+                        )
+                        budget_exhausted = True
+                        break
+                    if consecutive_failures >= MAX_CONSECUTIVE_FAILURES:
+                        logger.warning(
+                            "[%s] circuit breaker: %d consecutive download "
+                            "failures — stopping this board's downloads",
+                            board.code, MAX_CONSECUTIVE_FAILURES,
+                        )
+                        budget_exhausted = True
+                        break
+
                     result = await _download_document(
                         page, client, transform_download_url(full_url),
                         dest_path, referer=board.minutes_url,
                     )
                     if result == "ok":
                         _register("documents_downloaded")
+                        downloads_this_run += 1
+                        consecutive_failures = 0
                     elif result == "rejected":
                         stats["rejected"] += 1
+                        consecutive_failures += 1
                     else:
                         stats["errors"] += 1
+                        consecutive_failures += 1
 
             await session.commit()
 

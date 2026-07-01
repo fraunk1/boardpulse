@@ -50,8 +50,9 @@ DEFAULT = BoardStrategy()
 # Populated task-by-task in Wave 3 (T3–T7). Codes must exist in seed_data.
 STRATEGIES: dict[str, BoardStrategy] = {
     # Iowa DIAL hosts ALL Iowa boards' meetings on one page, with minutes as
-    # Google Drive links — filter to Board of Medicine rows only.
-    "IA_MD": BoardStrategy(filter_text="Board of Medicine"),
+    # Google Drive links. Rows use board ACRONYMS — the medicine board is
+    # "IBM" (e.g. "IBM Minutes 5/2/25"), not "Board of Medicine".
+    "IA_MD": BoardStrategy(filter_text="IBM"),
 
     # Depth-1 boards: the index lists meetings; PDFs live on detail pages.
     "TX_MD": BoardStrategy(depth=1),
@@ -59,9 +60,11 @@ STRATEGIES: dict[str, BoardStrategy] = {
     "FL_DO": BoardStrategy(depth=1),
     "UT_MD": BoardStrategy(depth=1),   # utah.gov/pmn notice pages
     "NM_MD": BoardStrategy(depth=1),
-    "MN_MD": BoardStrategy(depth=1),
+    # mn.gov and commerce.alaska.gov serve an EMPTY page to headless browsers
+    # (0 links rendered) — need a visible window like the WAF boards.
+    "MN_MD": BoardStrategy(depth=1, headed=True),
     "DE_MD": BoardStrategy(depth=1),   # publicmeetings.delaware.gov SPA
-    "AK_MD": BoardStrategy(depth=1),
+    "AK_MD": BoardStrategy(depth=1, headed=True),
     "RI_MD": BoardStrategy(depth=1),   # OpenGov dashboard (attempt)
     "WA_MD": BoardStrategy(depth=1, paginate=3),
     # oregon.gov 404s to non-browser fetches — force real Chromium
