@@ -293,6 +293,35 @@ def test_parse_date_mmddyyyy_requires_separators():
     assert parse_date("case number 20250612345") is None
 
 
+def test_parse_date_precise_accepts_day_precision():
+    from datetime import date
+    from app.scraper.collector import parse_date_precise
+    assert parse_date_precise("Med Board Meeting 6-6-25 minutes draft.pdf") == date(2025, 6, 6)
+    assert parse_date_precise("Jan 14 2026 - Executive Committee Minutes.pdf") == date(2026, 1, 14)
+
+
+def test_parse_date_precise_rejects_month_only():
+    from app.scraper.collector import parse_date_precise
+    # "September 2025" parses to day=1 in parse_date — precise must reject it
+    assert parse_date_precise("September 2025_Open Session Minutes.pdf") is None
+    assert parse_date_precise("June 2026 Med Board Draft Agenda.pdf") is None
+
+
+def test_parse_date_precise_accepts_explicit_first():
+    from datetime import date
+    from app.scraper.collector import parse_date_precise
+    assert parse_date_precise("minutes 2026-06-01 workshop.pdf") == date(2026, 6, 1)
+
+
+def test_filter_text_is_regex():
+    assert _passes_filter("TMB Medical Board Meeting June 2026", r"medical\s+board")
+    assert not _passes_filter("Acupuncture Board Meeting June 2026", r"medical\s+board")
+    assert _passes_filter("050826medagenda.pdf row",
+                          r"(\d{6}med[a-z]*\.pdf|medicine\s*(and|&)\s*surgery)")
+    assert not _passes_filter("040826chirominutes.pdf row",
+                              r"(\d{6}med[a-z]*\.pdf|medicine\s*(and|&)\s*surgery)")
+
+
 def test_is_within_window_rejects_far_future():
     from datetime import date, timedelta
     from app.scraper.collector import is_within_window

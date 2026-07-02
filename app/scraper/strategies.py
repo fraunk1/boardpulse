@@ -54,10 +54,21 @@ STRATEGIES: dict[str, BoardStrategy] = {
     # "IBM" (e.g. "IBM Minutes 5/2/25"), not "Board of Medicine".
     "IA_MD": BoardStrategy(filter_text="IBM"),
 
+    # Nebraska DHHS hosts EVERY profession's agendas/minutes on one page
+    # (chiropractic, dentistry, APRN, veterinary...). Medicine & Surgery
+    # rows/files carry "med" filename slugs (050826medagenda.pdf) or the
+    # board name; without this filter 141/142 collected docs were other
+    # professions'.
+    "NE_MD": BoardStrategy(
+        filter_text=r"(\d{6}med[a-z]*\.pdf|medicine\s*(and|&)\s*surgery)"),
+
     # Depth-1 boards: the index lists meetings; PDFs live on detail pages.
     # TX front page shows only UPCOMING events; past meetings (the ones with
-    # minutes) live on ?page=1..3.
-    "TX_MD": BoardStrategy(depth=1, paginate=4),
+    # minutes) live on ?page=1..3. The events calendar mixes ALL boards under
+    # the TMB umbrella (acupuncture, respiratory care, radiologic tech, PA)
+    # — keep only Medical Board rows. filter_text is a regex.
+    "TX_MD": BoardStrategy(depth=1, paginate=4,
+                           filter_text=r"medical\s+board"),
     "FL_MD": BoardStrategy(depth=1),
     "FL_DO": BoardStrategy(depth=1),
     "UT_MD": BoardStrategy(depth=1),   # utah.gov/pmn notice pages

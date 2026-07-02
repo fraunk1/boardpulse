@@ -110,6 +110,25 @@ def parse_date(text: str) -> date | None:
     return None
 
 
+def parse_date_precise(text: str) -> date | None:
+    """Like parse_date, but only accepts DAY-precision dates.
+
+    Month-only strings ("September 2025") parse to day=1 in parse_date;
+    for document-date reattribution we must not treat those as real dates,
+    or month-labeled minutes would be pulled off their true meeting.
+    """
+    d = parse_date(text)
+    if d is None:
+        return None
+    if d.day == 1:
+        # Only trust day=1 if the text explicitly says the 1st.
+        explicit_first = re.search(
+            r'(?:\b0?1[,\s./-]|[-_/.]0?1[-_/.]|\b(?:1st)\b)', text)
+        if not explicit_first:
+            return None
+    return d
+
+
 def is_within_window(d: date, months: int = 24) -> bool:
     """Return True if *d* is within the last *months* months from today,
     or a plausibly-scheduled future meeting (≤ ~13 months out). Guards
@@ -233,9 +252,11 @@ def transform_download_url(url: str) -> str:
 
 
 def _passes_filter(combined_text: str, filter_text: str | None) -> bool:
-    """Strategy filter_text: keep only rows mentioning the board's name
-    (case-insensitive) — for multi-board index pages like Iowa DIAL."""
-    return not filter_text or filter_text.lower() in combined_text.lower()
+    """Strategy filter_text: case-insensitive REGEX that a row's combined
+    date-context text must match — for multi-board index pages (Iowa DIAL,
+    Nebraska DHHS, Texas TMB events). Plain substrings work as-is."""
+    return not filter_text or bool(
+        re.search(filter_text, combined_text, re.IGNORECASE))
 
 
 def _site_key(url: str) -> str:
@@ -735,6 +756,31 @@ async def collect_board(board: Board, page) -> dict:
                     meetings_map[meeting_date].extend(child_docs)
                     logger.info("[%s] depth-1: +%d doc link(s) from %s",
                                 board.code, len(child_docs), detail_url)
+
+    # 4d. Re-home documents that carry their OWN precise date. Some sites
+    # group a row's documents under a neighboring meeting's date (NY listed
+    # every meeting's docs on the previous meeting's row). A doc whose own
+    # link text/filename parses to a day-precision in-window date more than
+    # 7 days from its row date belongs to ITS OWN date.
+    rehomed = 0
+    for meeting_date in list(meetings_map.keys()):
+        for link in list(meetings_map[meeting_date]):
+            if not link.get("isDoc"):
+                continue
+            own_text = f"{link.get('text', '')} {link.get('href', '')}"
+            own = parse_date_precise(own_text)
+            if (own and own != meeting_date
+                    and abs((own - meeting_date).days) > 7
+                    and is_within_window(own)):
+                meetings_map[meeting_date].remove(link)
+                meetings_map.setdefault(own, []).append(link)
+                rehomed += 1
+    if rehomed:
+        logger.info("[%s] re-homed %d doc link(s) to their own dates",
+                    board.code, rehomed)
+        # Drop dates left with no links at all
+        for d in [d for d, ls in meetings_map.items() if not ls]:
+            del meetings_map[d]
 
     # 5. Persist meetings and download documents
     async with db.async_session() as session:
