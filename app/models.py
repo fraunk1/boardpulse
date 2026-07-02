@@ -25,6 +25,10 @@ class Board(Base):
     address: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     discovery_status: Mapped[str] = mapped_column(String(20), default="pending")
     last_scraped_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    # 12-month AI rollup for the board (shown on the board page; meeting
+    # pages carry their OWN summaries in Meeting.summary)
+    summary: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    summarized_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
     meetings: Mapped[list["Meeting"]] = relationship(back_populates="board", cascade="all, delete-orphan")
 
@@ -33,14 +37,17 @@ class Meeting(Base):
     __tablename__ = "meetings"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    board_id: Mapped[int] = mapped_column(ForeignKey("boards.id"))
-    meeting_date: Mapped[date] = mapped_column(Date)
+    board_id: Mapped[int] = mapped_column(ForeignKey("boards.id"), index=True)
+    meeting_date: Mapped[date] = mapped_column(Date, index=True)
     title: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     meeting_type: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     source_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     screenshot_path: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # THIS meeting's own AI summary + topics (per-meeting since the
+    # per-meeting-summaries change; formerly held a board-level copy)
     summary: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     topics: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    summarized_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     scraped_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     board: Mapped["Board"] = relationship(back_populates="meetings")
@@ -51,7 +58,7 @@ class MeetingDocument(Base):
     __tablename__ = "meeting_documents"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    meeting_id: Mapped[int] = mapped_column(ForeignKey("meetings.id"))
+    meeting_id: Mapped[int] = mapped_column(ForeignKey("meetings.id"), index=True)
     doc_type: Mapped[str] = mapped_column(String(20))  # "minutes", "agenda", "notice", "attachment"
     filename: Mapped[str] = mapped_column(String(255))
     file_path: Mapped[str] = mapped_column(Text)

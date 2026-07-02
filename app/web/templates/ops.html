@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+
+{% block title %}Ops — boardpulse{% endblock %}
+
+{% block body %}
+<div class="max-w-[1400px] mx-auto px-6 py-8">
+
+    <!-- Header -->
+    <div class="mb-8">
+        <div class="flex items-center gap-3 mb-2">
+            <div class="w-10 h-10 rounded-xl bg-bp-frost border border-bp-cloud flex items-center justify-center">
+                <i data-lucide="activity" class="w-5 h-5 text-bp-navy"></i>
+            </div>
+            <div>
+                <h1 class="text-2xl font-bold text-bp-navy tracking-tight">Ops Status</h1>
+                <p class="text-sm text-bp-steel">Refresh health, coverage, and extraction diagnostics</p>
+            </div>
+        </div>
+
+        <!-- Top-line stats -->
+        <div class="flex items-center gap-6 mt-4">
+            <div class="flex items-center gap-2">
+                <div class="text-2xl font-bold text-bp-navy">{{ total_boards }}</div>
+                <div class="text-[11px] text-bp-mist uppercase tracking-wider leading-tight">Boards<br>Monitored</div>
+            </div>
+            <div class="w-px h-8 bg-bp-cloud"></div>
+            <div class="flex items-center gap-2">
+                <div class="text-2xl font-bold text-bp-teal">{{ have_docs }}</div>
+                <div class="text-[11px] text-bp-mist uppercase tracking-wider leading-tight">Have<br>Docs</div>
+            </div>
+            <div class="w-px h-8 bg-bp-cloud"></div>
+            <div class="flex items-center gap-2">
+                <div class="text-2xl font-bold text-bp-gold">{{ accounted }}</div>
+                <div class="text-[11px] text-bp-mist uppercase tracking-wider leading-tight">Accounted<br>For</div>
+            </div>
+            <div class="w-px h-8 bg-bp-cloud"></div>
+            <div class="flex items-center gap-2">
+                <div class="text-2xl font-bold {% if unaccounted > 0 %}text-amber-500{% else %}text-bp-steel{% endif %}">{{ unaccounted }}</div>
+                <div class="text-[11px] text-bp-mist uppercase tracking-wider leading-tight">Unaccounted</div>
+            </div>
+            <div class="w-px h-8 bg-bp-cloud"></div>
+            <div class="flex items-center gap-2">
+                <div class="text-2xl font-bold {% if failure_count > 0 %}text-amber-500{% else %}text-bp-steel{% endif %}">{{ failure_count }}</div>
+                <div class="text-[11px] text-bp-mist uppercase tracking-wider leading-tight">Extraction<br>Failures</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Last Refresh -->
+    <div class="mb-8">
+        <h2 class="section-label flex items-center gap-1.5 mb-3">
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+            Last Refresh
+        </h2>
+        <div class="bg-white border border-bp-cloud rounded-xl p-5">
+            {% if last_refresh %}
+            <div class="flex items-center gap-3 mb-3">
+                <span class="w-1.5 h-1.5 rounded-full bg-bp-teal"></span>
+                <span class="text-sm font-mono text-bp-navy">{{ last_refresh.name }}</span>
+                <span class="text-xs text-bp-mist">{{ last_refresh.mtime.strftime('%Y-%m-%d %H:%M:%S') }}</span>
+            </div>
+            <pre class="text-[11px] font-mono text-bp-steel bg-bp-frost rounded-lg p-4 overflow-x-auto whitespace-pre-wrap">{{ last_refresh.diff_text }}</pre>
+            {% else %}
+            <div class="flex items-center gap-2 text-bp-mist text-sm">
+                <i data-lucide="circle-slash" class="w-4 h-4"></i>
+                No refresh logs found yet.
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Status Rollup -->
+    <div class="mb-8">
+        <h2 class="section-label flex items-center gap-1.5 mb-3">
+            <i data-lucide="pie-chart" class="w-3.5 h-3.5"></i>
+            Discovery Status Rollup
+        </h2>
+        <div class="flex flex-wrap gap-3">
+            {% for status, count in status_rollup %}
+            <div class="bg-white border border-bp-cloud rounded-lg px-4 py-2.5 flex items-center gap-2">
+                <span class="text-lg font-bold text-bp-navy">{{ count }}</span>
+                <span class="text-[11px] uppercase tracking-wider text-bp-mist">{{ status }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Per-Board Coverage -->
+    <div class="mb-8">
+        <h2 class="section-label flex items-center gap-1.5 mb-3">
+            <i data-lucide="table" class="w-3.5 h-3.5"></i>
+            Per-Board Coverage
+        </h2>
+        <div class="bg-white border border-bp-cloud rounded-xl overflow-hidden">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="bg-bp-frost border-b border-bp-cloud">
+                        <th class="text-left font-semibold text-bp-mist text-[10px] uppercase tracking-wider px-4 py-3">Code</th>
+                        <th class="text-left font-semibold text-bp-mist text-[10px] uppercase tracking-wider px-4 py-3">State</th>
+                        <th class="text-right font-semibold text-bp-mist text-[10px] uppercase tracking-wider px-4 py-3">Meetings</th>
+                        <th class="text-right font-semibold text-bp-mist text-[10px] uppercase tracking-wider px-4 py-3">Docs</th>
+                        <th class="text-right font-semibold text-bp-mist text-[10px] uppercase tracking-wider px-4 py-3">Docs w/ Text</th>
+                        <th class="text-left font-semibold text-bp-mist text-[10px] uppercase tracking-wider px-4 py-3">Discovery Status</th>
+                        <th class="text-left font-semibold text-bp-mist text-[10px] uppercase tracking-wider px-4 py-3">Accounted</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in coverage_rows %}
+                    <tr class="border-b border-bp-cloud/60 last:border-b-0 hover:bg-bp-frost/60 transition-colors">
+                        <td class="px-4 py-2.5 font-mono text-xs text-bp-mist">
+                            <a href="/board/{{ row.board.code }}" class="hover:text-bp-teal transition-colors">{{ row.board.code }}</a>
+                        </td>
+                        <td class="px-4 py-2.5 text-bp-steel">{{ row.board.state }}</td>
+                        <td class="px-4 py-2.5 text-right font-mono text-bp-navy">{{ row.mtgs }}</td>
+                        <td class="px-4 py-2.5 text-right font-mono text-bp-navy">{{ row.docs }}</td>
+                        <td class="px-4 py-2.5 text-right font-mono {% if row.docs_text > 0 %}text-bp-teal{% else %}text-amber-500{% endif %}">{{ row.docs_text }}</td>
+                        <td class="px-4 py-2.5 text-xs text-bp-steel">{{ row.discovery_status }}</td>
+                        <td class="px-4 py-2.5">
+                            {% if row.accounted %}
+                            <span class="inline-flex items-center gap-1.5 text-[10px] text-bp-steel">
+                                <i data-lucide="check" class="w-3 h-3 text-bp-teal"></i> Yes
+                            </span>
+                            {% else %}
+                            <span class="inline-flex items-center gap-1.5 text-[10px] text-amber-600">
+                                <i data-lucide="alert-triangle" class="w-3 h-3"></i> No
+                            </span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Extraction Failures -->
+    <div class="mb-8">
+        <h2 class="section-label flex items-center gap-1.5 mb-3">
+            <i data-lucide="file-warning" class="w-3.5 h-3.5"></i>
+            Extraction Failures ({{ failure_count }})
+        </h2>
+        {% if failures %}
+        <div class="bg-white border border-bp-cloud rounded-xl overflow-hidden max-h-96 overflow-y-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="bg-bp-frost border-b border-bp-cloud sticky top-0">
+                        <th class="text-left font-semibold text-bp-mist text-[10px] uppercase tracking-wider px-4 py-3">Board</th>
+                        <th class="text-left font-semibold text-bp-mist text-[10px] uppercase tracking-wider px-4 py-3">Filename</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for code, filename in failures %}
+                    <tr class="border-b border-bp-cloud/60 last:border-b-0">
+                        <td class="px-4 py-2 font-mono text-xs text-bp-mist">
+                            <a href="/board/{{ code }}" class="hover:text-bp-teal transition-colors">{{ code }}</a>
+                        </td>
+                        <td class="px-4 py-2 text-xs text-bp-steel">{{ filename }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="bg-white border border-bp-cloud rounded-xl p-5 text-sm text-bp-mist flex items-center gap-2">
+            <i data-lucide="check-circle" class="w-4 h-4 text-bp-teal"></i>
+            No extraction failures — every document has text.
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Coverage Ledger -->
+    <div>
+        <h2 class="section-label flex items-center gap-1.5 mb-3">
+            <i data-lucide="book-marked" class="w-3.5 h-3.5"></i>
+            Coverage Ledger
+        </h2>
+        {% if ledger %}
+        <div class="bg-white border border-bp-cloud rounded-xl overflow-hidden">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="bg-bp-frost border-b border-bp-cloud">
+                        <th class="text-left font-semibold text-bp-mist text-[10px] uppercase tracking-wider px-4 py-3">Board</th>
+                        <th class="text-left font-semibold text-bp-mist text-[10px] uppercase tracking-wider px-4 py-3">Date Recorded</th>
+                        <th class="text-left font-semibold text-bp-mist text-[10px] uppercase tracking-wider px-4 py-3">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for code, entry in ledger.items() | sort %}
+                    <tr class="border-b border-bp-cloud/60 last:border-b-0">
+                        <td class="px-4 py-2.5 font-mono text-xs text-bp-mist">
+                            <a href="/board/{{ code }}" class="hover:text-bp-teal transition-colors">{{ code }}</a>
+                        </td>
+                        <td class="px-4 py-2.5 text-xs font-mono text-bp-steel">{{ entry.date }}</td>
+                        <td class="px-4 py-2.5 text-xs text-bp-steel">{{ entry.status }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="bg-white border border-bp-cloud rounded-xl p-5 text-sm text-bp-mist">
+            No coverage ledger entries.
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -19,4 +19,6 @@ data/documents/
 data/exhibits/
 data/_research/
 data/_verify/
+data/cache/
+data/logs/
 _targets.md

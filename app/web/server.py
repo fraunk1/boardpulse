@@ -1,17 +1,21 @@
 """boardpulse web dashboard — Palantir-style intelligence interface."""
 import json
 import os
+import time
+from datetime import date, datetime
 from pathlib import Path
 
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import select, func, distinct
+from sqlalchemy import select, func, distinct, text
+from sqlalchemy.orm import selectinload
 
 from app.models import Board, Meeting, MeetingDocument
-from app.config import SCREENSHOTS_DIR, DOCUMENTS_DIR, REPORTS_DIR, EXHIBITS_DIR
+from app.config import SCREENSHOTS_DIR, DOCUMENTS_DIR, REPORTS_DIR, EXHIBITS_DIR, DATA_DIR, PROJECT_ROOT, LOGS_DIR
 import app.database as db
+import app.stats as stats
 
 # Paths
 WEB_DIR = Path(__file__).resolve().parent
@@ -90,8 +94,21 @@ async def _get_all_topics_with_counts() -> list[dict]:
     ], key=lambda x: -x["count"])
 
 
+_NATIONAL_STATS_CACHE: dict = {"value": None, "computed_at": 0.0}
+_NATIONAL_STATS_TTL_SECONDS = 600
+
+
 async def _get_national_stats() -> dict:
-    """Aggregate stats for the national overview."""
+    """Aggregate stats for the national overview.
+
+    ``meetings_with_files`` stats ~1,400 files on disk, so the result is
+    cached in-process for 10 minutes to keep the homepage fast.
+    """
+    now = time.time()
+    if (_NATIONAL_STATS_CACHE["value"] is not None
+            and now - _NATIONAL_STATS_CACHE["computed_at"] < _NATIONAL_STATS_TTL_SECONDS):
+        return _NATIONAL_STATS_CACHE["value"]
+
     async with db.async_session() as session:
         total_boards = (await session.execute(
             select(func.count(Board.id))
@@ -132,7 +149,7 @@ async def _get_national_stats() -> dict:
         if (DOCUMENTS_DIR / code / fn).exists()
     })
 
-    return {
+    stats = {
         "total_boards": total_boards,
         "total_meetings": total_meetings,
         "total_documents": total_documents,
@@ -141,6 +158,9 @@ async def _get_national_stats() -> dict:
         "states_covered": states_covered,
         "meetings_with_files": meetings_with_files,
     }
+    _NATIONAL_STATS_CACHE["value"] = stats
+    _NATIONAL_STATS_CACHE["computed_at"] = now
+    return stats
 
 
 async def _get_state_coverage() -> dict[str, dict]:
@@ -199,13 +219,16 @@ async def national_overview(request: Request):
     topics = await _get_all_topics_with_counts()
     state_data = await _get_state_coverage()
 
-    # Recent summaries (latest 8 meetings with summaries)
+    # Recent summaries (latest 8 meetings with summaries, most recently
+    # scraped first — excludes future-dated scheduled meetings so they
+    # don't crowd out real intelligence at the top of the feed)
     async with db.async_session() as session:
         recent = (await session.execute(
             select(Meeting, Board)
             .join(Board, Meeting.board_id == Board.id)
             .where(Meeting.summary.isnot(None))
-            .order_by(Meeting.meeting_date.desc())
+            .where(Meeting.meeting_date <= date.today())
+            .order_by(Meeting.scraped_at.desc())
             .limit(8)
         )).all()
 
@@ -237,24 +260,28 @@ async def topic_view(request: Request, slug: str):
     """Topic drill-down — all boards/meetings with this topic."""
     display_name = slug.replace("-", " ").title()
 
+    # SQL-side topic filter via SQLite's json_each table-valued function,
+    # instead of loading every meeting and filtering in Python.
     async with db.async_session() as session:
         meetings = (await session.execute(
             select(Meeting, Board)
             .join(Board, Meeting.board_id == Board.id)
+            .options(selectinload(Meeting.board))
             .where(Meeting.topics.isnot(None))
+            .where(text(
+                "EXISTS (SELECT 1 FROM json_each(meetings.topics) "
+                "WHERE json_each.value = :slug)"
+            )).params(slug=slug)
             .order_by(Meeting.meeting_date.desc())
         )).all()
 
-    # Filter to meetings that have this topic
     filtered = []
     board_ids = set()
     state_set = set()
     for m, b in meetings:
-        tags = m.topics if isinstance(m.topics, list) else json.loads(m.topics or "[]")
-        if slug in tags:
-            filtered.append({"meeting": m, "board": b, "state_name": STATE_NAMES.get(b.state, b.state)})
-            board_ids.add(b.id)
-            state_set.add(b.state)
+        filtered.append({"meeting": m, "board": b, "state_name": STATE_NAMES.get(b.state, b.state)})
+        board_ids.add(b.id)
+        state_set.add(b.state)
 
     return templates.TemplateResponse(request, "topic.html", context={
         "topic_slug": slug,
@@ -275,7 +302,11 @@ async def topic_view(request: Request, slug: str):
 
 @app.get("/state/{abbr}", response_class=HTMLResponse)
 async def state_view(request: Request, abbr: str):
-    """State drill-down — all boards and meetings for a state."""
+    """State drill-down — all boards and meetings for a state.
+
+    Runs a constant number of queries regardless of how many boards the
+    state has (previously ran 5+ queries per board in a Python loop).
+    """
     abbr = abbr.upper()
     state_name = STATE_NAMES.get(abbr, abbr)
 
@@ -284,56 +315,70 @@ async def state_view(request: Request, abbr: str):
             select(Board).where(Board.state == abbr).order_by(Board.code)
         )).scalars().all()
 
-    if not boards:
-        raise HTTPException(status_code=404, detail=f"No boards found for {abbr}")
+        if not boards:
+            raise HTTPException(status_code=404, detail=f"No boards found for {abbr}")
+
+        board_ids = [b.id for b in boards]
+
+        # One GROUP BY query: meeting count + summary count per board.
+        meeting_stats = (await session.execute(
+            select(
+                Meeting.board_id,
+                func.count(Meeting.id),
+                func.sum(func.iif(Meeting.summary.isnot(None), 1, 0)),
+            )
+            .where(Meeting.board_id.in_(board_ids))
+            .group_by(Meeting.board_id)
+        )).all()
+        meeting_stats_by_board = {
+            board_id: (count, summary_count or 0)
+            for board_id, count, summary_count in meeting_stats
+        }
+
+        # One GROUP BY query: document count per board (joined through meetings).
+        doc_counts = (await session.execute(
+            select(Meeting.board_id, func.count(MeetingDocument.id))
+            .join(MeetingDocument, MeetingDocument.meeting_id == Meeting.id)
+            .where(Meeting.board_id.in_(board_ids))
+            .group_by(Meeting.board_id)
+        )).all()
+        doc_count_by_board = {board_id: count for board_id, count in doc_counts}
+
+        # One query: (board_id, topics) rows for topic aggregation in Python.
+        topic_rows = (await session.execute(
+            select(Meeting.board_id, Meeting.topics)
+            .where(Meeting.board_id.in_(board_ids), Meeting.topics.isnot(None))
+        )).all()
+
+        # One query: (board_id, code, filename) doc rows for the on-disk
+        # existence check, so that loop doesn't hit the DB per row.
+        doc_rows = (await session.execute(
+            select(Meeting.board_id, Board.code, MeetingDocument.filename, MeetingDocument.meeting_id)
+            .join(MeetingDocument, MeetingDocument.meeting_id == Meeting.id)
+            .join(Board, Meeting.board_id == Board.id)
+            .where(Meeting.board_id.in_(board_ids))
+        )).all()
+
+    topics_by_board: dict[int, set] = {}
+    for board_id, topics_json in topic_rows:
+        tags = topics_json if isinstance(topics_json, list) else json.loads(topics_json or "[]")
+        topics_by_board.setdefault(board_id, set()).update(tags)
+
+    meetings_with_files_by_board: dict[int, set] = {}
+    for board_id, code, filename, meeting_id in doc_rows:
+        if (DOCUMENTS_DIR / code / filename).exists():
+            meetings_with_files_by_board.setdefault(board_id, set()).add(meeting_id)
 
     board_data = []
     for b in boards:
-        async with db.async_session() as session:
-            meeting_count = (await session.execute(
-                select(func.count(Meeting.id)).where(Meeting.board_id == b.id)
-            )).scalar()
-            summary_count = (await session.execute(
-                select(func.count(Meeting.id))
-                .where(Meeting.board_id == b.id, Meeting.summary.isnot(None))
-            )).scalar()
-            doc_count = (await session.execute(
-                select(func.count(MeetingDocument.id))
-                .where(MeetingDocument.meeting_id.in_(
-                    select(Meeting.id).where(Meeting.board_id == b.id)
-                ))
-            )).scalar()
-
-            # Get topics for this board
-            topic_meetings = (await session.execute(
-                select(Meeting.topics)
-                .where(Meeting.board_id == b.id, Meeting.topics.isnot(None))
-            )).scalars().all()
-
-            # Count meetings with actual files on disk
-            doc_rows = (await session.execute(
-                select(MeetingDocument.meeting_id, MeetingDocument.filename)
-                .where(MeetingDocument.meeting_id.in_(
-                    select(Meeting.id).where(Meeting.board_id == b.id)
-                ))
-            )).all()
-        meetings_with_files = len({
-            mid for mid, fn in doc_rows
-            if (DOCUMENTS_DIR / b.code / fn).exists()
-        })
-
-        topics = set()
-        for t in topic_meetings:
-            tags = t if isinstance(t, list) else json.loads(t or "[]")
-            topics.update(tags)
-
+        meeting_count, summary_count = meeting_stats_by_board.get(b.id, (0, 0))
         board_data.append({
             "board": b,
             "meetings": meeting_count,
             "summaries": summary_count,
-            "documents": doc_count,
-            "meetings_with_files": meetings_with_files,
-            "topics": sorted(topics),
+            "documents": doc_count_by_board.get(b.id, 0),
+            "meetings_with_files": len(meetings_with_files_by_board.get(b.id, set())),
+            "topics": sorted(topics_by_board.get(b.id, set())),
         })
 
     return templates.TemplateResponse(request, "state.html", context={
@@ -347,9 +392,248 @@ async def state_view(request: Request, abbr: str):
 
 
 # ---------------------------------------------------------------------------
+# Pages — Full-Text Search
+# ---------------------------------------------------------------------------
+
+_SEARCH_PAGE_SIZE = 25
+
+
+def _sanitize_fts_query(q: str) -> str:
+    """Turn free-typed user input into a safe FTS5 MATCH expression.
+
+    Splits on whitespace and wraps each token in double quotes, joined by
+    spaces. Quoting each token neutralizes FTS5 operators (AND/OR/NOT/NEAR,
+    column filters, prefix `*`) and unbalanced quotes — every token becomes
+    a literal phrase match, so the query can't raise a syntax error.
+    """
+    tokens = q.split()
+    if not tokens:
+        return ""
+    escaped = [tok.replace('"', '""') for tok in tokens]
+    return " ".join(f'"{tok}"' for tok in escaped)
+
+
+@app.get("/search", response_class=HTMLResponse)
+async def search_view(request: Request, q: str = "", page: int = 1):
+    """Full-text search across meeting document text (SQLite FTS5)."""
+    q = (q or "").strip()
+    page = max(1, page)
+    results: list[dict] = []
+    has_next = False
+    error = False
+
+    if q:
+        fts_query = _sanitize_fts_query(q)
+        offset = (page - 1) * _SEARCH_PAGE_SIZE
+        try:
+            async with db.async_session() as session:
+                rows = (await session.execute(text(
+                    """
+                    SELECT
+                        d.id AS doc_id,
+                        d.doc_type,
+                        m.id AS meeting_id,
+                        m.meeting_date,
+                        m.title,
+                        b.code AS board_code,
+                        b.state AS board_state,
+                        snippet(doc_fts, 0, '<mark>', '</mark>', ' … ', 14) AS snippet
+                    FROM doc_fts
+                    JOIN meeting_documents d ON d.id = doc_fts.rowid
+                    JOIN meetings m ON m.id = d.meeting_id
+                    JOIN boards b ON b.id = m.board_id
+                    WHERE doc_fts MATCH :query
+                    ORDER BY bm25(doc_fts)
+                    LIMIT :limit OFFSET :offset
+                    """
+                ), {"query": fts_query, "limit": _SEARCH_PAGE_SIZE + 1, "offset": offset})).all()
+        except Exception:
+            # Malformed/edge-case FTS5 query — never surface a 500, just show
+            # a friendly empty state.
+            rows = []
+            error = True
+
+        has_next = len(rows) > _SEARCH_PAGE_SIZE
+        rows = rows[:_SEARCH_PAGE_SIZE]
+
+        for r in rows:
+            # Raw SQL via text() returns SQLite's stored TEXT for a Date
+            # column, not a parsed date.fromisoformat() object — parse it
+            # here so the template can call .strftime() like it does
+            # everywhere else (ORM queries auto-convert; this one doesn't).
+            meeting_date = r.meeting_date
+            if isinstance(meeting_date, str):
+                meeting_date = date.fromisoformat(meeting_date)
+            results.append({
+                "doc_id": r.doc_id,
+                "doc_type": r.doc_type,
+                "meeting_id": r.meeting_id,
+                "meeting_date": meeting_date,
+                "title": r.title,
+                "board_code": r.board_code,
+                "board_state": r.board_state,
+                "state_name": STATE_NAMES.get(r.board_state, r.board_state),
+                "snippet": r.snippet,
+            })
+
+    return templates.TemplateResponse(request, "search.html", context={
+        "q": q,
+        "page": page,
+        "results": results,
+        "result_count": len(results),
+        "has_next": has_next,
+        "has_prev": page > 1,
+        "error": error,
+        "breadcrumbs": [
+            {"label": "National", "url": "/"},
+        ],
+        "page_title": "Search",
+    })
+
+
+# ---------------------------------------------------------------------------
+# Pages — Ops Status
+# ---------------------------------------------------------------------------
+
+def _latest_refresh_log() -> dict | None:
+    """Return {path, mtime, diff_text} for the newest refresh-*.log, or None."""
+    if not LOGS_DIR.exists():
+        return None
+    log_files = sorted(LOGS_DIR.glob("refresh-*.log"), reverse=True)
+    if not log_files:
+        return None
+    log_path = log_files[0]
+    try:
+        text_content = log_path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+
+    marker = "REFRESH DIFF"
+    idx = text_content.find(marker)
+    diff_text = text_content[idx:] if idx != -1 else text_content
+
+    return {
+        "name": log_path.name,
+        "mtime": datetime.fromtimestamp(log_path.stat().st_mtime),
+        "diff_text": diff_text.strip(),
+    }
+
+
+def _load_coverage_ledger() -> dict:
+    ledger_path = PROJECT_ROOT / "coverage_ledger.json"
+    if not ledger_path.exists():
+        return {}
+    try:
+        return json.loads(ledger_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+@app.get("/ops", response_class=HTMLResponse)
+async def ops_view(request: Request):
+    """Operational status page — refresh health, per-board coverage, failures."""
+    async with db.async_session() as session:
+        boards = (await session.execute(
+            select(Board).order_by(Board.state, Board.code)
+        )).scalars().all()
+
+    per_board = await stats.per_board_counts()
+    failures = await stats.extraction_failures()
+    rollup = await stats.status_rollup()
+
+    coverage_rows = []
+    accounted = 0
+    have_docs = 0
+    for b in boards:
+        counts = per_board.get(b.code, {"mtgs": 0, "docs": 0, "docs_text": 0})
+        row_has_docs = counts["docs_text"] > 0
+        if row_has_docs:
+            have_docs += 1
+        is_accounted = b.discovery_status in ("none_published", "blocked") or row_has_docs
+        if is_accounted:
+            accounted += 1
+        coverage_rows.append({
+            "board": b,
+            "mtgs": counts["mtgs"],
+            "docs": counts["docs"],
+            "docs_text": counts["docs_text"],
+            "discovery_status": b.discovery_status,
+            "accounted": is_accounted,
+        })
+
+    total_boards = len(boards)
+
+    return templates.TemplateResponse(request, "ops.html", context={
+        "last_refresh": _latest_refresh_log(),
+        "coverage_rows": coverage_rows,
+        "total_boards": total_boards,
+        "have_docs": have_docs,
+        "accounted": accounted,
+        "unaccounted": total_boards - accounted,
+        "status_rollup": sorted(rollup.items()),
+        "failures": failures,
+        "failure_count": len(failures),
+        "ledger": _load_coverage_ledger(),
+        "breadcrumbs": [
+            {"label": "National", "url": "/"},
+        ],
+        "page_title": "Ops",
+    })
+
+
+# ---------------------------------------------------------------------------
+# Pages — Boards Directory
+# ---------------------------------------------------------------------------
+
+@app.get("/boards", response_class=HTMLResponse)
+async def boards_directory(request: Request):
+    """Flat directory of every board — one row per board, one aggregate query."""
+    async with db.async_session() as session:
+        rows = (await session.execute(
+            select(
+                Board,
+                func.count(Meeting.id),
+                func.max(Meeting.scraped_at),
+            )
+            .outerjoin(Meeting, Meeting.board_id == Board.id)
+            .group_by(Board.id)
+            .order_by(Board.state, Board.code)
+        )).all()
+
+    board_rows = []
+    for board, meeting_count, last_meeting_scraped_at in rows:
+        if meeting_count > 0:
+            status = "collected"
+        elif board.discovery_status in ("found", "manual"):
+            status = "discovered"
+        elif board.discovery_status == "none_published":
+            status = "none_published"
+        elif board.discovery_status == "blocked":
+            status = "blocked"
+        else:
+            status = "pending"
+
+        board_rows.append({
+            "board": board,
+            "meeting_count": meeting_count,
+            "last_scraped_at": board.last_scraped_at or last_meeting_scraped_at,
+            "status": status,
+        })
+
+    return templates.TemplateResponse(request, "boards.html", context={
+        "board_rows": board_rows,
+        "breadcrumbs": [
+            {"label": "National", "url": "/"},
+        ],
+        "page_title": "Boards",
+    })
+
+
+# ---------------------------------------------------------------------------
 # Pages — Board Detail
 # ---------------------------------------------------------------------------
 
+# KEEP: live fallback for citation links in /report that the citation-rewriter couldn't resolve to a specific page.
 @app.get("/board/{state}/{code}")
 async def board_redirect(state: str, code: str):
     """Redirect old /board/{state}/{code} URLs to /board/{code}.
@@ -416,6 +700,12 @@ async def board_view(request: Request, code: str):
 # Pages — Meeting Detail
 # ---------------------------------------------------------------------------
 
+# Unbounded-but-safe cache of PDF page counts, keyed by (file_path, mtime).
+# No TTL/eviction: the mtime in the key means a changed file just gets a
+# new entry; stale entries for ~1,400 files cost negligible memory.
+_PAGE_COUNT_CACHE: dict = {}
+
+
 @app.get("/meeting/{meeting_id}", response_class=HTMLResponse)
 async def meeting_view(request: Request, meeting_id: int):
     """Meeting detail — full summary, documents, exhibits."""
@@ -440,19 +730,27 @@ async def meeting_view(request: Request, meeting_id: int):
     # Only include documents whose files actually exist on disk
     docs = [d for d in docs_all if (DOCUMENTS_DIR / board.code / d.filename).exists()]
 
-    # Get page counts for PDF documents (for page-image rendering)
+    # Get page counts for PDF documents (for page-image rendering). Cached
+    # by (file_path, mtime) so ~1,400 files aren't re-opened with fitz on
+    # every hit — a changed file gets a fresh cache entry since mtime is
+    # part of the key, so no eviction/TTL is needed.
     doc_pages = []
     for d in docs:
         file_path = DOCUMENTS_DIR / board.code / d.filename
         page_count = 0
         if file_path.suffix.lower() == ".pdf":
-            try:
-                import fitz
-                pdf = fitz.open(str(file_path))
-                page_count = len(pdf)
-                pdf.close()
-            except Exception:
-                pass
+            cache_key = (str(file_path), file_path.stat().st_mtime)
+            if cache_key in _PAGE_COUNT_CACHE:
+                page_count = _PAGE_COUNT_CACHE[cache_key]
+            else:
+                try:
+                    import fitz
+                    pdf = fitz.open(str(file_path))
+                    page_count = pdf.page_count
+                    pdf.close()
+                except Exception:
+                    pass
+                _PAGE_COUNT_CACHE[cache_key] = page_count
         doc_pages.append({
             "doc": d,
             "page_count": page_count,
@@ -535,6 +833,13 @@ async def serve_exhibit_page(board_code: str, exhibit_name: str, page_num: int):
 # Pages — National Landscape Report
 # ---------------------------------------------------------------------------
 
+# Single-slot in-process cache for the rendered report: keyed on
+# (report_path, report_mtime) so a re-run of `summarize --national` (which
+# writes a new/changed file) invalidates it automatically. Intentionally
+# NOT an LRU — only the latest report is ever kept.
+_REPORT_CACHE: dict = {}
+
+
 @app.get("/report", response_class=HTMLResponse)
 async def national_report(request: Request):
     """Serve the latest national landscape report with deep-linked citations.
@@ -542,75 +847,89 @@ async def national_report(request: Request):
     Citation links are rewritten from /board/{state}/{code}#{date}
     to /meeting/{id}#page-{best_page} so clicking a citation jumps
     directly to the evidence page in the document viewer.
-    """
-    import markdown
-    import re as _re
-    import fitz
 
+    The fitz-based "best page" citation scan is expensive, so the rendered
+    HTML body is cached in-process keyed on (report_path, report_mtime).
+    """
     report_files = sorted(REPORTS_DIR.glob("*-board-landscape.md"), reverse=True)
     if not report_files:
         return HTMLResponse("<h1>No report available</h1><p>Run <code>python cli.py summarize --national</code> first.</p>")
 
     report_path = report_files[0]
-    md_text = report_path.read_text(encoding="utf-8")
+    report_mtime = report_path.stat().st_mtime
+    cache_key = (str(report_path), report_mtime)
 
-    # Build citation index: map (board_code, date) → (meeting_id, best_page)
-    citation_index = {}
-    async with db.async_session() as session:
-        all_meetings = (await session.execute(
-            select(Meeting, Board)
-            .join(Board, Meeting.board_id == Board.id)
-        )).all()
-        for m, b in all_meetings:
-            citation_index[(b.code, m.meeting_date.isoformat())] = m.id
+    cached = _REPORT_CACHE.get(cache_key)
+    if cached is not None:
+        html_body = cached["html_body"]
+    else:
+        import markdown
+        import re as _re
+        import fitz
 
-    # Rewrite citation links in markdown before rendering
-    # Pattern: [text](/board/{state}/{code}#{date})
-    def _rewrite_citation(match):
-        link_text = match.group(1)
-        state = match.group(2)
-        code = match.group(3)
-        date_str = match.group(4)
+        md_text = report_path.read_text(encoding="utf-8")
 
-        meeting_id = citation_index.get((code, date_str))
-        if meeting_id:
-            # Find best page for the claim text (context before the link)
-            best_page = 1
-            doc_path = DOCUMENTS_DIR / code
-            if doc_path.exists():
-                # Get the claim text from preceding context
-                start = max(0, match.start() - 300)
-                claim_text = md_text[start:match.start()].strip()
-                # Find the PDF for this date
-                for pdf_file in doc_path.glob(f"{date_str}*.pdf"):
-                    try:
-                        doc = fitz.open(str(pdf_file))
-                        # Simple best-page: find page with most matching words
-                        words = [w for w in _re.sub(r'[^\w\s]', '', claim_text).split() if len(w) >= 5][:8]
-                        skip = {'board', 'meeting', 'state', 'medical', 'discussed', 'which', 'their', 'about', 'would'}
-                        words = [w for w in words if w.lower() not in skip]
-                        best_score = 0
-                        for idx in range(len(doc)):
-                            page_text = doc[idx].get_text("text").lower()
-                            score = sum(1 for w in words if w.lower() in page_text)
-                            if score > best_score:
-                                best_score = score
-                                best_page = idx + 1
-                        doc.close()
-                        break  # use first matching PDF
-                    except Exception:
-                        pass
+        # Build citation index: map (board_code, date) → (meeting_id, best_page)
+        citation_index = {}
+        async with db.async_session() as session:
+            all_meetings = (await session.execute(
+                select(Meeting, Board)
+                .join(Board, Meeting.board_id == Board.id)
+            )).all()
+            for m, b in all_meetings:
+                citation_index[(b.code, m.meeting_date.isoformat())] = m.id
 
-            return f"[{link_text}](/meeting/{meeting_id}#page-{best_page})"
-        return match.group(0)  # leave unchanged if no match
+        # Rewrite citation links in markdown before rendering
+        # Pattern: [text](/board/{state}/{code}#{date})
+        def _rewrite_citation(match):
+            link_text = match.group(1)
+            state = match.group(2)
+            code = match.group(3)
+            date_str = match.group(4)
 
-    md_text = _re.sub(
-        r'\[([^\]]+)\]\(/board/(\w{2})/(\w+_\w+)#(\d{4}-\d{2}-\d{2})\)',
-        _rewrite_citation,
-        md_text,
-    )
+            meeting_id = citation_index.get((code, date_str))
+            if meeting_id:
+                # Find best page for the claim text (context before the link)
+                best_page = 1
+                doc_path = DOCUMENTS_DIR / code
+                if doc_path.exists():
+                    # Get the claim text from preceding context
+                    start = max(0, match.start() - 300)
+                    claim_text = md_text[start:match.start()].strip()
+                    # Find the PDF for this date
+                    for pdf_file in doc_path.glob(f"{date_str}*.pdf"):
+                        try:
+                            doc = fitz.open(str(pdf_file))
+                            # Simple best-page: find page with most matching words
+                            words = [w for w in _re.sub(r'[^\w\s]', '', claim_text).split() if len(w) >= 5][:8]
+                            skip = {'board', 'meeting', 'state', 'medical', 'discussed', 'which', 'their', 'about', 'would'}
+                            words = [w for w in words if w.lower() not in skip]
+                            best_score = 0
+                            for idx in range(len(doc)):
+                                page_text = doc[idx].get_text("text").lower()
+                                score = sum(1 for w in words if w.lower() in page_text)
+                                if score > best_score:
+                                    best_score = score
+                                    best_page = idx + 1
+                            doc.close()
+                            break  # use first matching PDF
+                        except Exception:
+                            pass
 
-    html_body = markdown.markdown(md_text, extensions=["tables", "fenced_code"])
+                return f"[{link_text}](/meeting/{meeting_id}#page-{best_page})"
+            return match.group(0)  # leave unchanged if no match
+
+        md_text = _re.sub(
+            r'\[([^\]]+)\]\(/board/(\w{2})/(\w+_\w+)#(\d{4}-\d{2}-\d{2})\)',
+            _rewrite_citation,
+            md_text,
+        )
+
+        html_body = markdown.markdown(md_text, extensions=["tables", "fenced_code"])
+
+        # Single-slot cache: clear before inserting the new (and only) entry.
+        _REPORT_CACHE.clear()
+        _REPORT_CACHE[cache_key] = {"html_body": html_body}
 
     return templates.TemplateResponse(request, "report.html", context={
         "report_html": html_body,
@@ -629,9 +948,18 @@ async def national_report(request: Request):
 # On-Demand PDF Page Renderer
 # ---------------------------------------------------------------------------
 
+_PAGE_RENDER_DPI = 150
+_PAGE_CACHE_DIR = DATA_DIR / "cache" / "pages"
+
+
 @app.get("/document-page/{board_code}/{filename}/{page_num}")
 async def render_document_page(board_code: str, filename: str, page_num: int):
-    """Render a single PDF page as a PNG image on demand."""
+    """Render a single PDF page as a PNG image on demand, with a disk cache.
+
+    Cached PNGs live under DATA_DIR/cache/pages/{board_code}/{filename}/{page}-{dpi}.png.
+    A cache hit is served directly when it's at least as new as the source
+    PDF; otherwise the page is re-rendered with fitz and the cache is refreshed.
+    """
     import fitz
     from fastapi.responses import Response
 
@@ -643,15 +971,25 @@ async def render_document_page(board_code: str, filename: str, page_num: int):
     if file_path.suffix.lower() != ".pdf":
         raise HTTPException(status_code=400, detail="Not a PDF")
 
+    cache_path = _PAGE_CACHE_DIR / board_code / filename / f"{page_num}-{_PAGE_RENDER_DPI}.png"
+
+    if cache_path.exists() and cache_path.stat().st_mtime >= file_path.stat().st_mtime:
+        return FileResponse(str(cache_path), media_type="image/png",
+                             headers={"Cache-Control": "public, max-age=86400"})
+
     try:
         doc = fitz.open(str(file_path))
         if page_num < 1 or page_num > len(doc):
             doc.close()
             raise HTTPException(status_code=404, detail="Page not found")
         page = doc[page_num - 1]
-        pix = page.get_pixmap(dpi=150)
+        pix = page.get_pixmap(dpi=_PAGE_RENDER_DPI)
         img_bytes = pix.tobytes("png")
         doc.close()
+
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        cache_path.write_bytes(img_bytes)
+
         return Response(content=img_bytes, media_type="image/png",
                         headers={"Cache-Control": "public, max-age=86400"})
     except HTTPException:

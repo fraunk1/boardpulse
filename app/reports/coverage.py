@@ -2,17 +2,16 @@
 """Quick coverage report straight from boardpulse.db (stdlib sqlite3, sync).
 
 Usage:
-    python _coverage.py            # summary + per-board table
-    python _coverage.py --summary  # just the totals
+    python cli.py coverage            # summary + per-board table
+    python cli.py coverage --summary  # just the totals
 """
 import sqlite3
 import sys
-from pathlib import Path
 
-DB = Path(__file__).resolve().parent / "boardpulse.db"
+from app.config import DB_PATH as DB
 
 
-def main():
+def main(summary: bool = False):
     con = sqlite3.connect(DB)
     cur = con.cursor()
 
@@ -41,7 +40,7 @@ def main():
     print(f"  with extracted text .... {docs_text}")
     print(f"Meetings with summary .... {mtg_summ}")
 
-    if "--summary" in sys.argv:
+    if summary or "--summary" in sys.argv:
         return
 
     print("\nPer-board (boards with >=1 meeting):")

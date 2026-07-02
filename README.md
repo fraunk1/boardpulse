@@ -76,8 +76,14 @@ python cli.py summarize --board AL_MD
 # Generate national landscape report
 python cli.py summarize --national
 
-# Recollect documents for boards missing files
-python recollect_docs.py --all-missing
+# Diagnostics
+python cli.py coverage            # totals + per-board coverage
+python cli.py boards              # coverage buckets + 63/63 done-math
+python cli.py qa                  # data-quality audit
+python cli.py ledger list         # verified no-minutes / blocked boards
+
+# Reset + re-collect a board after fixing its URL or the collector
+python _recollect.py TX_MD
 ```
 
 ## Architecture

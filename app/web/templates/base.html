@@ -91,9 +91,23 @@
 
             <!-- Right nav -->
             <div class="flex items-center gap-3">
+                <form action="/search" method="get" class="hidden md:block relative">
+                    <i data-lucide="search" class="w-3.5 h-3.5 text-bp-mist absolute left-2.5 top-1/2 -translate-y-1/2"></i>
+                    <input type="text" name="q" placeholder="Search minutes…"
+                        class="w-48 lg:w-64 pl-8 pr-2.5 py-1.5 text-xs bg-bp-frost border border-bp-cloud rounded-lg
+                               text-bp-navy placeholder-bp-mist focus:outline-none focus:ring-2 focus:ring-bp-teal/30 focus:border-bp-teal focus:bg-white transition-colors">
+                </form>
+                <a href="/boards" class="text-xs text-bp-steel hover:text-bp-teal transition-colors flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-bp-frost">
+                    <i data-lucide="building-2" class="w-3.5 h-3.5"></i>
+                    <span class="hidden sm:inline">Boards</span>
+                </a>
                 <a href="/report" class="text-xs text-bp-steel hover:text-bp-teal transition-colors flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-bp-frost">
                     <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
                     <span class="hidden sm:inline">National Report</span>
+                </a>
+                <a href="/ops" class="text-xs text-bp-steel hover:text-bp-teal transition-colors flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-bp-frost">
+                    <i data-lucide="activity" class="w-3.5 h-3.5"></i>
+                    <span class="hidden sm:inline">Ops</span>
                 </a>
                 <div class="h-4 w-px bg-bp-cloud"></div>
                 <span class="text-[10px] font-mono text-bp-mist tracking-wider uppercase">Intelligence Platform</span>

@@ -10,7 +10,8 @@ Flow:
     4. prepare_national_bundle() — collect all per-board summaries, write synthesis prompt
     5. (external) Claude Code subagent writes data/reports/YYYY-MM-DD-board-landscape.md
 """
-from datetime import date, timedelta
+import re
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 from sqlalchemy import select
@@ -161,11 +162,79 @@ def _parse_summary_frontmatter(text: str) -> tuple[list[str], str]:
     return topics, body
 
 
+# Per-meeting section delimiter in board summary files. Lenient by design:
+# tolerates 2+ '=', flexible spacing, and trailing title text after the date.
+_MEETING_DELIM_RE = re.compile(
+    r'^\s*={2,}\s*MEETING:\s*(\d{4}-\d{2}-\d{2}).*$', re.MULTILINE)
+_END_DELIM_RE = re.compile(r'^\s*={2,}\s*END\s*={2,}\s*$', re.MULTILINE)
+_TOPICS_LINE_RE = re.compile(r'^\s*topics:\s*\[?([^\]\n]*)\]?\s*$',
+                             re.IGNORECASE | re.MULTILINE)
+
+
+def _parse_topics_value(raw: str) -> list[str]:
+    return [t.strip().strip('"').strip("'")
+            for t in raw.split(",") if t.strip()]
+
+
+def parse_board_summary_file(
+    text: str,
+) -> tuple[list[str], str, dict[str, tuple[str, list[str]]]]:
+    """Parse a board summary file into (board_topics, rollup, meetings).
+
+    File layout (see prompts.per_board_prompt for the authoring contract):
+      YAML frontmatter (topics union) -> 12-month board ROLLUP ->
+      one "=== MEETING: YYYY-MM-DD ===" block per text-bearing meeting
+      (optional "topics: [...]" first line) -> "=== END ===".
+
+    Deliberately lenient: a mangled delimiter loses one section, never the
+    file; zero delimiters = LEGACY format (whole body is the rollup,
+    meetings={}) so old files degrade to board-page-only summaries.
+
+    Returns:
+        (board_topics, rollup_markdown,
+         {date_str: (meeting_summary_md, meeting_topics)})
+    """
+    import re as _re
+
+    board_topics, body = _parse_summary_frontmatter(text.strip())
+
+    matches = list(_MEETING_DELIM_RE.finditer(body))
+    if not matches:
+        return board_topics, body.strip(), {}
+
+    rollup = body[: matches[0].start()].strip()
+
+    meetings: dict[str, tuple[str, list[str]]] = {}
+    for i, m in enumerate(matches):
+        date_str = m.group(1)
+        start = m.end()
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(body)
+        section = body[start:end]
+        section = _END_DELIM_RE.sub("", section).strip()
+
+        topics: list[str] = []
+        tm = _TOPICS_LINE_RE.search(section[:200])
+        if tm:
+            topics = _parse_topics_value(tm.group(1))
+            # remove the topics line from the summary text
+            section = (section[: tm.start()] + section[tm.end():]).strip()
+
+        if date_str in meetings:
+            print(f"  Warning: duplicate section for {date_str} — first wins")
+            continue
+        meetings[date_str] = (section, topics)
+
+    return board_topics, rollup, meetings
+
+
 async def ingest_board_summary(board_code: str) -> bool:
     """Read a completed summary file and store it in the database.
 
-    Parses YAML frontmatter for topic tags, then stores the summary text
-    and topics on all meetings for that board in the collection window.
+    New contract: the file's rollup goes on Board.summary; each
+    "=== MEETING: date ===" section goes on ITS OWN meeting's summary and
+    topics. Window meetings absent from the file get summary/topics
+    CLEARED (removes stale board-level blobs; textless meetings stay
+    honestly empty). Legacy files (no sections) set only the board rollup.
 
     Returns True if successful.
     """
@@ -181,10 +250,11 @@ async def ingest_board_summary(board_code: str) -> bool:
         print(f"Summary file is empty: {summary_path}")
         return False
 
-    # Parse frontmatter for topics
-    topics, body = _parse_summary_frontmatter(summary_text)
+    board_topics, rollup, sections = parse_board_summary_file(summary_text)
+    legacy = not sections
 
     cutoff = date.today() - timedelta(days=365)
+    now = datetime.now(timezone.utc)
 
     async with db.async_session() as session:
         board = (await session.execute(
@@ -195,21 +265,41 @@ async def ingest_board_summary(board_code: str) -> bool:
             print(f"Board {board_code} not found.")
             return False
 
+        # Board-level 12-month rollup
+        board.summary = rollup
+        board.summarized_at = now
+
         meetings = (await session.execute(
             select(Meeting)
             .where(Meeting.board_id == board.id)
             .where(Meeting.meeting_date >= cutoff)
         )).scalars().all()
 
-        # Store the board-level summary and topics on all meetings in the period
+        matched = 0
+        window_dates = set()
         for meeting in meetings:
-            meeting.summary = summary_text
-            if topics:
-                meeting.topics = topics
+            key = meeting.meeting_date.isoformat()
+            window_dates.add(key)
+            if key in sections:
+                section_md, section_topics = sections[key]
+                meeting.summary = section_md
+                meeting.topics = section_topics or None
+                meeting.summarized_at = now
+                matched += 1
+            elif not legacy:
+                # In the new contract, absence from the file means the
+                # meeting has no summarizable text — clear stale blobs.
+                meeting.summary = None
+                meeting.topics = None
+                meeting.summarized_at = None
+
+        ghosts = sorted(set(sections) - window_dates)
         await session.commit()
 
-    topic_str = f", topics={topics}" if topics else ""
-    print(f"  Ingested summary for {board_code} ({len(meetings)} meetings updated{topic_str})")
+    ghost_str = f", ghost_dates={ghosts}" if ghosts else ""
+    print(f"  Ingested {board_code}: rollup={len(rollup)} chars, "
+          f"matched {matched}/{len(meetings)} window meetings"
+          f"{', LEGACY format' if legacy else ''}{ghost_str}")
     return True
 
 
@@ -270,11 +360,16 @@ async def prepare_national_bundle() -> Path | None:
         if not summary_text:
             continue
 
+        # National synthesis consumes the board ROLLUP only — the
+        # per-meeting sections would bloat the prompt ~10x with detail the
+        # landscape report doesn't need (citations live in the rollup).
+        _topics, rollup, _sections = parse_board_summary_file(summary_text)
+
         board_summaries.append({
             "board_name": board.name,
             "state": board.state,
             "board_code": board.code,
-            "summary_text": summary_text,
+            "summary_text": rollup,
         })
 
     if len(board_summaries) < 2:

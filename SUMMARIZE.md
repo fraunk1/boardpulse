@@ -27,11 +27,18 @@ python cli.py summarize --board CA_MD
 
 For each `*_prompt.md` file in `data/reports/`, dispatch a subagent with this task:
 
-> Read `data/reports/{board_code}_prompt.md`. Follow the summarization instructions
-> in the file. Write your output to `data/reports/{board_code}_summary.md`.
-> Use only the information provided in the prompt file.
+> Read the ENTIRE `data/reports/{board_code}_prompt.md` (page through with
+> multiple Read calls). Follow its embedded Output Format EXACTLY — the
+> contract is two-layer: a 300-600 word 12-month board ROLLUP first (with
+> date-citation links + Sources table), then one `=== MEETING: YYYY-MM-DD ===`
+> block per meeting that has extracted text (80-200 words + a `topics: [...]`
+> line), ending `=== END ===`. The delimiters are machine-parsed — reproduce
+> them exactly. OMIT blocks for meetings marked "(No extracted text
+> available)". Use only the information provided in the prompt file.
+> Write your output to `data/reports/{board_code}_summary.md`.
 
-Use `haiku` model for per-board summaries (cost-efficient, sufficient quality).
+Use `sonnet` for per-board summaries (the delimiter contract + no-fabrication
+discipline need it).
 
 Dispatch all subagents in parallel — they are independent.
 
