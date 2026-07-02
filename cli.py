@@ -72,6 +72,18 @@ def main():
     # status
     sub.add_parser("status", help="Show collection status for all boards")
 
+    # diagnostics (consolidated from the former root _*.py scripts)
+    cov = sub.add_parser("coverage", help="Coverage report (totals + per-board)")
+    cov.add_argument("--summary", action="store_true", help="Totals only")
+    sub.add_parser("boards", help="Board-by-board coverage buckets + done-math")
+    sub.add_parser("qa", help="Data-quality audit (date mismatches, "
+                             "contamination, ghost citations)")
+    led = sub.add_parser("ledger", help="Coverage ledger — mark/list "
+                                        "none_published/blocked boards")
+    led.add_argument("ledger_args", nargs="*",
+                     help="list | none_published CODE... | blocked CODE... "
+                          "| manual CODE...")
+
     # run
     sub.add_parser("run", help="Run full pipeline (bootstrap -> discover -> collect -> extract)")
 
@@ -85,6 +97,24 @@ def main():
     if args.command == "serve":
         from app.web.server import run_server
         run_server(host=args.host, port=args.port)
+        return
+
+    # Sync diagnostics (stdlib sqlite3 — no event loop needed)
+    if args.command == "coverage":
+        from app.reports.coverage import main as coverage_main
+        coverage_main(summary=args.summary)
+        return
+    if args.command == "boards":
+        from app.reports.boards import main as boards_main
+        boards_main()
+        return
+    if args.command == "qa":
+        from app.reports.qa import main as qa_main
+        qa_main()
+        return
+    if args.command == "ledger":
+        from app.reports.ledger import main as ledger_main
+        ledger_main(args.ledger_args or None)
         return
 
     # Refresh manages its own event loop + exit code

@@ -52,3 +52,22 @@ async def init_db(url: str | None = None):
         for name, table, column in _SCHEMA_INDEXES:
             await conn.exec_driver_sql(
                 f"CREATE INDEX IF NOT EXISTS {name} ON {table} ({column})")
+
+        # Full-text search over meeting document text (FTS5, external-content
+        # table so the indexed text isn't duplicated on disk). First startup
+        # against a pre-existing DB backfills the index once; after that,
+        # refresh.py keeps it current with a 'rebuild' after each extract pass.
+        await conn.exec_driver_sql(
+            "CREATE VIRTUAL TABLE IF NOT EXISTS doc_fts USING fts5("
+            "content_text, content='meeting_documents', content_rowid='id')")
+
+        fts_count = (await conn.exec_driver_sql(
+            "SELECT count(*) FROM doc_fts")).scalar()
+        if not fts_count:
+            has_text = (await conn.exec_driver_sql(
+                "SELECT 1 FROM meeting_documents "
+                "WHERE content_text IS NOT NULL AND content_text != '' LIMIT 1"
+            )).first()
+            if has_text:
+                await conn.exec_driver_sql(
+                    "INSERT INTO doc_fts(doc_fts) VALUES('rebuild')")

@@ -15,11 +15,10 @@ import json
 import sqlite3
 import sys
 from datetime import date
-from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent
-DB = ROOT / "boardpulse.db"
-LEDGER = ROOT / "coverage_ledger.json"
+from app.config import DB_PATH as DB, PROJECT_ROOT
+
+LEDGER = PROJECT_ROOT / "coverage_ledger.json"
 
 VALID = {"none_published", "blocked", "manual", "found"}
 
@@ -30,12 +29,13 @@ def load_ledger() -> dict:
     return {}
 
 
-def main():
-    if len(sys.argv) < 2:
+def main(argv: list[str] | None = None):
+    argv = argv if argv is not None else sys.argv[1:]
+    if not argv:
         print(__doc__)
         return
 
-    cmd = sys.argv[1]
+    cmd = argv[0]
     con = sqlite3.connect(DB, timeout=30)
 
     if cmd == "list":
@@ -57,7 +57,7 @@ def main():
         con.close()
         sys.exit(1)
 
-    codes = [c.upper() for c in sys.argv[2:]]
+    codes = [c.upper() for c in argv[1:]]
     if not codes:
         print("no board codes given")
         con.close()

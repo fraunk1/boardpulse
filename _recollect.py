@@ -1,17 +1,12 @@
 #!/usr/bin/env python3
-"""Reset and re-collect the given boards.
+"""Reset and re-collect the given boards (thin wrapper; logic lives in
+app/scraper/reset.py + the collector).
 
-`collect_board` skips meetings that already exist, so after fixing a board's
-minutes_url OR the collector itself, a plain re-collect won't backfill docs.
-This clears each board's meetings (+documents) first, then collects fresh.
-
-Usage: python _recollect.py MT_MD WA_MD UT_MD ...
+Usage: python _recollect.py [--purge-files] CODE [CODE ...]
 """
 import asyncio
 import logging
-import sqlite3
 import sys
-from pathlib import Path
 
 logging.basicConfig(
     level=logging.INFO,
@@ -21,39 +16,7 @@ logging.basicConfig(
 for n in ("httpx", "httpcore", "asyncio", "playwright"):
     logging.getLogger(n).setLevel(logging.WARNING)
 
-DB = Path(__file__).resolve().parent / "boardpulse.db"
-
-
-def reset(codes, purge_files: bool = False):
-    """Clear a board's meetings + documents rows; optionally its files too.
-
-    purge_files removes data/documents/<CODE>/ entirely — use when the
-    downloaded files themselves are bad (portal stubs, wrong documents),
-    otherwise valid on-disk files are revalidated and re-registered.
-    """
-    con = sqlite3.connect(DB, timeout=30)
-    cur = con.cursor()
-    for code in codes:
-        row = cur.execute("SELECT id FROM boards WHERE code=?", (code,)).fetchone()
-        if not row:
-            print(f"  {code}: NOT FOUND")
-            continue
-        bid = row[0]
-        cur.execute(
-            "DELETE FROM meeting_documents WHERE meeting_id IN "
-            "(SELECT id FROM meetings WHERE board_id=?)", (bid,))
-        cur.execute("DELETE FROM meetings WHERE board_id=?", (bid,))
-        if purge_files:
-            import shutil
-            from app.config import DOCUMENTS_DIR
-            board_dir = DOCUMENTS_DIR / code
-            if board_dir.exists():
-                shutil.rmtree(board_dir)
-                print(f"  {code}: cleared (files purged)")
-                continue
-        print(f"  {code}: cleared")
-    con.commit()
-    con.close()
+from app.scraper.reset import reset  # noqa: E402  (re-export for importers)
 
 
 async def main():

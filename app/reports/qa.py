@@ -21,14 +21,9 @@ import sqlite3
 import sys
 from collections import Counter, defaultdict
 from datetime import date, datetime
-from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent
-sys.path.insert(0, str(ROOT))
-DB = ROOT / "boardpulse.db"
-REPORTS = ROOT / "data" / "reports"
-
-from app.scraper.collector import parse_date  # noqa: E402
+from app.config import DB_PATH as DB, REPORTS_DIR as REPORTS
+from app.scraper.collector import parse_date
 
 OTHER_PROFESSIONS = [
     "acupunctur", "respiratory", "pharmac", "nursing", "massage",

@@ -37,25 +37,32 @@ from app.config import LOGS_DIR  # noqa: E402
 
 DB = ROOT / "boardpulse.db"
 
-SNAP_SQL = """
-    SELECT b.code,
-           COUNT(DISTINCT m.id) AS mtgs,
-           COUNT(d.id) AS docs,
-           SUM(CASE WHEN d.content_text IS NOT NULL AND d.content_text != ''
-                    THEN 1 ELSE 0 END) AS docs_text
-    FROM boards b
-    LEFT JOIN meetings m ON m.board_id = b.id
-    LEFT JOIN meeting_documents d ON d.meeting_id = m.id
-    GROUP BY b.id
-"""
+
+async def snapshot() -> dict:
+    """app.stats.per_board_counts() — the ONE definition of the per-board
+    coverage aggregate, shared with the /ops status page. Async because run()
+    already executes inside an event loop (asyncio.run here would crash)."""
+    import app.database as db
+    from app.stats import per_board_counts
+
+    await db.init_db(f"sqlite+aiosqlite:///{DB}")
+    return await per_board_counts()
 
 
-def snapshot() -> dict:
+def rebuild_fts_index() -> None:
+    """Rebuild the doc_fts full-text index via a small sync sqlite3 connection.
+
+    Monthly cadence + ~35MB of extracted text means a full rebuild finishes
+    in seconds, so there's no drift-prone incremental sync to maintain.
+    """
     con = sqlite3.connect(DB)
-    rows = con.execute(SNAP_SQL).fetchall()
+    con.execute(
+        "CREATE VIRTUAL TABLE IF NOT EXISTS doc_fts USING fts5("
+        "content_text, content='meeting_documents', content_rowid='id')")
+    con.execute("INSERT INTO doc_fts(doc_fts) VALUES('rebuild')")
+    con.commit()
     con.close()
-    return {code: {"mtgs": m, "docs": d, "docs_text": dt or 0}
-            for code, m, d, dt in rows}
+    print("FTS index rebuilt")
 
 
 def setup_logging(quiet: bool) -> Path:
@@ -89,7 +96,7 @@ async def run(
     from app.extractor.extract import extract_all
 
     log_path = setup_logging(quiet)
-    before = snapshot()
+    before = await snapshot()
 
     # 1. Reset first when --full (single board only — global reset is too
     #    destructive for an unattended tool)
@@ -123,8 +130,11 @@ async def run(
     if not no_extract:
         await extract_all()
 
+    # 4b. Keep the full-text search index current
+    rebuild_fts_index()
+
     # 5. Diff report
-    after = snapshot()
+    after = await snapshot()
     changed: list[str] = []
     regressed: list[str] = []
     print("\n" + "=" * 64)

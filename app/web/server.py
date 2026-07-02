@@ -2,7 +2,7 @@
 import json
 import os
 import time
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
 from fastapi import FastAPI, Request, HTTPException
@@ -13,8 +13,9 @@ from sqlalchemy import select, func, distinct, text
 from sqlalchemy.orm import selectinload
 
 from app.models import Board, Meeting, MeetingDocument
-from app.config import SCREENSHOTS_DIR, DOCUMENTS_DIR, REPORTS_DIR, EXHIBITS_DIR, DATA_DIR
+from app.config import SCREENSHOTS_DIR, DOCUMENTS_DIR, REPORTS_DIR, EXHIBITS_DIR, DATA_DIR, PROJECT_ROOT, LOGS_DIR
 import app.database as db
+import app.stats as stats
 
 # Paths
 WEB_DIR = Path(__file__).resolve().parent
@@ -387,6 +388,196 @@ async def state_view(request: Request, abbr: str):
         "breadcrumbs": [
             {"label": "National", "url": "/"},
         ],
+    })
+
+
+# ---------------------------------------------------------------------------
+# Pages — Full-Text Search
+# ---------------------------------------------------------------------------
+
+_SEARCH_PAGE_SIZE = 25
+
+
+def _sanitize_fts_query(q: str) -> str:
+    """Turn free-typed user input into a safe FTS5 MATCH expression.
+
+    Splits on whitespace and wraps each token in double quotes, joined by
+    spaces. Quoting each token neutralizes FTS5 operators (AND/OR/NOT/NEAR,
+    column filters, prefix `*`) and unbalanced quotes — every token becomes
+    a literal phrase match, so the query can't raise a syntax error.
+    """
+    tokens = q.split()
+    if not tokens:
+        return ""
+    escaped = [tok.replace('"', '""') for tok in tokens]
+    return " ".join(f'"{tok}"' for tok in escaped)
+
+
+@app.get("/search", response_class=HTMLResponse)
+async def search_view(request: Request, q: str = "", page: int = 1):
+    """Full-text search across meeting document text (SQLite FTS5)."""
+    q = (q or "").strip()
+    page = max(1, page)
+    results: list[dict] = []
+    has_next = False
+    error = False
+
+    if q:
+        fts_query = _sanitize_fts_query(q)
+        offset = (page - 1) * _SEARCH_PAGE_SIZE
+        try:
+            async with db.async_session() as session:
+                rows = (await session.execute(text(
+                    """
+                    SELECT
+                        d.id AS doc_id,
+                        d.doc_type,
+                        m.id AS meeting_id,
+                        m.meeting_date,
+                        m.title,
+                        b.code AS board_code,
+                        b.state AS board_state,
+                        snippet(doc_fts, 0, '<mark>', '</mark>', ' … ', 14) AS snippet
+                    FROM doc_fts
+                    JOIN meeting_documents d ON d.id = doc_fts.rowid
+                    JOIN meetings m ON m.id = d.meeting_id
+                    JOIN boards b ON b.id = m.board_id
+                    WHERE doc_fts MATCH :query
+                    ORDER BY bm25(doc_fts)
+                    LIMIT :limit OFFSET :offset
+                    """
+                ), {"query": fts_query, "limit": _SEARCH_PAGE_SIZE + 1, "offset": offset})).all()
+        except Exception:
+            # Malformed/edge-case FTS5 query — never surface a 500, just show
+            # a friendly empty state.
+            rows = []
+            error = True
+
+        has_next = len(rows) > _SEARCH_PAGE_SIZE
+        rows = rows[:_SEARCH_PAGE_SIZE]
+
+        for r in rows:
+            # Raw SQL via text() returns SQLite's stored TEXT for a Date
+            # column, not a parsed date.fromisoformat() object — parse it
+            # here so the template can call .strftime() like it does
+            # everywhere else (ORM queries auto-convert; this one doesn't).
+            meeting_date = r.meeting_date
+            if isinstance(meeting_date, str):
+                meeting_date = date.fromisoformat(meeting_date)
+            results.append({
+                "doc_id": r.doc_id,
+                "doc_type": r.doc_type,
+                "meeting_id": r.meeting_id,
+                "meeting_date": meeting_date,
+                "title": r.title,
+                "board_code": r.board_code,
+                "board_state": r.board_state,
+                "state_name": STATE_NAMES.get(r.board_state, r.board_state),
+                "snippet": r.snippet,
+            })
+
+    return templates.TemplateResponse(request, "search.html", context={
+        "q": q,
+        "page": page,
+        "results": results,
+        "result_count": len(results),
+        "has_next": has_next,
+        "has_prev": page > 1,
+        "error": error,
+        "breadcrumbs": [
+            {"label": "National", "url": "/"},
+        ],
+        "page_title": "Search",
+    })
+
+
+# ---------------------------------------------------------------------------
+# Pages — Ops Status
+# ---------------------------------------------------------------------------
+
+def _latest_refresh_log() -> dict | None:
+    """Return {path, mtime, diff_text} for the newest refresh-*.log, or None."""
+    if not LOGS_DIR.exists():
+        return None
+    log_files = sorted(LOGS_DIR.glob("refresh-*.log"), reverse=True)
+    if not log_files:
+        return None
+    log_path = log_files[0]
+    try:
+        text_content = log_path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+
+    marker = "REFRESH DIFF"
+    idx = text_content.find(marker)
+    diff_text = text_content[idx:] if idx != -1 else text_content
+
+    return {
+        "name": log_path.name,
+        "mtime": datetime.fromtimestamp(log_path.stat().st_mtime),
+        "diff_text": diff_text.strip(),
+    }
+
+
+def _load_coverage_ledger() -> dict:
+    ledger_path = PROJECT_ROOT / "coverage_ledger.json"
+    if not ledger_path.exists():
+        return {}
+    try:
+        return json.loads(ledger_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+@app.get("/ops", response_class=HTMLResponse)
+async def ops_view(request: Request):
+    """Operational status page — refresh health, per-board coverage, failures."""
+    async with db.async_session() as session:
+        boards = (await session.execute(
+            select(Board).order_by(Board.state, Board.code)
+        )).scalars().all()
+
+    per_board = await stats.per_board_counts()
+    failures = await stats.extraction_failures()
+    rollup = await stats.status_rollup()
+
+    coverage_rows = []
+    accounted = 0
+    have_docs = 0
+    for b in boards:
+        counts = per_board.get(b.code, {"mtgs": 0, "docs": 0, "docs_text": 0})
+        row_has_docs = counts["docs_text"] > 0
+        if row_has_docs:
+            have_docs += 1
+        is_accounted = b.discovery_status in ("none_published", "blocked") or row_has_docs
+        if is_accounted:
+            accounted += 1
+        coverage_rows.append({
+            "board": b,
+            "mtgs": counts["mtgs"],
+            "docs": counts["docs"],
+            "docs_text": counts["docs_text"],
+            "discovery_status": b.discovery_status,
+            "accounted": is_accounted,
+        })
+
+    total_boards = len(boards)
+
+    return templates.TemplateResponse(request, "ops.html", context={
+        "last_refresh": _latest_refresh_log(),
+        "coverage_rows": coverage_rows,
+        "total_boards": total_boards,
+        "have_docs": have_docs,
+        "accounted": accounted,
+        "unaccounted": total_boards - accounted,
+        "status_rollup": sorted(rollup.items()),
+        "failures": failures,
+        "failure_count": len(failures),
+        "ledger": _load_coverage_ledger(),
+        "breadcrumbs": [
+            {"label": "National", "url": "/"},
+        ],
+        "page_title": "Ops",
     })
 
 
