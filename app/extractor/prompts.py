@@ -78,55 +78,66 @@ Summarize the meeting minutes for **{board_name}** ({state}) covering the meetin
 ## Instructions
 
 1. Read all the meeting text provided below carefully.
-2. Produce a YAML frontmatter block with topic tags extracted from the meetings.
-3. Produce a structured summary in Markdown with the sections listed below.
-4. **Every factual claim MUST cite the specific meeting date** using the format `([YYYY-MM-DD](/board/{state}/{board_code}#YYYY-MM-DD))`. This creates a clickable link.
-5. Keep the summary between 500-1500 words depending on volume of source material.
-6. Write in a professional, neutral tone suitable for a regulatory affairs audience.
+2. Produce ONE file with TWO layers: first a 12-month BOARD ROLLUP, then one
+   PER-MEETING section for every meeting that has extracted text.
+3. **In the rollup, every factual claim MUST cite the specific meeting date** using the format `([YYYY-MM-DD](/board/{state}/{board_code}#YYYY-MM-DD))`. This creates a clickable link.
+4. Write in a professional, neutral tone suitable for a regulatory affairs audience.
+5. Use ONLY information contained in this file. Never invent facts, dates, votes, or names. Every name+date pairing you write must appear together in the source text for that exact date.
 
-## Available Meeting Dates (for citations)
+## Available Meeting Dates (for citations and section headers)
 
 {meeting_ref_table}
 
 ## Output Format
 
-Write the summary as a Markdown document with YAML frontmatter. The frontmatter MUST include a `topics` list — choose from these standard tags (use only tags that actually appear in the minutes):
-
-`AI`, `telehealth`, `opioids`, `IMLC`, `CME`, `scope-of-practice`, `disciplinary`, `rulemaking`, `workforce`, `patient-safety`, `controlled-substances`, `physician-wellness`, `licensing`, `legislation`, `public-health`
+Produce EXACTLY this structure (the `=== MEETING: ... ===` delimiters are parsed by machine — reproduce them exactly):
 
 ```markdown
 ---
-topics: ["tag1", "tag2", "tag3"]
+topics: ["tag1", "tag2"]
 board: {board_code}
 state: {state}
 ---
 
-# {board_name} — Meeting Summary
+# {board_name} — 12-Month Board Summary
 
 **Period:** [earliest date] to [latest date]
 **Meetings analyzed:** [count]
 
-## Key Topics Discussed
-- Topic description ([YYYY-MM-DD](/board/{state}/{board_code}#YYYY-MM-DD))
-- ...
-
-## Notable Actions
-- Specific action with date citation ([YYYY-MM-DD](/board/{state}/{board_code}#YYYY-MM-DD))
-- ...
-
-## Recurring Themes
-- ...
-
-## Noteworthy Items
-- ...
+[BOARD ROLLUP: 300-600 words synthesizing the year across meetings — key
+topics, notable actions, recurring themes. This is the ONLY place for
+cross-meeting narrative, and every claim carries a date citation link.
+End the rollup with the Sources table:]
 
 ## Sources
 | # | Date | Board | Source |
 |---|------|-------|--------|
 | 1 | YYYY-MM-DD | {board_name} | [Minutes page]({board_code}_MINUTES_URL) |
+
+=== MEETING: YYYY-MM-DD ===
+topics: [tag1, tag2]
+
+[80-200 words summarizing ONLY this meeting: what was discussed, decided,
+or noted — no cross-meeting narrative, no citation links needed. Plain
+prose or short bullets.]
+
+=== MEETING: YYYY-MM-DD ===
+topics: []
+
+[...]
+
+=== END ===
 ```
 
-For the Sources table, list each meeting date referenced in the summary. Use this URL as the source link: {minutes_url or 'N/A'}
+Rules for the per-meeting sections:
+- One `=== MEETING: YYYY-MM-DD ===` block for EVERY meeting above whose text is present, using the exact dates from the reference table, newest first.
+- OMIT blocks for meetings marked "(No extracted text available)".
+- The `topics:` line uses ONLY tags from this standard set that genuinely appear in THAT meeting (an empty `[]` is fine):
+  `AI`, `telehealth`, `opioids`, `IMLC`, `CME`, `scope-of-practice`, `disciplinary`, `rulemaking`, `workforce`, `patient-safety`, `controlled-substances`, `physician-wellness`, `licensing`, `legislation`, `public-health`
+- The frontmatter `topics` list is the union of the per-meeting topics.
+- End the file with `=== END ===`.
+
+Sources-table URL: {minutes_url or 'N/A'}
 
 ## Meeting Minutes Data
 

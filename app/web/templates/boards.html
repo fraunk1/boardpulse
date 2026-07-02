@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+
+{% block title %}Boards — boardpulse{% endblock %}
+
+{% block body %}
+<div class="max-w-[1400px] mx-auto px-6 py-8">
+
+    <!-- Header -->
+    <div class="mb-8">
+        <div class="flex items-center gap-3 mb-2">
+            <div class="w-10 h-10 rounded-xl bg-bp-frost border border-bp-cloud flex items-center justify-center">
+                <i data-lucide="building-2" class="w-5 h-5 text-bp-navy"></i>
+            </div>
+            <div>
+                <h1 class="text-2xl font-bold text-bp-navy tracking-tight">Boards</h1>
+                <p class="text-sm text-bp-steel">{{ board_rows | length }} state medical boards monitored</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Boards Table -->
+    <div class="bg-white border border-bp-cloud rounded-xl overflow-hidden">
+        <table class="w-full text-sm">
+            <thead>
+                <tr class="bg-bp-frost border-b border-bp-cloud">
+                    <th class="text-left font-semibold text-bp-mist text-[10px] uppercase tracking-wider px-4 py-3">Code</th>
+                    <th class="text-left font-semibold text-bp-mist text-[10px] uppercase tracking-wider px-4 py-3">Name</th>
+                    <th class="text-left font-semibold text-bp-mist text-[10px] uppercase tracking-wider px-4 py-3">State</th>
+                    <th class="text-left font-semibold text-bp-mist text-[10px] uppercase tracking-wider px-4 py-3">Type</th>
+                    <th class="text-right font-semibold text-bp-mist text-[10px] uppercase tracking-wider px-4 py-3">Meetings</th>
+                    <th class="text-left font-semibold text-bp-mist text-[10px] uppercase tracking-wider px-4 py-3">Last Scraped</th>
+                    <th class="text-left font-semibold text-bp-mist text-[10px] uppercase tracking-wider px-4 py-3">Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in board_rows %}
+                {% set b = item.board %}
+                <tr class="border-b border-bp-cloud/60 last:border-b-0 hover:bg-bp-frost/60 transition-colors cursor-pointer"
+                    onclick="window.location.href='/board/{{ b.code }}'">
+                    <td class="px-4 py-3 font-mono text-xs text-bp-mist">
+                        <a href="/board/{{ b.code }}" class="hover:text-bp-teal transition-colors">{{ b.code }}</a>
+                    </td>
+                    <td class="px-4 py-3">
+                        <a href="/board/{{ b.code }}" class="font-medium text-bp-navy hover:text-bp-teal transition-colors">{{ b.name }}</a>
+                    </td>
+                    <td class="px-4 py-3 text-bp-steel">{{ STATE_NAMES.get(b.state, b.state) }}</td>
+                    <td class="px-4 py-3">
+                        <span class="px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded
+                            {% if b.board_type == 'MD' %}badge-md
+                            {% elif b.board_type == 'DO' %}badge-do
+                            {% else %}badge-combined{% endif %}">
+                            {{ b.board_type }}
+                        </span>
+                    </td>
+                    <td class="px-4 py-3 text-right font-mono text-bp-navy">{{ item.meeting_count }}</td>
+                    <td class="px-4 py-3 text-xs font-mono text-bp-mist">
+                        {% if item.last_scraped_at %}{{ item.last_scraped_at.strftime('%Y-%m-%d') }}{% else %}&mdash;{% endif %}
+                    </td>
+                    <td class="px-4 py-3">
+                        {% if item.status == 'collected' %}
+                        <span class="inline-flex items-center gap-1.5 text-[10px] text-bp-steel">
+                            <span class="w-1.5 h-1.5 rounded-full bg-bp-teal"></span> Collected
+                        </span>
+                        {% elif item.status == 'discovered' %}
+                        <span class="inline-flex items-center gap-1.5 text-[10px] text-bp-steel">
+                            <span class="w-1.5 h-1.5 rounded-full bg-bp-gold"></span> Discovered
+                        </span>
+                        {% elif item.status == 'none_published' %}
+                        <span class="inline-flex items-center gap-1.5 text-[10px] text-bp-steel">
+                            <span class="w-1.5 h-1.5 rounded-full bg-[#8A93A6]"></span> No public minutes
+                        </span>
+                        {% elif item.status == 'blocked' %}
+                        <span class="inline-flex items-center gap-1.5 text-[10px] text-bp-steel">
+                            <span class="w-1.5 h-1.5 rounded-full bg-[#8A93A6]"></span> Blocked
+                        </span>
+                        {% else %}
+                        <span class="inline-flex items-center gap-1.5 text-[10px] text-bp-steel">
+                            <span class="w-1.5 h-1.5 rounded-full bg-bp-cloud"></span> Pending
+                        </span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

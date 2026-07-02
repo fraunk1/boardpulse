@@ -110,10 +110,11 @@ class TestPerBoardPrompt:
             board_code="NY_MD",
             meetings=meetings,
         )
-        assert "Key Topics Discussed" in result
-        assert "Notable Actions" in result
-        assert "Recurring Themes" in result
-        assert "Noteworthy Items" in result
+        # New two-layer contract: board rollup + machine-parsed meeting blocks
+        assert "12-Month Board Summary" in result
+        assert "=== MEETING: YYYY-MM-DD ===" in result
+        assert "=== END ===" in result
+        assert "OMIT blocks" in result
 
     def test_multiple_documents_per_meeting(self):
         """Multiple documents in one meeting are all included."""

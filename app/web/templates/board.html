@@ -86,6 +86,27 @@
         </div>
     </section>
 
+    <!-- Board AI Summary — 12-month rollup -->
+    {% if board.summary %}
+    <section class="max-w-[1400px] mx-auto px-6 pt-8">
+        <div class="flex items-center gap-2 mb-4">
+            <div class="w-8 h-8 rounded-lg bg-bp-gold/10 border border-bp-gold/20 flex items-center justify-center">
+                <i data-lucide="sparkles" class="w-4 h-4 text-bp-gold"></i>
+            </div>
+            <div>
+                <h2 class="text-sm font-semibold text-bp-navy">Board AI Summary <span class="font-normal text-bp-mist">— 12-month rollup</span></h2>
+                {% if board.summarized_at %}
+                <p class="text-[10px] text-bp-mist uppercase tracking-wider">Generated {{ board.summarized_at.strftime('%B %d, %Y') }} — individual meetings carry their own summaries</p>
+                {% endif %}
+            </div>
+        </div>
+        <div class="gold-accent">
+            <div class="summary-content text-sm text-bp-steel leading-relaxed max-w-none"
+                 data-markdown="{{ board.summary | e }}"></div>
+        </div>
+    </section>
+    {% endif %}
+
     <!-- Meetings Timeline -->
     <section class="max-w-[1400px] mx-auto px-6 py-8">
         <h2 class="section-label flex items-center gap-1.5 mb-4">

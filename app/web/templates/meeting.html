@@ -4,7 +4,7 @@
 {% block title %}{{ board.name }} — {{ meeting.meeting_date.strftime('%b %d, %Y') }} — boardpulse{% endblock %}
 
 {% block body %}
-<div x-data="{ lightboxOpen: false, lightboxSrc: '' }">
+<div x-data="{ lightboxOpen: false, lightboxSrc: '', boardContextOpen: {{ 'false' if meeting.summary else 'true' }} }">
 
     <!-- Meeting Header -->
     <section class="bg-bp-frost border-b border-bp-cloud">
@@ -63,7 +63,7 @@
 
     <div class="max-w-[1000px] mx-auto px-6 py-8 space-y-8">
 
-        <!-- AI SUMMARY — First, the intelligence -->
+        <!-- MEETING AI SUMMARY — this meeting's own summary -->
         {% if meeting.summary %}
         <section>
             <div class="flex items-center gap-2 mb-4">
@@ -71,13 +71,37 @@
                     <i data-lucide="sparkles" class="w-4 h-4 text-bp-gold"></i>
                 </div>
                 <div>
-                    <h2 class="text-sm font-semibold text-bp-navy">Board AI Summary <span class="font-normal text-bp-mist">— 12-month view</span></h2>
-                    <p class="text-[10px] text-bp-mist uppercase tracking-wider">Covers this board's meetings over the last 12 months — not only the meeting on this page</p>
+                    <h2 class="text-sm font-semibold text-bp-navy">Meeting AI Summary</h2>
+                    <p class="text-[10px] text-bp-mist uppercase tracking-wider">AI summary of this meeting's minutes</p>
                 </div>
             </div>
             <div class="gold-accent">
                 <div class="summary-content text-sm text-bp-steel leading-relaxed max-w-none"
                      data-markdown="{{ meeting.summary | e }}"></div>
+            </div>
+        </section>
+        {% endif %}
+
+        <!-- BOARD CONTEXT — collapsed 12-month rollup (opens when the
+             meeting has no summary of its own) -->
+        {% if board.summary %}
+        <section class="rounded-xl border border-bp-cloud overflow-hidden">
+            <button @click="boardContextOpen = !boardContextOpen"
+                    class="w-full flex items-center justify-between px-4 py-3 bg-bp-frost/60 hover:bg-bp-frost transition-colors text-left">
+                <span class="flex items-center gap-2">
+                    <i data-lucide="landmark" class="w-4 h-4 text-bp-mist"></i>
+                    <span class="text-sm font-semibold text-bp-navy">Board context</span>
+                    <span class="text-[10px] text-bp-mist uppercase tracking-wider">12-month AI rollup for {{ board.name }}</span>
+                </span>
+                <i data-lucide="chevron-down" class="w-4 h-4 text-bp-mist transition-transform"
+                   :class="{ 'rotate-180': boardContextOpen }"></i>
+            </button>
+            <div x-show="boardContextOpen" class="px-4 py-4 border-t border-bp-cloud">
+                <div class="summary-content text-sm text-bp-steel leading-relaxed max-w-none"
+                     data-markdown="{{ board.summary | e }}"></div>
+                {% if board.summarized_at %}
+                <p class="text-[10px] text-bp-mist mt-3">Generated {{ board.summarized_at.strftime('%B %d, %Y') }}</p>
+                {% endif %}
             </div>
         </section>
         {% endif %}
@@ -153,7 +177,7 @@
         </section>
         {% endif %}
 
-        {% if not doc_pages and not meeting.summary %}
+        {% if not doc_pages and not meeting.summary and not board.summary %}
         <div class="text-center py-8">
             <i data-lucide="file-x" class="w-10 h-10 text-bp-cloud mx-auto mb-3"></i>
             <p class="text-sm text-bp-steel">No documents or summaries available for this meeting.</p>
