@@ -39,9 +39,11 @@ def extract_text_from_file(file_path: Path) -> str | None:
             ["markitdown", str(file_path)],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=60,
         )
-        if result.returncode == 0 and result.stdout.strip():
+        if result.returncode == 0 and (result.stdout or "").strip():
             return result.stdout.strip()
         return None
     except (subprocess.TimeoutExpired, FileNotFoundError):
