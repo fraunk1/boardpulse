@@ -43,6 +43,22 @@ def main():
         help="Prepare national landscape synthesis prompt (requires per-board summaries)",
     )
 
+    # refresh — the run-anytime incremental scrape (see refresh.py)
+    rf = sub.add_parser(
+        "refresh",
+        help="Incremental re-scrape of all boards + extract + diff report",
+    )
+    rf.add_argument("--board", type=str, help="Single board code (e.g. TX_MD)")
+    rf.add_argument("--full", action="store_true",
+                    help="Reset the board first (requires --board)")
+    rf.add_argument("--include-headed", action="store_true",
+                    help="Also run headed-WAF boards (visible windows)")
+    rf.add_argument("--prompts", action="store_true",
+                    help="Emit AI-summary prompt bundles for changed boards")
+    rf.add_argument("--no-extract", action="store_true",
+                    help="Skip the text-extraction pass")
+    rf.add_argument("--quiet", action="store_true", help="Log to file only")
+
     # serve
     srv = sub.add_parser("serve", help="Start the web dashboard (port 8099)")
     srv.add_argument("--host", default="0.0.0.0", help="Bind address (default: 0.0.0.0)")
@@ -70,6 +86,18 @@ def main():
         from app.web.server import run_server
         run_server(host=args.host, port=args.port)
         return
+
+    # Refresh manages its own event loop + exit code
+    if args.command == "refresh":
+        import refresh as refresh_mod
+        sys.exit(asyncio.run(refresh_mod.run(
+            board=args.board,
+            full=args.full,
+            include_headed=args.include_headed,
+            prompts=args.prompts,
+            no_extract=args.no_extract,
+            quiet=args.quiet,
+        )))
 
     asyncio.run(dispatch(args))
 
@@ -275,10 +303,10 @@ async def show_status():
         print(f"{board.code:<10} {board.state:<6} {board.discovery_status:<12} "
               f"{url_display:<40} {meeting_count:<10} {scraped}")
 
-    found = sum(1 for b in boards if b.discovery_status == "found")
-    failed = sum(1 for b in boards if b.discovery_status == "failed")
-    pending = sum(1 for b in boards if b.discovery_status == "pending")
-    print(f"\nTotal: {len(boards)} boards | Found: {found} | Failed: {failed} | Pending: {pending}")
+    from collections import Counter
+    status_counts = Counter(b.discovery_status for b in boards)
+    summary = " | ".join(f"{k}: {v}" for k, v in sorted(status_counts.items()))
+    print(f"\nTotal: {len(boards)} boards | {summary}")
 
 
 if __name__ == "__main__":

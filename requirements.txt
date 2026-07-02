@@ -11,3 +11,6 @@ pymupdf>=1.24
 reportlab>=4.0
 # Text extraction CLI used by app/extractor/parser.py (invoked as a subprocess)
 markitdown[pdf,docx,xlsx,pptx]>=0.0.1
+# Test dependencies (pyproject sets asyncio_mode = "auto")
+pytest>=8.0
+pytest-asyncio>=0.24

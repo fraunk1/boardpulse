@@ -176,8 +176,14 @@ async def _get_state_coverage() -> dict[str, dict]:
         state_data[b.state]["total_meetings"] += mc
         if mc > 0:
             state_data[b.state]["status"] = "collected"
-        elif b.discovery_status == "found" and state_data[b.state]["status"] != "collected":
+        elif (b.discovery_status in ("found", "manual")
+              and state_data[b.state]["status"] != "collected"):
             state_data[b.state]["status"] = "discovered"
+        elif (b.discovery_status in ("none_published", "blocked")
+              and state_data[b.state]["status"] == "pending"):
+            # Verified: the board publishes no minutes online (or the site
+            # hard-blocks collection) — accounted for, distinct from pending.
+            state_data[b.state]["status"] = "no_minutes"
 
     return state_data
 

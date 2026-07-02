@@ -64,6 +64,7 @@
                         <div class="flex items-center gap-4 text-[10px] text-bp-mist">
                             <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-sm bg-bp-teal"></span> Collected</span>
                             <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-sm bg-bp-gold"></span> Discovered</span>
+                            <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-sm bg-[#8A93A6]"></span> No public minutes</span>
                             <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-sm bg-bp-cloud"></span> Pending</span>
                         </div>
                     </div>
@@ -99,6 +100,7 @@
                             <span class="w-1.5 h-1.5 rounded-full flex-none
                                 {% if data.status == 'collected' %}bg-bp-teal
                                 {% elif data.status == 'discovered' %}bg-bp-gold
+                                {% elif data.status == 'no_minutes' %}bg-[#8A93A6]
                                 {% else %}bg-bp-cloud{% endif %}"></span>
                             <span class="font-mono font-semibold text-bp-navy w-6">{{ abbr }}</span>
                             <span class="text-bp-steel group-hover:text-bp-navy truncate text-[11px]">{{ data.name }}</span>

@@ -208,4 +208,7 @@ class TestNationalSynthesisPrompt:
         assert "Regional Patterns" in result
         assert "Emerging Trends" in result
         assert "Notable Outliers" in result
-        assert "Recommendations for FSMB" in result
+        # Descriptive-not-prescriptive: the synthesis asks for considerations
+        # and open questions, never "FSMB should..." directives.
+        assert "Considerations and Open Questions for FSMB" in result
+        assert "Recommendations for FSMB" not in result

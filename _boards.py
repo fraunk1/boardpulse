@@ -1,9 +1,23 @@
 #!/usr/bin/env python3
-"""Full board-by-board status for coverage planning (stdlib sqlite3)."""
+"""Full board-by-board status for coverage planning (stdlib sqlite3).
+
+Buckets every one of the 63 boards — none hidden:
+  HAVE DOCS      docs > 0
+  ACCOUNTED      discovery_status in (none_published, blocked) — verified
+                 as publishing nothing / hard-blocked; counts toward 100%
+  MTGS NO DOCS   meetings detected but no documents collected
+  URL NO MTGS    a minutes_url is set but no dated meetings were found
+  NO URL         never discovered (pending / not_found / failed)
+
+Definition of done: HAVE DOCS + ACCOUNTED == total boards.
+"""
 import sqlite3
 from pathlib import Path
 
 DB = Path(__file__).resolve().parent / "boardpulse.db"
+
+ACCOUNTED_STATUSES = ("none_published", "blocked")
+
 con = sqlite3.connect(DB)
 cur = con.cursor()
 rows = cur.execute(
@@ -18,23 +32,44 @@ rows = cur.execute(
     ORDER BY docs DESC, mtgs DESC, b.code
     """
 ).fetchall()
+con.close()
 
 have_docs = [r for r in rows if r[4] > 0]
-mtgs_no_docs = [r for r in rows if r[4] == 0 and r[3] > 0]
-found_empty = [r for r in rows if r[4] == 0 and r[3] == 0 and r[1] == "found"]
-not_found = [r for r in rows if r[1] in ("not_found", "pending", "failed")]
+accounted = [r for r in rows if r[4] == 0 and r[1] in ACCOUNTED_STATUSES]
+mtgs_no_docs = [r for r in rows
+                if r[4] == 0 and r[3] > 0 and r[1] not in ACCOUNTED_STATUSES]
+url_no_mtgs = [r for r in rows
+               if r[4] == 0 and r[3] == 0 and r[2]
+               and r[1] not in ACCOUNTED_STATUSES]
+no_url = [r for r in rows
+          if r[4] == 0 and r[3] == 0 and not r[2]
+          and r[1] not in ACCOUNTED_STATUSES]
 
-print(f"TOTAL {len(rows)} boards | have_docs={len(have_docs)} | "
-      f"mtgs_but_no_docs={len(mtgs_no_docs)} | found_but_empty={len(found_empty)} | "
-      f"not_found={len(not_found)}\n")
+total = len(rows)
+covered = len(have_docs) + len(accounted)
+
+print(f"TOTAL {total} boards | have_docs={len(have_docs)} | "
+      f"accounted={len(accounted)} | mtgs_no_docs={len(mtgs_no_docs)} | "
+      f"url_no_mtgs={len(url_no_mtgs)} | no_url={len(no_url)}")
+print(f"DONE-MATH: have_docs({len(have_docs)}) + accounted({len(accounted)}) "
+      f"= {covered} / {total}"
+      + ("   << 100% COVERAGE >>" if covered == total else ""))
+print()
+
+# Sanity: every board appears in exactly one bucket
+bucketed = sum(map(len, (have_docs, accounted, mtgs_no_docs, url_no_mtgs, no_url)))
+assert bucketed == total, f"bucket leak: {bucketed} != {total}"
+
 
 def dump(label, group):
     print(f"--- {label} ({len(group)}) ---")
     for code, status, url, mtgs, docs in group:
-        print(f"  {code:8} {status:10} mtgs={mtgs:<3} docs={docs:<3} {url[:90]}")
+        print(f"  {code:8} {status:14} mtgs={mtgs:<4} docs={docs:<4} {url[:80]}")
     print()
 
+
 dump("HAVE DOCS", have_docs)
-dump("MEETINGS BUT NO DOCS (collector/url issue)", mtgs_no_docs)
-dump("FOUND BUT EMPTY (bad url)", found_empty)
-dump("NOT DISCOVERED (need url)", not_found)
+dump("ACCOUNTED (none_published / blocked)", accounted)
+dump("MEETINGS BUT NO DOCS", mtgs_no_docs)
+dump("URL SET, NO MEETINGS FOUND", url_no_mtgs)
+dump("NO URL (undiscovered)", no_url)

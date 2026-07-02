@@ -82,9 +82,15 @@
                 {% if item.meetings > 0 %}
                 <span class="w-1.5 h-1.5 rounded-full bg-bp-teal"></span>
                 <span class="text-[10px] text-bp-mist">Active — {{ item.meetings }} meetings collected</span>
-                {% elif b.discovery_status == 'found' %}
+                {% elif b.discovery_status in ('found', 'manual') %}
                 <span class="w-1.5 h-1.5 rounded-full bg-bp-gold"></span>
                 <span class="text-[10px] text-bp-mist">Discovered — ready for collection</span>
+                {% elif b.discovery_status == 'none_published' %}
+                <span class="w-1.5 h-1.5 rounded-full bg-[#8A93A6]"></span>
+                <span class="text-[10px] text-bp-mist">No public minutes — verified</span>
+                {% elif b.discovery_status == 'blocked' %}
+                <span class="w-1.5 h-1.5 rounded-full bg-[#8A93A6]"></span>
+                <span class="text-[10px] text-bp-mist">Blocked — site resists automated collection</span>
                 {% else %}
                 <span class="w-1.5 h-1.5 rounded-full bg-bp-cloud"></span>
                 <span class="text-[10px] text-bp-mist">Pending discovery</span>

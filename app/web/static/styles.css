@@ -53,6 +53,7 @@ html { scroll-behavior: smooth; }
 /* State color fills — clean palette on white */
 .state-collected  { fill: #139AD0; }
 .state-discovered { fill: #FBAA29; }
+.state-no_minutes { fill: #8A93A6; }  /* verified: no public minutes / blocked */
 .state-not-scraped,
 .state-not_scraped { fill: #DCE3ED; }
 .state-no-board,
