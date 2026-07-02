@@ -1,46 +1,17 @@
 {
-  "AK_MD": {
-    "date": "2026-07-01",
-    "status": "blocked"
-  },
-  "AR_MD": {
-    "date": "2026-07-01",
-    "status": "none_published"
-  },
-  "AZ_DO": {
-    "date": "2026-07-01",
-    "status": "blocked"
-  },
   "KS_MD": {
-    "date": "2026-07-01",
-    "status": "blocked"
+    "date": "2026-07-02",
+    "status": "blocked",
+    "note": "Current site (ksbha.ks.gov) sits behind a state-level bot wall that rejects automated collection. Archived 2023-24 minutes/agendas were recovered from the Internet Archive and are in the library; CURRENT minutes need either a records request or a hand download from the live site."
   },
   "KY_MD": {
-    "date": "2026-07-01",
-    "status": "none_published"
-  },
-  "MN_MD": {
-    "date": "2026-07-01",
-    "status": "blocked"
-  },
-  "MO_MD": {
-    "date": "2026-07-01",
-    "status": "blocked"
-  },
-  "OR_MD": {
-    "date": "2026-07-01",
-    "status": "blocked"
-  },
-  "RI_MD": {
-    "date": "2026-07-01",
-    "status": "blocked"
-  },
-  "VT_DO": {
-    "date": "2026-07-01",
-    "status": "none_published"
+    "date": "2026-07-02",
+    "status": "none_published",
+    "note": "KBML publishes no meeting minutes or agendas anywhere (re-verified 2026-07-02: no minutes category in its document search, none in sitemap). It DOES publish monthly Board Action Reports, quarterly newsletters, and an annual report at kbml.ky.gov. Actual minutes require an open-records request."
   },
   "WV_DO": {
-    "date": "2026-07-01",
-    "status": "none_published"
+    "date": "2026-07-02",
+    "status": "none_published",
+    "note": "Board site is wvbdosteo.org (bdosteo.wv.gov no longer resolves). Minutes page exists but has not been updated since May 2019, though SOS open-meetings filings confirm the board meets regularly through June 2026. Board Orders library is current. Minutes require a records request (board contact: Jamie Frame, Jamie.C.Frame@wv.gov, 304-558-6095)."
   }
 }
