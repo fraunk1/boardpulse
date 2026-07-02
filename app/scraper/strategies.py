@@ -59,8 +59,10 @@ STRATEGIES: dict[str, BoardStrategy] = {
     # rows/files carry "med" filename slugs (050826medagenda.pdf) or the
     # board name; without this filter 141/142 collected docs were other
     # professions'.
+    # NOTE: med(?!rad) — Nebraska ALSO has a "Board of Medical Radiography"
+    # whose files are NNNNNNmedrad*.pdf; a plain med[a-z]* matched them.
     "NE_MD": BoardStrategy(
-        filter_text=r"(\d{6}med[a-z]*\.pdf|medicine\s*(and|&)\s*surgery)"),
+        filter_text=r"(\d{6}med(?!rad)[a-z]*\.pdf|medicine\s*(and|&)\s*surgery)"),
 
     # Depth-1 boards: the index lists meetings; PDFs live on detail pages.
     # TX front page shows only UPCOMING events; past meetings (the ones with
