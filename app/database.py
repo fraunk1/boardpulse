@@ -35,6 +35,12 @@ async def init_db(url: str | None = None):
     """
     global engine, async_session
     db_url = url or DATABASE_URL
+    if engine is not None:
+        # Dispose the previous engine's pooled connections before replacing
+        # it — otherwise re-init (tests, refresh snapshots) leaks aiosqlite
+        # connections bound to a dead event loop ("Event loop is closed"
+        # errors at interpreter shutdown; fails CI on Linux).
+        await engine.dispose()
     engine = create_async_engine(db_url, echo=False)
     async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     async with engine.begin() as conn:

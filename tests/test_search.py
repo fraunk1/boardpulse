@@ -58,6 +58,9 @@ def client_and_ids(tmp_path_factory):
             return m1.id
 
     m1_id = asyncio.run(seed())
+    # seed() ran in its own (now-closed) loop; drop that loop's pooled
+    # connections before the TestClient loop takes over the engine.
+    asyncio.run(db.engine.dispose())
 
     # init_db()'s first-startup FTS population runs inside the SAME engine.begin()
     # transaction that creates the schema — before the seed data above exists.
@@ -76,6 +79,9 @@ def client_and_ids(tmp_path_factory):
 
     with TestClient(server.app) as client:
         yield client, m1_id
+
+    # ...and drop the connections the app created on the TestClient's loop.
+    asyncio.run(db.engine.dispose())
 
 
 def test_search_finds_highlighted_result(client_and_ids):
