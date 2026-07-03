@@ -149,6 +149,9 @@ async def temp_db(tmp_path, monkeypatch):
                         f"sqlite+aiosqlite:///{db_file.as_posix()}")
     await db.init_db()
     yield db
+    # Close pooled connections while this test's loop is still alive —
+    # leaked aiosqlite connections raise "Event loop is closed" at GC.
+    await db.engine.dispose()
 
 
 async def _seed_board(db, tmp_path, monkeypatch, meeting_dates):

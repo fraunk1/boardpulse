@@ -54,12 +54,18 @@ def client_and_ids(tmp_path_factory):
             return m1.id, m2.id
 
     m1_id, m2_id = asyncio.run(seed())
+    # seed() ran in its own (now-closed) loop; drop that loop's pooled
+    # connections before the TestClient loop takes over the engine.
+    asyncio.run(db.engine.dispose())
 
     from fastapi.testclient import TestClient
     from app.web import server
 
     with TestClient(server.app) as client:
         yield client, m1_id, m2_id
+
+    # ...and drop the connections the app created on the TestClient's loop.
+    asyncio.run(db.engine.dispose())
 
 
 def test_home(client_and_ids):

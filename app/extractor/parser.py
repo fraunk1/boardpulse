@@ -1,8 +1,21 @@
 """Extract text from collected documents (PDF, DOCX, HTML)."""
 import subprocess
+import sys
 from pathlib import Path
 
 from bs4 import BeautifulSoup
+
+
+def _markitdown_cmd() -> str:
+    """Prefer the markitdown that lives next to this interpreter (venv
+    Scripts) so extraction works even when the venv isn't on PATH — a bare
+    "markitdown" silently fails every document in that case."""
+    exe = Path(sys.executable).parent / (
+        "markitdown.exe" if sys.platform == "win32" else "markitdown")
+    return str(exe) if exe.exists() else "markitdown"
+
+
+MARKITDOWN = _markitdown_cmd()
 
 
 def extract_text_from_html(html: str) -> str:
@@ -36,7 +49,7 @@ def extract_text_from_file(file_path: Path) -> str | None:
 
     try:
         result = subprocess.run(
-            ["markitdown", str(file_path)],
+            [MARKITDOWN, str(file_path)],
             capture_output=True,
             text=True,
             encoding="utf-8",

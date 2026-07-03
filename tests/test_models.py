@@ -15,6 +15,9 @@ async def setup_db(tmp_path):
     """Initialize a fresh in-memory DB for each test."""
     await db.init_db(url="sqlite+aiosqlite://")
     yield
+    # Close pooled connections while this test's loop is still alive —
+    # leaked aiosqlite connections raise "Event loop is closed" at GC.
+    await db.engine.dispose()
 
 
 @pytest.mark.asyncio
