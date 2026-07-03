@@ -15,7 +15,7 @@ async_session = None
 # are upgraded here with idempotent, metadata-only ALTERs (instant on SQLite).
 _SCHEMA_ADDITIONS: dict[str, dict[str, str]] = {
     "boards": {"summary": "TEXT", "summarized_at": "DATETIME"},
-    "meetings": {"summarized_at": "DATETIME"},
+    "meetings": {"summarized_at": "DATETIME", "facts_extracted_at": "DATETIME"},
 }
 
 # Indexes for the hot query paths (models declare index=True for fresh DBs;
@@ -24,7 +24,62 @@ _SCHEMA_INDEXES = [
     ("ix_meetings_board_id", "meetings", "board_id"),
     ("ix_meetings_meeting_date", "meetings", "meeting_date"),
     ("ix_meeting_documents_meeting_id", "meeting_documents", "meeting_id"),
+    ("ix_policy_actions_topic_date", "policy_actions", "topic, action_date"),
+    ("ix_policy_actions_stage", "policy_actions", "stage"),
+    ("ix_legislation_bill", "legislation_mentions", "bill_state, bill_number"),
+    ("ix_disciplinary_category", "disciplinary_actions", "category"),
 ]
+
+# Reporting views, recreated on every startup so their definitions are always
+# current (DROP + CREATE is idempotent; SQLite views are just stored SQL).
+_QUARTER_EXPR = (
+    "strftime('%Y', {col}) || '-Q' || "
+    "((CAST(strftime('%m', {col}) AS INTEGER) + 2) / 3)"
+)
+
+_SCHEMA_VIEWS: dict[str, str] = {
+    "v_policy_actions": f"""
+        SELECT pa.*, b.code AS board_code, b.state, m.meeting_date,
+               strftime('%Y', pa.action_date) AS yr,
+               {_QUARTER_EXPR.format(col='pa.action_date')} AS quarter
+        FROM policy_actions pa
+        JOIN meetings m ON m.id = pa.meeting_id
+        JOIN boards b ON b.id = m.board_id
+    """,
+    "v_legislation": f"""
+        SELECT l.*, b.code AS board_code, b.state, m.meeting_date,
+               {_QUARTER_EXPR.format(col='m.meeting_date')} AS quarter
+        FROM legislation_mentions l
+        JOIN meetings m ON m.id = l.meeting_id
+        JOIN boards b ON b.id = m.board_id
+    """,
+    "v_disciplinary": f"""
+        SELECT da.*, b.code AS board_code, b.state, m.meeting_date,
+               {_QUARTER_EXPR.format(col='m.meeting_date')} AS quarter
+        FROM disciplinary_actions da
+        JOIN meetings m ON m.id = da.meeting_id
+        JOIN boards b ON b.id = m.board_id
+    """,
+    "v_emerging_national": """
+        SELECT et.topic_slug,
+               MIN(et.first_mentioned_on) AS first_seen_nationally,
+               COUNT(*) AS boards_mentioning
+        FROM emerging_topics et
+        GROUP BY et.topic_slug
+    """,
+    "v_board_deltas": """
+        SELECT bs.run_id, rr.started_at, b.code AS board_code,
+               bs.mtgs, bs.docs, bs.docs_text,
+               bs.mtgs_summarized, bs.mtgs_facts,
+               bs.docs - LAG(bs.docs) OVER w AS docs_added,
+               bs.mtgs - LAG(bs.mtgs) OVER w AS mtgs_added,
+               bs.mtgs_facts - LAG(bs.mtgs_facts) OVER w AS facts_added
+        FROM board_snapshots bs
+        JOIN refresh_runs rr ON rr.id = bs.run_id
+        JOIN boards b ON b.id = bs.board_id
+        WINDOW w AS (PARTITION BY bs.board_id ORDER BY bs.run_id)
+    """,
+}
 
 
 async def init_db(url: str | None = None):
@@ -58,6 +113,11 @@ async def init_db(url: str | None = None):
         for name, table, column in _SCHEMA_INDEXES:
             await conn.exec_driver_sql(
                 f"CREATE INDEX IF NOT EXISTS {name} ON {table} ({column})")
+
+        for view_name, view_sql in _SCHEMA_VIEWS.items():
+            await conn.exec_driver_sql(f"DROP VIEW IF EXISTS {view_name}")
+            await conn.exec_driver_sql(
+                f"CREATE VIEW {view_name} AS {view_sql}")
 
         # Full-text search over meeting document text (FTS5, external-content
         # table so the indexed text isn't duplicated on disk). First startup
