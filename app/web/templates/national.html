@@ -113,8 +113,28 @@
                 </div>
             </div>
 
-            <!-- RIGHT COL: Topics + Recent Activity -->
+            <!-- RIGHT COL: Watchlist + Emerging + Topics + Recent Activity -->
             <div class="space-y-8">
+                <!-- Watchlist (standing full-text queries) -->
+                {% include "partials/watchlist_card.html" %}
+
+                <!-- Emerging issues feed (fact-backed, empty-guarded) -->
+                {% include "partials/emerging_feed.html" %}
+
+                <!-- Latest brief link -->
+                <a href="/briefs" class="flex items-center justify-between px-4 py-3 rounded-xl border border-bp-cloud bg-bp-frost hover:border-bp-teal/30 hover:bg-white transition-colors group">
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-8 h-8 rounded-lg bg-bp-teal/10 border border-bp-teal/20 flex items-center justify-center">
+                            <i data-lucide="mail" class="w-4 h-4 text-bp-teal"></i>
+                        </div>
+                        <div>
+                            <div class="text-sm font-medium text-bp-navy group-hover:text-bp-teal transition-colors">Latest brief</div>
+                            <div class="text-[10px] text-bp-mist">The most recent national roundup</div>
+                        </div>
+                    </div>
+                    <i data-lucide="arrow-right" class="w-4 h-4 text-bp-mist group-hover:text-bp-teal transition-colors"></i>
+                </a>
+
                 <!-- Topic Intelligence -->
                 <div>
                     <h2 class="section-label flex items-center gap-1.5 mb-3">

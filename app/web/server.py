@@ -2,7 +2,7 @@
 import json
 import os
 import time
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 from fastapi import FastAPI, Request, HTTPException
@@ -12,10 +12,11 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy import select, func, distinct, text
 from sqlalchemy.orm import selectinload
 
-from app.models import Board, Meeting, MeetingDocument
+from app.models import Board, Meeting, MeetingDocument, WatchlistTerm
 from app.config import SCREENSHOTS_DIR, DOCUMENTS_DIR, REPORTS_DIR, EXHIBITS_DIR, DATA_DIR, PROJECT_ROOT, LOGS_DIR
 import app.database as db
 import app.stats as stats
+import app.web.trends as trends
 
 # Paths
 WEB_DIR = Path(__file__).resolve().parent
@@ -64,6 +65,11 @@ templates.env.globals["relative_screenshot"] = _relative_screenshot_path
 async def startup():
     from app.database import init_db
     await init_db()
+    # Seed the four default watch terms on first run (no-op if any exist).
+    try:
+        await trends.seed_watchlist_if_empty()
+    except Exception as exc:  # never block startup on the watchlist
+        print(f"Watchlist seed skipped: {exc}")
 
 
 # ---------------------------------------------------------------------------
@@ -241,14 +247,121 @@ async def national_overview(request: Request):
     # State colors for map
     state_colors = {s: d["status"] for s, d in state_data.items()}
 
+    # Watchlist (with new-hit counts) + emerging-issues feed. Both are
+    # resilient: watchlist counts fall back to 0 on FTS edge cases, the
+    # emerging feed is empty-guarded until fact extraction runs.
+    watchlist = await trends.watchlist_with_counts(_sanitize_fts_query)
+    emerging = await trends.emerging_national(limit=6)
+
     return templates.TemplateResponse(request, "national.html", context={
         "stats": stats,
         "topics": topics,
         "state_data": state_data,
         "state_colors": state_colors,
         "recent_summaries": recent_summaries,
+        "watchlist": watchlist,
+        "emerging": emerging,
         "breadcrumbs": [],
     })
+
+
+# ---------------------------------------------------------------------------
+# Pages — Trends Dashboard
+# ---------------------------------------------------------------------------
+
+@app.get("/trends", response_class=HTMLResponse)
+async def trends_view(request: Request):
+    """Trends dashboard — topics over time (live), plus rulemaking,
+    legislation, and discipline (fact-backed, empty-guarded until extraction
+    runs)."""
+    gaining = await trends.gaining_traction(limit=6)
+    tot = await trends.topics_over_time(top_n=6)
+    rulemaking = await trends.rulemaking_pipeline()
+    legislation = await trends.legislation_table()
+    discipline = await trends.discipline_trends()
+
+    return templates.TemplateResponse(request, "trends.html", context={
+        "gaining": gaining,
+        "topics_over_time": tot,
+        "rulemaking": rulemaking,
+        "legislation": legislation,
+        "discipline": discipline,
+        "current_quarter": trends.current_quarter_label(),
+        "breadcrumbs": [
+            {"label": "National", "url": "/"},
+        ],
+        "page_title": "Trends",
+    })
+
+
+# ---------------------------------------------------------------------------
+# Watchlist — HTMX add / mark-seen / delete, all re-render the card partial
+# ---------------------------------------------------------------------------
+
+async def _render_watchlist_card(request: Request) -> HTMLResponse:
+    """Render just the watchlist card partial (for HTMX swaps)."""
+    watchlist = await trends.watchlist_with_counts(_sanitize_fts_query)
+    return templates.TemplateResponse(
+        request, "partials/watchlist_card.html", context={"watchlist": watchlist})
+
+
+def _parse_urlencoded_form(body: bytes) -> dict[str, str]:
+    """Parse an application/x-www-form-urlencoded body without needing
+    python-multipart (which isn't installed). HTMX posts this content type by
+    default, so this covers the watchlist add form. Last value wins per key.
+    """
+    from urllib.parse import parse_qsl
+    return dict(parse_qsl(body.decode("utf-8", errors="replace"),
+                          keep_blank_values=True))
+
+
+@app.post("/watchlist", response_class=HTMLResponse)
+async def watchlist_add(request: Request):
+    """Add a watch term. Label = the term, title-cased. Idempotent on term.
+
+    Reads the term from the urlencoded HTMX form body directly (Starlette's
+    request.form() would require python-multipart, which isn't a dependency
+    here).
+    """
+    form = _parse_urlencoded_form(await request.body())
+    term = (form.get("term") or "").strip()
+    if term:
+        label = term if term.isupper() else term.title()
+        async with db.async_session() as session:
+            existing = (await session.execute(
+                select(WatchlistTerm).where(WatchlistTerm.term == term)
+            )).scalar_one_or_none()
+            if existing is None:
+                session.add(WatchlistTerm(term=term, label=label))
+                await session.commit()
+    return await _render_watchlist_card(request)
+
+
+@app.post("/watchlist/{term_id}/delete", response_class=HTMLResponse)
+async def watchlist_delete(request: Request, term_id: int):
+    """Remove a watch term."""
+    async with db.async_session() as session:
+        term = (await session.execute(
+            select(WatchlistTerm).where(WatchlistTerm.id == term_id)
+        )).scalar_one_or_none()
+        if term is not None:
+            await session.delete(term)
+            await session.commit()
+    return await _render_watchlist_card(request)
+
+
+@app.post("/watchlist/{term_id}/seen", response_class=HTMLResponse)
+async def watchlist_seen(request: Request, term_id: int):
+    """Mark a watch term seen — sets acknowledged_at=now so its new-hit count
+    resets to zero until fresh documents arrive."""
+    async with db.async_session() as session:
+        term = (await session.execute(
+            select(WatchlistTerm).where(WatchlistTerm.id == term_id)
+        )).scalar_one_or_none()
+        if term is not None:
+            term.acknowledged_at = datetime.now(timezone.utc)
+            await session.commit()
+    return await _render_watchlist_card(request)
 
 
 # ---------------------------------------------------------------------------
@@ -283,6 +396,9 @@ async def topic_view(request: Request, slug: str):
         board_ids.add(b.id)
         state_set.add(b.state)
 
+    # Quarterly chart data: meetings mentioning + boards discussing this topic.
+    topic_quarterly = await trends.topic_quarterly(slug)
+
     return templates.TemplateResponse(request, "topic.html", context={
         "topic_slug": slug,
         "topic_name": display_name,
@@ -290,6 +406,7 @@ async def topic_view(request: Request, slug: str):
         "board_count": len(board_ids),
         "state_count": len(state_set),
         "meeting_count": len(filtered),
+        "topic_quarterly": topic_quarterly,
         "breadcrumbs": [
             {"label": "National", "url": "/"},
         ],
@@ -684,11 +801,15 @@ async def board_view(request: Request, code: str):
 
     state_name = STATE_NAMES.get(board.state, board.state)
 
+    # 24-month (8-quarter) meeting-count sparkline for the info grid.
+    activity_spark = await trends.board_activity_sparkline(board.id, quarters=8)
+
     return templates.TemplateResponse(request, "board.html", context={
         "board": board,
         "meeting_data": meeting_data,
         "topic_counts": topics_sorted,
         "state_name": state_name,
+        "activity_spark": activity_spark,
         "breadcrumbs": [
             {"label": "National", "url": "/"},
             {"label": state_name, "url": f"/state/{board.state}"},
@@ -838,6 +959,48 @@ async def serve_exhibit_page(board_code: str, exhibit_name: str, page_num: int):
 # writes a new/changed file) invalidates it automatically. Intentionally
 # NOT an LRU — only the latest report is ever kept.
 _REPORT_CACHE: dict = {}
+
+
+@app.get("/briefs", response_class=HTMLResponse)
+async def briefs_latest(request: Request):
+    from app.reports import brief as brief_mod
+    return await _render_brief(request, brief_mod.latest_brief_ym())
+
+
+@app.get("/briefs/{ym}", response_class=HTMLResponse)
+async def briefs_month(request: Request, ym: str):
+    return await _render_brief(request, ym)
+
+
+@app.get("/briefs/{ym}/email", response_class=HTMLResponse)
+async def briefs_email(ym: str):
+    from app.reports import brief as brief_mod
+    html_path = brief_mod.BRIEFS_DIR / f"{ym}.html"
+    if not html_path.exists():
+        raise HTTPException(status_code=404,
+                            detail="Email version not generated for this brief")
+    return HTMLResponse(html_path.read_text(encoding="utf-8"))
+
+
+async def _render_brief(request: Request, ym):
+    import re
+    import markdown as _markdown
+    from app.reports import brief as brief_mod
+    all_briefs = sorted(
+        (p.stem for p in brief_mod.BRIEFS_DIR.glob("*.md")
+         if re.fullmatch(r"\d{4}-\d{2}", p.stem)), reverse=True)
+    brief_html, has_html = None, False
+    if ym:
+        md_path = brief_mod.BRIEFS_DIR / f"{ym}.md"
+        if md_path.exists():
+            brief_html = _markdown.markdown(
+                md_path.read_text(encoding="utf-8"), extensions=["tables"])
+        has_html = (brief_mod.BRIEFS_DIR / f"{ym}.html").exists()
+    return templates.TemplateResponse(request, "brief.html", {
+        "brief_ym": ym, "brief_html": brief_html,
+        "all_briefs": all_briefs, "has_html": has_html,
+        "page_title": "Monthly Delta Brief",
+    })
 
 
 @app.get("/report", response_class=HTMLResponse)

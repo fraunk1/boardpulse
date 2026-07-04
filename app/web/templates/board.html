@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "partials/charts.html" import sparkline %}
 
 {% set page_title = board.name %}
 {% block title %}{{ board.name }} — boardpulse{% endblock %}
@@ -52,6 +53,17 @@
                         <div class="text-[10px] text-bp-mist uppercase tracking-wider">Summaries</div>
                     </div>
                 </div>
+
+                <!-- 24-month activity sparkline -->
+                {% if activity_spark and (activity_spark | sum) > 0 %}
+                <div class="flex items-center gap-3 p-3 bg-white rounded-lg border border-bp-cloud">
+                    <i data-lucide="activity" class="w-5 h-5 text-bp-teal"></i>
+                    <div class="min-w-0">
+                        <div class="mt-0.5">{{ sparkline(activity_spark, width=110, height=26, color="#139AD0") }}</div>
+                        <div class="text-[10px] text-bp-mist uppercase tracking-wider">Activity &bull; last 24 mo</div>
+                    </div>
+                </div>
+                {% endif %}
 
                 <!-- Contact -->
                 {% if board.homepage %}

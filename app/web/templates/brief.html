@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% set page_title = "Monthly Delta Brief" %}
+{% block title %}Monthly Delta Brief — boardpulse{% endblock %}
+
+{% block body %}
+<div class="max-w-[900px] mx-auto px-6 py-10">
+    <!-- Brief Header -->
+    <div class="mb-8 pb-6 border-b border-bp-cloud">
+        <div class="flex items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-bp-teal/10 border border-bp-teal/20 flex items-center justify-center">
+                    <i data-lucide="mail" class="w-5 h-5 text-bp-teal"></i>
+                </div>
+                <div>
+                    <h1 class="text-2xl font-bold text-bp-navy tracking-tight">Monthly Delta Brief</h1>
+                    <p class="text-sm text-bp-steel">What changed across the state medical boards this period</p>
+                </div>
+            </div>
+            {% if brief_ym %}
+            <div class="flex items-center gap-2">
+                {% if all_briefs and all_briefs|length > 1 %}
+                <form method="get" action="" class="hidden sm:block">
+                    <select name="ym" onchange="location.href='/briefs/'+this.value"
+                        class="text-xs bg-bp-frost border border-bp-cloud rounded-lg px-2.5 py-1.5 text-bp-navy focus:outline-none focus:ring-2 focus:ring-bp-teal/30">
+                        {% for ym in all_briefs %}
+                        <option value="{{ ym }}" {% if ym == brief_ym %}selected{% endif %}>{{ ym }}</option>
+                        {% endfor %}
+                    </select>
+                </form>
+                {% endif %}
+                {% if has_html %}
+                <a href="/briefs/{{ brief_ym }}/email" target="_blank"
+                    class="text-xs text-bp-steel hover:text-bp-teal transition-colors flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-bp-frost border border-bp-cloud">
+                    <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+                    <span>Email version</span>
+                </a>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+        {% if brief_ym %}
+        <div class="text-xs font-mono text-bp-mist mt-3">Brief: {{ brief_ym }}</div>
+        {% endif %}
+    </div>
+
+    {% if not brief_html %}
+    <!-- Empty state -->
+    <div class="rounded-xl border border-bp-cloud bg-bp-frost/60 px-6 py-10 text-center">
+        <i data-lucide="inbox" class="w-8 h-8 text-bp-mist mx-auto mb-3"></i>
+        <p class="text-bp-slate font-medium">No brief available yet.</p>
+        <p class="text-sm text-bp-steel mt-1">Run <code class="font-mono text-bp-teal-d">python cli.py brief</code> to generate one.</p>
+    </div>
+    {% else %}
+    <!-- Brief Content -->
+    <article class="prose prose-slate prose-lg max-w-none
+        prose-headings:text-bp-navy prose-headings:font-bold
+        prose-h1:text-2xl prose-h1:border-b prose-h1:border-bp-cloud prose-h1:pb-4 prose-h1:mb-6
+        prose-h2:text-xl prose-h2:mt-10 prose-h2:mb-4 prose-h2:text-bp-teal-d
+        prose-h3:text-base prose-h3:mt-6
+        prose-p:text-bp-steel prose-p:leading-relaxed
+        prose-li:text-bp-steel
+        prose-strong:text-bp-navy
+        prose-hr:border-bp-cloud
+        prose-table:text-sm
+        prose-th:text-bp-navy prose-th:bg-bp-frost
+        prose-a:text-bp-teal prose-a:no-underline hover:prose-a:underline">
+        {{ brief_html | safe }}
+    </article>
+    {% endif %}
+
+    <!-- Footer -->
+    <div class="mt-10 pt-6 border-t border-bp-cloud text-xs text-bp-mist">
+        Board Pulse &mdash; descriptive monthly delta brief. Records what boards did and discussed, not what they should do.
+    </div>
+</div>
+{% endblock %}

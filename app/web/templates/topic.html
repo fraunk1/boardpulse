@@ -3,6 +3,12 @@
 {% set page_title = topic_name %}
 {% block title %}{{ topic_name }} — boardpulse{% endblock %}
 
+{% block head %}
+<link rel="stylesheet" href="/static/vendor/apexcharts.min.css">
+<script src="/static/vendor/apexcharts.min.js"></script>
+<script src="/static/bp-charts.js"></script>
+{% endblock %}
+
 {% block body %}
 <div class="max-w-[1400px] mx-auto px-6 py-8">
 
@@ -36,6 +42,19 @@
             </div>
         </div>
     </div>
+
+    <!-- Quarterly trend chart -->
+    {% if topic_quarterly and (topic_quarterly.meetings | sum) > 0 %}
+    <div class="mb-8">
+        <h2 class="section-label flex items-center gap-1.5 mb-3">
+            <i data-lucide="bar-chart-3" class="w-3.5 h-3.5"></i>
+            Meetings mentioning {{ topic_name }} by quarter
+        </h2>
+        <div class="bg-white border border-bp-cloud rounded-xl p-4">
+            <div id="chart-topic-quarterly"></div>
+        </div>
+    </div>
+    {% endif %}
 
     <!-- Meeting List -->
     <div>
@@ -87,4 +106,28 @@
         {% endif %}
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+{% if topic_quarterly and (topic_quarterly.meetings | sum) > 0 %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const el = document.getElementById('chart-topic-quarterly');
+    if (!el) return;
+    const opts = BPCharts.merge(BPCharts.base(), {
+        chart: { type: 'bar', height: 300 },
+        series: [
+            { name: 'Meetings mentioning', type: 'column', data: {{ topic_quarterly.meetings | tojson }} },
+            { name: 'Boards discussing', type: 'line', data: {{ topic_quarterly.boards | tojson }} }
+        ],
+        stroke: { width: [0, 2] },
+        plotOptions: { bar: { columnWidth: '55%', borderRadius: 3 } },
+        markers: { size: [0, 4] },
+        xaxis: { categories: {{ topic_quarterly.quarters | tojson }} },
+        legend: { position: 'top', horizontalAlign: 'left' },
+    });
+    new ApexCharts(el, opts).render();
+});
+</script>
+{% endif %}
 {% endblock %}

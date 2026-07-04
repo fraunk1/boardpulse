@@ -2,7 +2,9 @@
 """boardpulse CLI — State medical board meeting minutes intelligence."""
 import argparse
 import asyncio
+import subprocess
 import sys
+from datetime import datetime, timezone
 
 
 def main():
@@ -69,6 +71,15 @@ def main():
                     help="Gate the facts files without writing (dry run)")
     fx.add_argument("--status", action="store_true",
                     help="Print per-board facts coverage and exit")
+
+    # brief — monthly delta brief (build / ingest prose / render PDF)
+    br = sub.add_parser("brief", help="Monthly delta brief: build / ingest prose / PDF")
+    br.add_argument("--ingest", action="store_true",
+                    help="Splice YYYY-MM_prose.md into the brief + rebuild email HTML")
+    br.add_argument("--pdf", action="store_true",
+                    help="Render the brief email HTML to a Letter PDF (offline)")
+    br.add_argument("--ym", type=str, default=None,
+                    help="Target brief month YYYY-MM (default: latest / now)")
 
     # eval — gold-standard model eval harness
     ev = sub.add_parser("eval", help="Gold-standard eval harness (prepare|score|judge)")
@@ -163,6 +174,29 @@ def main():
             evalharness.score(args.run_id, args.model_label)
         elif args.eval_command == "judge":
             evalharness.judge(args.run_id)
+        return
+    if args.command == "brief":
+        from app.reports.brief import (
+            build_brief, ingest_brief_prose, latest_brief_ym, BRIEFS_DIR)
+        if args.pdf:
+            from app.config import PROJECT_ROOT
+            ym = args.ym or latest_brief_ym()
+            sys.exit(subprocess.call(
+                [sys.executable, str(PROJECT_ROOT / "scripts" / "render_brief_pdf.py")]
+                + ([ym] if ym else [])))
+        if args.ingest:
+            ym = args.ym or latest_brief_ym()
+            if not ym:
+                print("No brief to ingest. Run `python cli.py brief` first.")
+                sys.exit(1)
+            html_path = ingest_brief_prose(ym)
+            print(f"Brief HTML written: {html_path}")
+            return
+        sidecar = build_brief(datetime.now(timezone.utc).isoformat())
+        ym = sidecar["window"]["ym"]
+        print(f"Brief built: {BRIEFS_DIR / (ym + '.md')}")
+        print(f"Writer prompt: {ym}_prompt.md  (fill SLOT A/B -> {ym}_prose.md, "
+              f"then `python cli.py brief --ingest`)")
         return
 
     # Refresh manages its own event loop + exit code

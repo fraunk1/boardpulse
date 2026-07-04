@@ -1,0 +1,167 @@
+<!--
+  Board Pulse monthly delta brief — forwardable email HTML.
+
+  Rendered by app/reports/brief.ingest_brief_prose() via plain {{TOKEN}}
+  string substitution (NOT Jinja). Everything is inline-CSS and self-contained:
+  no external stylesheet, no web font, no JavaScript, no CDN. Table-based
+  layout + inline styles so Outlook / Gmail / print all render deterministically.
+  Sparklines are inline SVG. Safe to forward and safe to print to PDF.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<title>Board Pulse — Monthly Delta Brief — {{MONTH}}</title>
+</head>
+<body style="margin:0; padding:0; background-color:{{C_FROST}}; -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%;">
+  <!-- Outer wrapper -->
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:{{C_FROST}};">
+    <tr>
+      <td align="center" style="padding:24px 12px;">
+
+        <!-- Card -->
+        <table role="presentation" width="640" cellpadding="0" cellspacing="0" border="0" style="width:640px; max-width:640px; background-color:#FFFFFF; border:1px solid {{C_CLOUD}}; border-radius:12px; overflow:hidden;">
+
+          <!-- Masthead -->
+          <tr>
+            <td style="background-color:{{C_NAVY}}; padding:22px 28px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td style="font-family:'DM Sans','Segoe UI',Arial,sans-serif; font-size:20px; font-weight:700; color:#FFFFFF; letter-spacing:-0.3px;">
+                    board<span style="color:{{C_TEAL}};">pulse</span>
+                    <span style="font-family:'DM Sans','Segoe UI',Arial,sans-serif; font-size:12px; font-weight:500; color:{{C_MIST}}; letter-spacing:0.5px; text-transform:uppercase;">&nbsp;&nbsp;Monthly Delta Brief</span>
+                  </td>
+                  <td align="right" style="font-family:'DM Sans','Segoe UI',Arial,sans-serif; font-size:13px; font-weight:600; color:{{C_TEAL}};">
+                    {{MONTH}}
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Window strip -->
+          <tr>
+            <td style="background-color:{{C_FROST}}; padding:10px 28px; border-bottom:1px solid {{C_CLOUD}}; font-family:'DM Sans','Segoe UI',Arial,sans-serif; font-size:12px; color:{{C_STEEL}};">
+              What changed between <strong style="color:{{C_NAVY}};">{{SINCE}}</strong> and <strong style="color:{{C_NAVY}};">{{UNTIL}}</strong>
+            </td>
+          </tr>
+
+          <!-- Stat cards -->
+          <tr>
+            <td style="padding:20px 28px 4px 28px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td width="25%" valign="top" style="padding:0 6px;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:{{C_FROST}}; border:1px solid {{C_CLOUD}}; border-radius:8px;">
+                      <tr><td style="padding:12px 14px;">
+                        <div style="font-family:'DM Sans','Segoe UI',Arial,sans-serif; font-size:24px; font-weight:700; color:{{C_NAVY}}; line-height:1;">{{NEW_MEETINGS}}</div>
+                        <div style="font-family:'DM Sans','Segoe UI',Arial,sans-serif; font-size:11px; color:{{C_STEEL}}; margin-top:4px;">new meetings</div>
+                      </td></tr>
+                    </table>
+                  </td>
+                  <td width="25%" valign="top" style="padding:0 6px;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:{{C_FROST}}; border:1px solid {{C_CLOUD}}; border-radius:8px;">
+                      <tr><td style="padding:12px 14px;">
+                        <div style="font-family:'DM Sans','Segoe UI',Arial,sans-serif; font-size:24px; font-weight:700; color:{{C_TEAL}}; line-height:1;">{{RULE_CHANGES}}</div>
+                        <div style="font-family:'DM Sans','Segoe UI',Arial,sans-serif; font-size:11px; color:{{C_STEEL}}; margin-top:4px;">rule changes</div>
+                      </td></tr>
+                    </table>
+                  </td>
+                  <td width="25%" valign="top" style="padding:0 6px;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:{{C_FROST}}; border:1px solid {{C_CLOUD}}; border-radius:8px;">
+                      <tr><td style="padding:12px 14px;">
+                        <div style="font-family:'DM Sans','Segoe UI',Arial,sans-serif; font-size:24px; font-weight:700; color:{{C_GOLD}}; line-height:1;">{{BILLS}}</div>
+                        <div style="font-family:'DM Sans','Segoe UI',Arial,sans-serif; font-size:11px; color:{{C_STEEL}}; margin-top:4px;">bills mentioned</div>
+                      </td></tr>
+                    </table>
+                  </td>
+                  <td width="25%" valign="top" style="padding:0 6px;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:{{C_FROST}}; border:1px solid {{C_CLOUD}}; border-radius:8px;">
+                      <tr><td style="padding:12px 14px;">
+                        <div style="font-family:'DM Sans','Segoe UI',Arial,sans-serif; font-size:24px; font-weight:700; color:{{C_NAVY}}; line-height:1;">{{FIRST_MENTIONS}}</div>
+                        <div style="font-family:'DM Sans','Segoe UI',Arial,sans-serif; font-size:11px; color:{{C_STEEL}}; margin-top:4px;">first mentions</div>
+                      </td></tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Sparkline row -->
+          <tr>
+            <td align="right" style="padding:6px 34px 0 28px;">
+              {{SPARKLINE}}
+            </td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td style="padding:12px 28px 28px 28px; font-family:'DM Sans','Segoe UI',Arial,sans-serif; font-size:14px; line-height:1.6; color:{{C_STEEL}};">
+              <div class="bp-body">
+                {{BODY}}
+              </div>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color:{{C_NAVY}}; padding:16px 28px; font-family:'DM Sans','Segoe UI',Arial,sans-serif; font-size:11px; color:{{C_MIST}};">
+              Board Pulse &bull; Federation of State Medical Boards. This brief is descriptive: it records what boards did and discussed, not what they should do.
+            </td>
+          </tr>
+
+        </table>
+        <!-- /Card -->
+
+        <div style="font-family:'DM Sans','Segoe UI',Arial,sans-serif; font-size:10px; color:{{C_MIST}}; margin-top:12px;">
+          Generated automatically from state medical board meeting records.
+        </div>
+
+      </td>
+    </tr>
+  </table>
+
+  <!--
+    Scoped body styles for the markdown-rendered content. Kept in a <style>
+    block (not inline) only for the generated body HTML, whose element-level
+    inlining isn't practical; the layout above is fully inline so it survives
+    clients that strip <style>. Every rule is defensive and Outlook-tolerant.
+  -->
+  <style>
+    .bp-body h1, .bp-body h2, .bp-body h3 {
+      font-family:'DM Sans','Segoe UI',Arial,sans-serif;
+      color:{{C_NAVY}}; margin:22px 0 8px 0; line-height:1.25;
+    }
+    .bp-body h1 { font-size:20px; font-weight:700; }
+    .bp-body h2 {
+      font-size:15px; font-weight:700; text-transform:uppercase;
+      letter-spacing:0.4px; color:{{C_TEAL_D}};
+      border-bottom:1px solid {{C_CLOUD}}; padding-bottom:5px;
+    }
+    .bp-body h3 { font-size:13px; font-weight:600; }
+    .bp-body p { margin:8px 0; }
+    .bp-body ul { margin:8px 0; padding-left:20px; }
+    .bp-body li { margin:4px 0; }
+    .bp-body strong { color:{{C_NAVY}}; }
+    .bp-body em { color:{{C_STEEL}}; }
+    .bp-body a { color:{{C_TEAL}}; text-decoration:none; }
+    .bp-body hr { border:0; border-top:1px solid {{C_CLOUD}}; margin:20px 0; }
+    .bp-body table {
+      width:100%; border-collapse:collapse; margin:12px 0; font-size:13px;
+    }
+    .bp-body th {
+      text-align:left; background-color:{{C_FROST}}; color:{{C_NAVY}};
+      font-weight:600; padding:7px 10px; border-bottom:2px solid {{C_CLOUD}};
+    }
+    .bp-body td {
+      padding:6px 10px; border-bottom:1px solid {{C_CLOUD}};
+      color:{{C_STEEL}};
+    }
+    .bp-body th:nth-child(n+2), .bp-body td:nth-child(n+2) { text-align:right; }
+  </style>
+
+</body>
+</html>

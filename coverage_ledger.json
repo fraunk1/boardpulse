@@ -14,6 +14,11 @@
     "status": "manual",
     "note": "Archive gap only (current coverage is fine): the board's site publishes only the most recent meeting documents and no public archive of past minutes exists anywhere (verified 2026-07-03 incl. Wayback). History accumulates forward from mid-2026."
   },
+  "NH_MD": {
+    "date": "2026-07-04",
+    "status": "manual",
+    "note": "Archive gap only (recent coverage is fine): oplc.nh.gov serves current minutes but blocks automated fetch of its inline-document archive PDFs (403 on plain, www, and headless Chromium). 2023-24 archive URLs are known but unreachable without a manual/browser session; a hand download or records request would fill the back-history."
+  },
   "VT_DO": {
     "date": "2026-07-03",
     "status": "manual",

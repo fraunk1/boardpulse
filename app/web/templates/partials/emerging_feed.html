@@ -1,0 +1,41 @@
+{#
+  Emerging issues feed — latest first-mentions of new subjects across boards.
+
+  Driven by EmergingTopic (a fact table), so it's empty-guarded: until
+  extraction runs, we show a clean "not yet extracted" state. Expects:
+    emerging: {has_data: bool, items: [{topic, subject, board_code,
+               board_state, first_mentioned_on, quote}]}
+#}
+<div>
+    <h2 class="section-label flex items-center gap-1.5 mb-3">
+        <i data-lucide="radar" class="w-3.5 h-3.5"></i> Emerging Issues
+    </h2>
+
+    {% if emerging.has_data and emerging.items %}
+    <div class="space-y-3 stagger-in">
+        {% for it in emerging.items %}
+        <div class="summary-feed-item block">
+            <div class="flex items-center gap-2 mb-1">
+                {% if it.first_mentioned_on %}
+                <span class="text-[10px] font-mono text-bp-mist">{{ it.first_mentioned_on.strftime('%b %d, %Y') }}</span>
+                <span class="text-bp-cloud">&bull;</span>
+                {% endif %}
+                {% if it.board_code %}
+                <a href="/board/{{ it.board_code }}" class="text-[10px] font-medium text-bp-teal hover:underline">{{ it.board_code }}</a>
+                {% endif %}
+            </div>
+            <div class="text-sm font-medium text-bp-navy">{{ it.subject or (it.topic | title) }}</div>
+            {% if it.quote %}
+            <div class="text-xs text-bp-steel italic mt-0.5 line-clamp-2">&ldquo;{{ it.quote }}&rdquo;</div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="border border-dashed border-bp-cloud rounded-xl px-4 py-6 text-center">
+        <i data-lucide="radar" class="w-6 h-6 mx-auto mb-2 text-bp-cloud"></i>
+        <p class="text-xs text-bp-mist">No emerging issues extracted yet.</p>
+        <p class="text-[10px] text-bp-mist mt-0.5">First-mentions appear here after the next fact-extraction pass.</p>
+    </div>
+    {% endif %}
+</div>
