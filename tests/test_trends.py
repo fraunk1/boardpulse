@@ -271,8 +271,9 @@ def test_topic_page_has_quarterly_chart(client):
     assert "/static/vendor/apexcharts.min.js" in body
 
 
-def test_board_page_has_activity_sparkline(client):
+def test_board_page_has_topic_breakdown(client):
     r = client.get(f"/board/{client.seeded_board_code}")
     assert r.status_code == 200
-    # sparkline macro emits an inline <svg><polyline>
-    assert "<polyline" in r.text
+    # the seeded board has topic'd meetings, so the ranked bar chart renders
+    assert "What this board is working on" in r.text
+    assert "width:" in r.text  # a proportional bar
