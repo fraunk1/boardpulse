@@ -133,6 +133,31 @@
   table.nums tr:last-child td { border-bottom: none; }
   table.nums b.blue { color: var(--blue); }
   table.nums b.orange { color: var(--orange); }
+
+  /* ---------- page 3: sample board analysis ---------- */
+  .sample-intro { font-size: 9.6pt; color: var(--slate); line-height: 1.5; margin-bottom: 14px; }
+  .sample-intro strong { color: var(--ink); }
+  .sample-meta { display: flex; gap: 14px; flex-wrap: wrap; font-family: "DM Mono", monospace; font-size: 7.6pt; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: 14px; }
+  .sample-meta b { color: var(--navy); }
+  .sgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 18px; }
+  .sblock h3 { font-family: "DM Mono", monospace; font-size: 8pt; letter-spacing: .14em; text-transform: uppercase; color: var(--blue); border-bottom: 1.5px solid var(--line); padding-bottom: 4px; margin-bottom: 8px; }
+  .sblock.wide { grid-column: 1 / -1; }
+  /* topic bars */
+  .sbar { margin-bottom: 6px; }
+  .sbar-top { display: flex; justify-content: space-between; font-size: 8.5pt; color: var(--slate); margin-bottom: 2px; }
+  .sbar-top b { color: var(--ink); font-weight: 600; }
+  .sbar-track { height: 6px; border-radius: 4px; background: var(--wash); overflow: hidden; }
+  .sbar-fill { height: 100%; border-radius: 4px; background: var(--blue); }
+  /* fact rows */
+  .frow { display: flex; align-items: flex-start; gap: 7px; padding: 4px 0; border-bottom: 1px dotted var(--line); font-size: 8.7pt; color: var(--slate); line-height: 1.35; }
+  .frow:last-child { border-bottom: none; }
+  .frow .stage { flex-shrink: 0; font-family: "DM Mono", monospace; font-size: 6.4pt; letter-spacing: .05em; text-transform: uppercase; padding: 2px 5px; border-radius: 3px; margin-top: 1px; }
+  .stage.adopted, .stage.effective { background: #e6f6ec; color: #1a7f45; }
+  .stage.comment, .stage.proposed { background: #eaf4fb; color: #1671ab; }
+  .stage.tabled, .stage.watching { background: #f4f0e8; color: #8a6d2f; }
+  .frow b { color: var(--ink); font-weight: 600; }
+  .takeaway { grid-column: 1 / -1; background: var(--wash); border-left: 3px solid var(--orange); border-radius: 0 8px 8px 0; padding: 11px 14px; font-size: 9pt; color: var(--slate); line-height: 1.5; }
+  .takeaway b { color: var(--ink); font-weight: 600; }
 </style>
 </head>
 <body>
@@ -149,8 +174,8 @@
 
   <div class="stats">
     <div class="stat"><b>63</b><span>Boards monitored</span></div>
-    <div class="stat"><b>987</b><span>Meetings tracked</span></div>
-    <div class="stat"><b>1,543</b><span>Documents on file</span></div>
+    <div class="stat"><b>1,933</b><span>Meetings tracked</span></div>
+    <div class="stat"><b>2,677</b><span>Documents on file</span></div>
     <div class="stat"><b>501</b><span>Meeting AI summaries</span></div>
     <div class="stat"><b>15</b><span>Topics tagged</span></div>
   </div>
@@ -173,13 +198,13 @@
     </div>
     <div class="wblock when">
       <h3>When</h3>
-      <p>Refreshed automatically on the <strong>first of each month</strong>, with on-demand refreshes anytime. Summaries cover a rolling <strong>12-month window</strong>, and every page shows when its data was last collected.</p>
+      <p>Refreshed automatically on the <strong>first of each month</strong>, with on-demand refreshes anytime. Summaries cover a rolling <strong>12-month window</strong> while the document library reaches back to <strong>2021</strong> for trend analysis; every page shows when its data was last collected.</p>
     </div>
   </div>
 
   <div class="pagefoot">
     <div><b>Frank B. Meyers, JD</b> · Director, Regulatory Innovation &amp; Member Services · <a href="mailto:fmeyers@fsmb.org" style="color:inherit;text-decoration:none">fmeyers@fsmb.org</a></div>
-    <div class="pagenum">1 / 2</div>
+    <div class="pagenum">1 / 3</div>
   </div>
 </div>
 
@@ -243,14 +268,76 @@
   <h2><span class="tag">Status</span>By the numbers <span style="font-weight:400;font-size:8.5pt;color:var(--muted)">(as of July 2, 2026)</span></h2>
   <table class="nums">
     <tr><td>Coverage</td><td><b class="blue">61 of 63 boards have documents on file</b> — including several recovered by hand from bot-walled sites and internet archives. The remaining two (Kentucky and West Virginia's osteopathic board) publish no minutes anywhere online; an open-records request is the path to theirs</td></tr>
-    <tr><td>Library</td><td>987 meetings · 1,543 documents · 1,484 with searchable text (including 436 pages of scanned West Virginia minutes transcribed by AI)</td></tr>
+    <tr><td>Library</td><td>1,933 meetings · 2,677 documents · 2,567 with searchable text, reaching back to June 2021 (including West Virginia and Virginia minutes transcribed by AI from scans)</td></tr>
     <tr><td>Summaries</td><td><b class="orange">501 per-meeting summaries</b> · 57 board 12-month narratives · one national landscape report across 57 boards</td></tr>
     <tr><td>Cadence</td><td>Automatic refresh on the 1st of each month; any board can be updated on demand</td></tr>
   </table>
 
   <div class="pagefoot">
     <div>Summaries are AI-generated research aids; the linked source documents are the authoritative record. · Prepared with AI assistance.</div>
-    <div class="pagenum">2 / 2</div>
+    <div class="pagenum">2 / 3</div>
+  </div>
+</div>
+
+<!-- ================= PAGE 3: SAMPLE BOARD ANALYSIS ================= -->
+<div class="page">
+  <div class="p2head">
+    <div class="wordmark"><span class="dot">●</span>board<span class="pulse">pulse</span></div>
+    <div class="kicker">Sample analysis · one board, assembled from its minutes</div>
+  </div>
+
+  <h1 style="font-size:16pt; margin:0 0 4px;">District of Columbia Board of Medicine</h1>
+  <div class="sample-meta">
+    <span><b>29</b> meetings tracked</span>
+    <span>Since <b>January 2023</b></span>
+    <span><b>16</b> bills followed</span>
+    <span><b>10</b> rule actions</span>
+  </div>
+  <p class="sample-intro">This is the picture boardpulse builds for a single board — pulled automatically from its own meeting minutes, then organized so a reader can see the board's agenda at a glance. Everything below traces back to a source document.</p>
+
+  <div class="sgrid">
+
+    <div class="sblock">
+      <h3>What they've focused on</h3>
+      <div class="sbar"><div class="sbar-top"><b>Workforce</b><span>4 meetings</span></div><div class="sbar-track"><div class="sbar-fill" style="width:100%"></div></div></div>
+      <div class="sbar"><div class="sbar-top"><b>Licensing</b><span>4 meetings</span></div><div class="sbar-track"><div class="sbar-fill" style="width:100%"></div></div></div>
+      <div class="sbar"><div class="sbar-top"><b>Legislation</b><span>3 meetings</span></div><div class="sbar-track"><div class="sbar-fill" style="width:75%"></div></div></div>
+      <div class="sbar"><div class="sbar-top"><b>Rulemaking</b><span>2 meetings</span></div><div class="sbar-track"><div class="sbar-fill" style="width:50%"></div></div></div>
+      <div class="sbar"><div class="sbar-top"><b>Public health</b><span>2 meetings</span></div><div class="sbar-track"><div class="sbar-fill" style="width:50%"></div></div></div>
+    </div>
+
+    <div class="sblock">
+      <h3>On the horizon <span style="color:var(--muted);font-weight:400">— first mentions</span></h3>
+      <div class="frow"><span class="stage watching">New</span><div><b>Artificial intelligence in healthcare regulation.</b> The Board Chair noted an upcoming FSMB symposium on AI in the practice of medicine.</div></div>
+      <div class="frow"><span class="stage watching">New</span><div><b>Physician workforce, wellness &amp; burnout.</b> The Primary Care Office previewed a workforce initiative addressing burnout.</div></div>
+      <div style="margin-top:8px;font-size:8pt;color:var(--muted);line-height:1.4">Emerging-topic detection flags the first time a board raises something new — an early signal of where the conversation is heading.</div>
+    </div>
+
+    <div class="sblock">
+      <h3>Rules in motion</h3>
+      <div class="frow"><span class="stage comment">Comment</span><div><b>Self-administered hormonal contraceptive prescription</b> (17 DCMR 6517)</div></div>
+      <div class="frow"><span class="stage effective">Effective</span><div><b>Pharmacist prescribing protocol</b> — joint Board of Medicine / Board of Pharmacy</div></div>
+      <div class="frow"><span class="stage effective">Effective</span><div><b>Pre-licensure practice</b> by postgraduate physicians (17 DCMR 4611)</div></div>
+      <div class="frow"><span class="stage tabled">Tabled</span><div><b>Physician-assistant licensure reciprocity</b> with Virginia and Maryland</div></div>
+    </div>
+
+    <div class="sblock">
+      <h3>Bills they're watching</h3>
+      <div class="frow"><div><b>Health Occupations Revision Act rewrite</b> (B25-0545) — a broad revision of the DC health-professions code</div></div>
+      <div class="frow"><div><b>Licensing-board residency requirement</b> (B25-0312) — raised across four meetings</div></div>
+      <div class="frow"><div><b>Reproductive health care protections</b> for providers (B24-0830)</div></div>
+      <div class="frow"><div><b>Prior authorization reform</b> (B25-0124) &nbsp;·&nbsp; <b>Medical cannabis self-certification</b> (B24-0113)</div></div>
+    </div>
+
+    <div class="takeaway">
+      <b>What the record shows.</b> Across 2023–2025 the DC Board of Medicine managed steady leadership turnover while its substantive agenda centered on workforce and modernizing who may practice and how — expanded pharmacist and postgraduate practice authority, cross-border PA licensure, and a full rewrite of the Health Occupations Revision Act. Reproductive-health rulemaking and artificial-intelligence questions have entered the conversation. <span style="color:var(--muted)">Every item above links to the meeting where it appears; this page is descriptive — it reports what the minutes record, not a judgment of the board.</span>
+    </div>
+
+  </div>
+
+  <div class="pagefoot">
+    <div><b>Frank B. Meyers, JD</b> · Director, Regulatory Innovation &amp; Member Services · <a href="mailto:fmeyers@fsmb.org" style="color:inherit;text-decoration:none">fmeyers@fsmb.org</a></div>
+    <div class="pagenum">3 / 3</div>
   </div>
 </div>
 
