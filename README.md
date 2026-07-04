@@ -10,7 +10,7 @@ boardpulse collects, indexes, and analyzes meeting minutes from state medical bo
 
 - **Collects** meeting minutes, agendas, and documents from 63 state medical boards (51 states + DC, MD and DO boards)
 - **Downloads** the actual PDF documents — not just metadata
-- **Summarizes** meetings using local LLMs (Ollama) with topic tagging
+- **Summarizes** meetings and extracts structured facts using Claude Code subagents behind deterministic quality gates, with topic tagging
 - **Generates** a national landscape report with citations linking to source documents
 - **Renders** exhibit pages from cited PDFs with highlighted evidence passages
 
@@ -41,9 +41,9 @@ The web dashboard provides a drill-down intelligence interface:
 | Metric | Count |
 |--------|-------|
 | Boards monitored | 63 |
-| Meetings tracked | 1,500+ |
-| Documents on file | 1,000+ |
-| AI summaries | 400+ |
+| Boards with documents | 61 |
+| Meetings tracked | ~1,933 (back to 2021) |
+| Documents on file | ~2,677 |
 | Topics tracked | 15 |
 | States covered | 46 |
 
@@ -70,11 +70,28 @@ python cli.py serve
 # Run collection for a specific board
 python cli.py collect --board AL_MD
 
-# Generate AI summaries (requires Ollama with gemma3:4b)
+# Generate AI summaries — prepares a prompt bundle, then a Claude Code subagent
+# writes the summary and --ingest gates it into the DB (see SUMMARIZE.md)
 python cli.py summarize --board AL_MD
+python cli.py summarize --ingest       # gate + store summaries (exits 1 on any reject)
+python cli.py summarize --archive      # back-history prompts for the 36-month view
+
+# Extract structured facts (policy actions, legislation, discipline, emerging topics)
+python cli.py facts --board AL_MD      # prep the fact-extraction prompt(s)
+python cli.py facts --ingest           # gate + store facts JSON (exits 1 on any reject)
+python cli.py facts --status           # per-board facts coverage
+
+# Monthly delta brief ("what changed") + the /briefs page
+python cli.py brief                     # compute the brief + writer prompt
+python cli.py brief --ingest            # splice the two prose slots + build email HTML
+python cli.py brief --pdf               # render the brief to a Letter PDF
 
 # Generate national landscape report
 python cli.py summarize --national
+
+# Gold-standard model eval (proves a model still produces gate-valid summaries)
+python cli.py eval prepare
+python cli.py eval score <run> --model-label <model>
 
 # Diagnostics
 python cli.py coverage            # totals + per-board coverage
@@ -99,18 +116,37 @@ boardpulse/
 │   │   ├── collector.py  # Main collection pipeline
 │   │   ├── boards.py     # Board seed data (63 boards)
 │   │   └── discoverer.py # Minutes URL discovery
-│   ├── extractor/        # AI processing
-│   │   ├── summarizer.py # Ollama-powered summarization
+│   ├── extractor/        # AI processing (prompt prep + gated ingest)
+│   │   ├── summarizer.py # Per-board summary prompt bundles + gated ingest
+│   │   ├── facts.py      # Structured-fact prompt chunks + gated ingest
 │   │   ├── exhibits.py   # PDF page rendering with highlights
 │   │   └── prompts.py    # Summary generation prompts
-│   ├── models.py         # SQLAlchemy models (Board, Meeting, MeetingDocument)
+│   ├── quality/          # The deterministic quality layer
+│   │   ├── gates.py      # Ingest gates (structure, citations, verbatim quotes)
+│   │   ├── taxonomy.py   # Controlled vocabularies (single source of truth)
+│   │   └── evalharness.py# Gold-standard model eval (prepare / score / judge)
+│   ├── reports/
+│   │   └── brief.py      # Monthly delta brief (build / ingest prose / PDF)
+│   ├── web/
+│   │   └── trends.py     # /trends charts + watchlist queries
+│   ├── models.py         # SQLAlchemy models (Board, Meeting, MeetingDocument,
+│   │                     #   PolicyAction, LegislationMention, DisciplinaryAction,
+│   │                     #   EmergingTopic, WatchlistTerm)
 │   ├── database.py       # Async SQLite (aiosqlite + WAL mode)
 │   └── config.py         # Paths and settings
 ├── data/
 │   ├── documents/        # Downloaded PDFs organized by board code
 │   ├── screenshots/      # Board website screenshots
-│   ├── reports/          # Generated landscape reports
+│   ├── reports/          # Per-board + national prompts and summaries
+│   │   ├── facts/        # Fact-extraction prompts + JSON output
+│   │   ├── archive/      # Back-history (out-of-window) summary prompts
+│   │   └── briefs/       # Monthly delta briefs (md / json / html / pdf)
+│   ├── examples/         # Few-shot worked examples injected into prompts
+│   │   └── facts/        # Hand-verified fact-extraction examples
+│   ├── gold/             # Frozen gold summary set + eval scorecards
 │   └── exhibits/         # Rendered exhibit page images
+├── SUMMARIZE.md          # Summary + facts + brief dispatch guide (model presets)
+├── FACTS.md              # Structured-fact extraction dispatch guide
 ├── cli.py                # CLI entry point
 ├── recollect_docs.py     # Aggressive document recollector
 └── boardpulse.db         # SQLite database
@@ -122,7 +158,7 @@ boardpulse/
 - **Frontend**: Jinja2 + HTMX + Alpine.js + Tailwind CSS
 - **Icons**: Lucide
 - **Scraping**: Playwright (headless Chromium)
-- **AI**: Ollama (gemma3:4b for summaries)
+- **AI**: Claude Code subagents produce summaries and structured facts behind deterministic quality gates (model-preset based — see SUMMARIZE.md)
 - **PDF Processing**: PyMuPDF (exhibit rendering)
 - **Database**: SQLite (WAL mode)
 
