@@ -444,6 +444,40 @@ async def board_activity_sparkline(board_id: int, quarters: int = 8,
     return [by_q.get(q, 0) for q in qs]
 
 
+async def board_topic_breakdown(board_id: int, months: int = 24,
+                                today: date | None = None) -> list[dict]:
+    """What this board discussed — meeting counts per topic over the trailing
+    ``months`` months, ranked most-discussed first. Returns
+    [{topic, count, pct}] where pct is relative to the top topic (for bar
+    widths). Reads meetings.topics via json_each, so it reflects summarized
+    meetings only (fills in as summaries land)."""
+    today = today or date.today()
+    # trailing window start, month arithmetic without dateutil
+    y, m = today.year, today.month - months
+    while m <= 0:
+        m += 12
+        y -= 1
+    start = f"{y:04d}-{m:02d}-01"
+
+    async with db.async_session() as session:
+        rows = (await session.execute(text("""
+            SELECT je.value AS topic, COUNT(DISTINCT m.id) AS n
+            FROM meetings m, json_each(m.topics) je
+            WHERE m.board_id = :bid
+              AND m.topics IS NOT NULL
+              AND m.meeting_date >= :start
+              AND m.meeting_date <= date('now')
+            GROUP BY je.value
+            ORDER BY n DESC
+        """), {"bid": board_id, "start": start})).all()
+
+    if not rows:
+        return []
+    top = rows[0][1]
+    return [{"topic": t, "count": n, "pct": round(100 * n / top)}
+            for t, n in rows]
+
+
 # ---------------------------------------------------------------------------
 # Watchlist — standing full-text queries with new-hit counts.
 # ---------------------------------------------------------------------------

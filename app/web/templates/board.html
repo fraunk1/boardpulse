@@ -54,17 +54,6 @@
                     </div>
                 </div>
 
-                <!-- 24-month activity sparkline -->
-                {% if activity_spark and (activity_spark | sum) > 0 %}
-                <div class="flex items-center gap-3 p-3 bg-white rounded-lg border border-bp-cloud">
-                    <i data-lucide="activity" class="w-5 h-5 text-bp-teal"></i>
-                    <div class="min-w-0">
-                        <div class="mt-0.5">{{ sparkline(activity_spark, width=110, height=26, color="#139AD0") }}</div>
-                        <div class="text-[10px] text-bp-mist uppercase tracking-wider">Activity &bull; last 24 mo</div>
-                    </div>
-                </div>
-                {% endif %}
-
                 <!-- Contact -->
                 {% if board.homepage %}
                 <a href="{{ board.homepage }}" target="_blank" rel="noopener"
@@ -84,14 +73,33 @@
                 {% endif %}
             </div>
 
-            <!-- Topics -->
-            {% if topic_counts %}
+            <!-- What this board is working on — topic breakdown, last 24 months -->
+            {% if topic_breakdown %}
+            <div class="mt-6 bg-white rounded-xl border border-bp-cloud p-5">
+                <div class="flex items-center gap-1.5 mb-4">
+                    <i data-lucide="bar-chart-3" class="w-4 h-4 text-bp-teal"></i>
+                    <h2 class="text-sm font-semibold text-bp-navy">What this board is working on</h2>
+                    <span class="text-[10px] text-bp-mist uppercase tracking-wider">topics discussed · last 24 months</span>
+                </div>
+                <div class="space-y-2.5">
+                    {% for t in topic_breakdown %}
+                    <a href="/topic/{{ t.topic }}" class="block group">
+                        <div class="flex items-center justify-between text-xs mb-1">
+                            <span class="text-bp-steel group-hover:text-bp-teal transition-colors font-medium">{{ t.topic | replace("-", " ") }}</span>
+                            <span class="text-bp-mist font-mono">{{ t.count }} meeting{{ 's' if t.count != 1 else '' }}</span>
+                        </div>
+                        <div class="h-2 rounded-full bg-bp-frost overflow-hidden">
+                            <div class="h-full rounded-full bg-bp-teal group-hover:bg-bp-teal-d transition-colors" style="width: {{ t.pct }}%"></div>
+                        </div>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+            {% elif topic_counts %}
             <div class="mt-4 flex flex-wrap gap-1.5">
                 {% for tag, count in topic_counts %}
-                <a href="/topic/{{ tag }}" class="tag-pill">
-                    {{ tag | replace("-", " ") }}
-                    <span class="text-[10px] text-bp-mist font-mono">{{ count }}</span>
-                </a>
+                <a href="/topic/{{ tag }}" class="tag-pill">{{ tag | replace("-", " ") }}
+                    <span class="text-[10px] text-bp-mist font-mono">{{ count }}</span></a>
                 {% endfor %}
             </div>
             {% endif %}

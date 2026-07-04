@@ -802,15 +802,16 @@ async def board_view(request: Request, code: str):
 
     state_name = STATE_NAMES.get(board.state, board.state)
 
-    # 24-month (8-quarter) meeting-count sparkline for the info grid.
-    activity_spark = await trends.board_activity_sparkline(board.id, quarters=8)
+    # What this board discussed — topic breakdown over the trailing 24 months
+    # (replaces the meeting-count sparkline as the quick "focus" metric).
+    topic_breakdown = await trends.board_topic_breakdown(board.id, months=24)
 
     return templates.TemplateResponse(request, "board.html", context={
         "board": board,
         "meeting_data": meeting_data,
         "topic_counts": topics_sorted,
         "state_name": state_name,
-        "activity_spark": activity_spark,
+        "topic_breakdown": topic_breakdown,
         "breadcrumbs": [
             {"label": "National", "url": "/"},
             {"label": state_name, "url": f"/state/{board.state}"},
