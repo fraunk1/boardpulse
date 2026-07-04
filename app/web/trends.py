@@ -145,7 +145,7 @@ async def topics_over_time(top_n: int = 6, today: date | None = None) -> dict:
     "data": [...]}]} ready to hand to ApexCharts. "Top" = most total mentions
     across the window.
     """
-    quarters = last_n_quarters(8, today)
+    quarters = last_n_quarters(12, today)
     q_set = set(quarters)
     q_expr = _quarter_expr("m.meeting_date")
 
@@ -185,7 +185,7 @@ async def topic_quarterly(slug: str, today: date | None = None) -> dict:
 
     Returns {"quarters": [...], "meetings": [...], "boards": [...]}.
     """
-    quarters = last_n_quarters(8, today)
+    quarters = last_n_quarters(12, today)
     q_set = set(quarters)
     q_expr = _quarter_expr("m.meeting_date")
 
@@ -227,13 +227,13 @@ async def rulemaking_pipeline(today: date | None = None) -> dict:
     empty = {
         "has_data": False,
         "pipeline": [],
-        "quarters": last_n_quarters(8, today),
+        "quarters": last_n_quarters(12, today),
         "adopted_series": [{"name": "Rules adopted", "data": []}],
     }
     if not await _table_has_rows("policy_actions"):
         return empty
 
-    quarters = last_n_quarters(8, today)
+    quarters = last_n_quarters(12, today)
     q_set = set(quarters)
 
     async with db.async_session() as session:
@@ -325,7 +325,7 @@ async def discipline_trends(today: date | None = None) -> dict:
 
     Returns has_data=False + empty payload when disciplinary_actions is empty.
     """
-    quarters = last_n_quarters(8, today)
+    quarters = last_n_quarters(12, today)
     empty = {
         "has_data": False,
         "quarters": quarters,
