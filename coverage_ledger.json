@@ -9,6 +9,16 @@
     "status": "none_published",
     "note": "KBML publishes no meeting minutes or agendas anywhere (re-verified 2026-07-02: no minutes category in its document search, none in sitemap). It DOES publish monthly Board Action Reports, quarterly newsletters, and an annual report at kbml.ky.gov. Actual minutes require an open-records request."
   },
+  "WY_MD": {
+    "date": "2026-07-03",
+    "status": "manual",
+    "note": "Archive gap only (current coverage is fine): the board's site publishes only the most recent meeting documents and no public archive of past minutes exists anywhere (verified 2026-07-03 incl. Wayback). History accumulates forward from mid-2026."
+  },
+  "VT_DO": {
+    "date": "2026-07-03",
+    "status": "manual",
+    "note": "Archive gap only (current coverage is fine): OPR overwrites one minutes PDF per meeting at a fixed URL; no Wayback captures exist and the state Preservica archive only exposes viewer pages, not files (verified 2026-07-03). History accumulates forward from mid-2026."
+  },
   "WV_DO": {
     "date": "2026-07-02",
     "status": "none_published",

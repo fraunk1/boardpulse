@@ -190,7 +190,10 @@ async def test_ingest_per_meeting(temp_db, tmp_path, monkeypatch):
     content = WELL_FORMED.replace("2026-05-01", d_in_file.isoformat())
     (tmp_path / "XX_MD_summary.md").write_text(content, encoding="utf-8")
 
-    ok = await ingest_board_summary("XX_MD")
+    # force=True: this test exercises the DB-write semantics (match/clear),
+    # not the ingest gate — the minimal fixture is far below the gate's
+    # content bands. Gate behavior has its own tests in test_gates.py.
+    ok = await ingest_board_summary("XX_MD", force=True)
     assert ok
 
     async with temp_db.async_session() as session:
@@ -226,7 +229,10 @@ async def test_ingest_legacy_sets_rollup_and_clears_meetings(
         "---\ntopics: [\"licensing\"]\n---\n\nLegacy blob only.",
         encoding="utf-8")
 
-    assert await ingest_board_summary("XX_MD")
+    # Legacy files are rejected by the ingest gate; force=True is now the
+    # only path that lets one through (gate rejection covered in test_gates).
+    assert not await ingest_board_summary("XX_MD")
+    assert await ingest_board_summary("XX_MD", force=True)
     async with temp_db.async_session() as session:
         board = (await session.execute(
             select(Board).where(Board.code == "XX_MD"))).scalar_one()

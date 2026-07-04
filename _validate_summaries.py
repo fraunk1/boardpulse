@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Validate *_summary.md files against the two-layer contract.
+"""Validate *_summary.md files with the ingest gate (app.quality.gates).
 
-For each file (or the codes given as args): parse with the production
-parser, then compare its meeting-block dates against the board's actual
-window meetings that have extracted text.
+Thin wrapper: for each file (or the codes given as args) it queries the
+same DB inputs ingest_board_summary() uses, then runs check_summary() and
+prints a per-board table. Exits 1 if any file fails the gate.
 
     python _validate_summaries.py            # all files
     python _validate_summaries.py HI_MD VA_MD
@@ -18,13 +18,53 @@ sys.path.insert(0, str(ROOT))
 DB = ROOT / "boardpulse.db"
 REPORTS = ROOT / "data" / "reports"
 
-from app.extractor.summarizer import parse_board_summary_file  # noqa: E402
+from app.quality.gates import check_summary, normalize_summary  # noqa: E402
+
+
+def gate_inputs(con: sqlite3.Connection, code: str) -> dict | None:
+    """Build the check_summary() keyword inputs for one board.
+
+    Mirrors ingest_board_summary(): text dates + per-date source text are
+    window-scoped (last 365 days); db_all_dates is every meeting the board
+    has, any age.
+    """
+    row = con.execute(
+        "SELECT state, minutes_url, homepage FROM boards WHERE code = ?",
+        (code,)).fetchone()
+    if row is None:
+        return None
+    state, minutes_url, homepage = row
+
+    cutoff = (date.today() - timedelta(days=365)).isoformat()
+    texts: dict[str, list[str]] = {}
+    for d, t in con.execute("""
+        SELECT m.meeting_date, d.content_text FROM meetings m
+        JOIN boards b ON b.id = m.board_id
+        JOIN meeting_documents d ON d.meeting_id = m.id
+        WHERE b.code = ? AND m.meeting_date >= ?
+          AND d.content_text IS NOT NULL AND d.content_text != ''
+    """, (code, cutoff)):
+        texts.setdefault(d[:10], []).append(t)
+
+    all_dates = {r[0][:10] for r in con.execute("""
+        SELECT DISTINCT m.meeting_date FROM meetings m
+        JOIN boards b ON b.id = m.board_id
+        WHERE b.code = ?
+    """, (code,))}
+
+    return dict(
+        state=state,
+        db_text_dates=set(texts),
+        db_all_dates=all_dates,
+        source_texts_by_date={k: "\n\n".join(v) for k, v in texts.items()},
+        minutes_url=minutes_url,
+        homepage=homepage,
+    )
 
 
 def main():
     codes = sys.argv[1:]
     con = sqlite3.connect(DB)
-    cutoff = (date.today() - timedelta(days=365)).isoformat()
 
     files = sorted(REPORTS.glob("*_summary.md"))
     if codes:
@@ -34,38 +74,24 @@ def main():
     bad = 0
     for f in files:
         code = f.stem.replace("_summary", "")
-        _topics, rollup, sections = parse_board_summary_file(
-            f.read_text(encoding="utf-8"))
-
-        text_dates = {r[0] for r in con.execute("""
-            SELECT DISTINCT m.meeting_date FROM meetings m
-            JOIN boards b ON b.id = m.board_id
-            JOIN meeting_documents d ON d.meeting_id = m.id
-            WHERE b.code = ? AND m.meeting_date >= ?
-              AND d.content_text IS NOT NULL AND d.content_text != ''
-        """, (code, cutoff)).fetchall()}
-
-        ghosts = sorted(set(sections) - text_dates)
-        missing = sorted(text_dates - set(sections))
-        legacy = not sections
-        rollup_words = len(rollup.split())
-
-        status = "OK"
-        if legacy:
-            status = "LEGACY"
+        inputs = gate_inputs(con, code)
+        if inputs is None:
+            print(f"  {code:8} {'NO-BOARD':12} board not found in DB")
             bad += 1
-        elif ghosts:
-            status = "GHOSTS"
-            bad += 1
-        elif rollup_words < 50:
-            status = "THIN-ROLLUP"
-            bad += 1
+            continue
 
-        print(f"  {code:8} {status:12} blocks={len(sections):<3} "
-              f"text_meetings={len(text_dates):<3} ghosts={len(ghosts)} "
-              f"missing={len(missing)} rollup={rollup_words}w")
-        if ghosts:
-            print(f"           ghost dates: {ghosts[:5]}")
+        text = normalize_summary(f.read_text(encoding="utf-8"))
+        result = check_summary(code, text, **inputs)
+
+        status = "OK" if result.ok else "FAIL"
+        err_codes = ",".join(sorted({e.code for e in result.errors}))
+        print(f"  {code:8} {status:12} errors={len(result.errors):<3} "
+              f"warnings={len(result.warnings):<3}"
+              f"{'  [' + err_codes + ']' if err_codes else ''}")
+        for e in result.errors:
+            print(f"           {e.code}: {e.message}")
+        if not result.ok:
+            bad += 1
 
     con.close()
     print(f"\n{len(files)} files checked, {bad} problematic")

@@ -42,6 +42,22 @@ def main():
         "--national", action="store_true",
         help="Prepare national landscape synthesis prompt (requires per-board summaries)",
     )
+    summ.add_argument(
+        "--force", action="store_true",
+        help="Bypass the ingest quality gate (manual overrides only)",
+    )
+
+    # eval — gold-standard model eval harness
+    ev = sub.add_parser("eval", help="Gold-standard eval harness (prepare|score|judge)")
+    evsub = ev.add_subparsers(dest="eval_command", required=True)
+    evp = evsub.add_parser("prepare", help="Freeze gold set + manifest from data/reports")
+    evp.add_argument("--boards", nargs="*", default=None,
+                     help="Board codes (default: 8 archetypes)")
+    evs = evsub.add_parser("score", help="Score data/eval/<run_id>/ against the gold set")
+    evs.add_argument("run_id")
+    evs.add_argument("--model-label", default=None)
+    evj = evsub.add_parser("judge", help="Emit judge_prompt.md for a qualitative pass")
+    evj.add_argument("run_id")
 
     # refresh — the run-anytime incremental scrape (see refresh.py)
     rf = sub.add_parser(
@@ -115,6 +131,15 @@ def main():
     if args.command == "ledger":
         from app.reports.ledger import main as ledger_main
         ledger_main(args.ledger_args or None)
+        return
+    if args.command == "eval":
+        from app.quality import evalharness
+        if args.eval_command == "prepare":
+            evalharness.prepare(args.boards or None)
+        elif args.eval_command == "score":
+            evalharness.score(args.run_id, args.model_label)
+        elif args.eval_command == "judge":
+            evalharness.judge(args.run_id)
         return
 
     # Refresh manages its own event loop + exit code
@@ -230,12 +255,15 @@ async def handle_summarize(args):
     from app.config import REPORTS_DIR
 
     if args.ingest:
-        # Ingest mode: read completed summary files back into DB
+        # Ingest mode: read completed summary files back into DB. The gate
+        # can reject files; exit 1 tells the operator a retry pass is needed
+        # (rejected boards leave data/reports/{code}_summary.errors.txt).
         if args.board:
-            await ingest_board_summary(args.board)
-        else:
-            await ingest_all_summaries()
-        return
+            ok = await ingest_board_summary(
+                args.board, force=getattr(args, "force", False))
+            sys.exit(0 if ok else 1)
+        ingested, rejected = await ingest_all_summaries()
+        sys.exit(1 if rejected else 0)
 
     if args.national:
         # National synthesis mode: build synthesis prompt from per-board summaries

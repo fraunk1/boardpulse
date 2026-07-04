@@ -6,7 +6,9 @@ Claude Code subagents consume, and ingests their output back into the database.
 Flow:
     1. prepare_board_bundle() — query DB, build prompt, write to data/reports/{code}_prompt.md
     2. (external) Claude Code subagent reads prompt, writes data/reports/{code}_summary.md
-    3. ingest_board_summary() — read summary file, store in meetings.summary + DB
+    3. ingest_board_summary() — normalize + gate the summary file
+       (app.quality.gates.check_summary), then store it in meetings.summary
+       + DB; rejected files get data/reports/{code}_summary.errors.txt
     4. prepare_national_bundle() — collect all per-board summaries, write synthesis prompt
     5. (external) Claude Code subagent writes data/reports/YYYY-MM-DD-board-landscape.md
 """
@@ -21,6 +23,7 @@ import app.database as db
 from app.config import REPORTS_DIR
 from app.models import Board, Meeting, MeetingDocument
 from app.extractor.prompts import per_board_prompt, national_synthesis_prompt
+from app.quality.gates import check_summary, normalize_summary
 
 
 async def prepare_board_bundle(board_code: str) -> Path | None:
@@ -227,33 +230,95 @@ def parse_board_summary_file(
     return board_topics, rollup, meetings
 
 
-async def ingest_board_summary(board_code: str) -> bool:
-    """Read a completed summary file and store it in the database.
+async def ingest_board_summary(board_code: str, *, force: bool = False) -> bool:
+    """Read a completed summary file, gate it, and store it in the database.
+
+    The file is normalized (BOM/fence/whitespace repairs) and then run
+    through app.quality.gates.check_summary against the board's actual
+    meeting dates and source text. On rejection the errors are written to
+    data/reports/{code}_summary.errors.txt (one "CODE: message" line each)
+    for the retry agent, and NOTHING is written to the database.
 
     New contract: the file's rollup goes on Board.summary; each
     "=== MEETING: date ===" section goes on ITS OWN meeting's summary and
     topics. Window meetings absent from the file get summary/topics
     CLEARED (removes stale board-level blobs; textless meetings stay
-    honestly empty). Legacy files (no sections) set only the board rollup.
+    honestly empty). Legacy files (no sections) set only the board rollup
+    — but only reach the database with force=True, which skips the gate.
 
     Returns True if successful.
     """
     await db.init_db()
 
     summary_path = REPORTS_DIR / f"{board_code}_summary.md"
+    errors_path = REPORTS_DIR / f"{board_code}_summary.errors.txt"
     if not summary_path.exists():
         print(f"No summary file found at {summary_path}")
         return False
 
-    summary_text = summary_path.read_text(encoding="utf-8").strip()
+    summary_text = normalize_summary(summary_path.read_text(encoding="utf-8"))
     if not summary_text:
         print(f"Summary file is empty: {summary_path}")
         return False
 
+    cutoff = date.today() - timedelta(days=365)
+
+    # --- Ingest gate: gather the DB-side inputs, then run check_summary ---
+    async with db.async_session() as session:
+        gate_board = (await session.execute(
+            select(Board).where(Board.code == board_code)
+        )).scalar_one_or_none()
+        if not gate_board:
+            print(f"Board {board_code} not found.")
+            return False
+
+        window_meetings = (await session.execute(
+            select(Meeting)
+            .where(Meeting.board_id == gate_board.id)
+            .where(Meeting.meeting_date >= cutoff)
+            .options(selectinload(Meeting.documents))
+        )).scalars().all()
+        all_dates = (await session.execute(
+            select(Meeting.meeting_date)
+            .where(Meeting.board_id == gate_board.id)
+        )).scalars().all()
+
+    source_texts: dict[str, list[str]] = {}
+    for m in window_meetings:
+        texts = [d.content_text for d in m.documents if d.content_text]
+        if texts:
+            source_texts.setdefault(m.meeting_date.isoformat(), []).extend(texts)
+
+    if force:
+        print(f"  WARNING: force=True — SKIPPING the ingest gate for "
+              f"{board_code}. Unvalidated summary content is being written "
+              "to the database.")
+    else:
+        result = check_summary(
+            board_code,
+            summary_text,
+            state=gate_board.state,
+            db_text_dates=set(source_texts),
+            db_all_dates={d.isoformat() for d in all_dates},
+            source_texts_by_date={k: "\n\n".join(v)
+                                  for k, v in source_texts.items()},
+            minutes_url=gate_board.minutes_url,
+            homepage=gate_board.homepage,
+        )
+        if not result.ok:
+            errors_path.write_text(
+                "\n".join(f"{e.code}: {e.message}" for e in result.errors)
+                + "\n", encoding="utf-8")
+            print(f"  REJECTED {board_code}: {len(result.errors)} errors "
+                  f"-> {errors_path}")
+            return False
+
+    # Gate passed (or bypassed): any prior rejection record is stale.
+    errors_path.unlink(missing_ok=True)
+
     board_topics, rollup, sections = parse_board_summary_file(summary_text)
     legacy = not sections
 
-    cutoff = date.today() - timedelta(days=365)
     now = datetime.now(timezone.utc)
 
     async with db.async_session() as session:
@@ -303,28 +368,34 @@ async def ingest_board_summary(board_code: str) -> bool:
     return True
 
 
-async def ingest_all_summaries() -> int:
+async def ingest_all_summaries() -> tuple[int, list[str]]:
     """Scan data/reports/ for *_summary.md files and ingest them all.
 
-    Returns count of successfully ingested summaries.
+    Returns (ingested_count, rejected_board_codes). A board lands in the
+    rejected list when its file fails the ingest gate (see its
+    *_summary.errors.txt) or can't be ingested at all (missing board, etc.).
     """
     await db.init_db()
 
     summary_files = sorted(REPORTS_DIR.glob("*_summary.md"))
     if not summary_files:
         print("No summary files found in data/reports/")
-        return 0
+        return 0, []
 
     print(f"Found {len(summary_files)} summary files to ingest.\n")
-    success = 0
+    ingested = 0
+    rejected: list[str] = []
     for path in summary_files:
         # Extract board_code from filename: CA_MD_summary.md -> CA_MD
         board_code = path.stem.replace("_summary", "")
         if await ingest_board_summary(board_code):
-            success += 1
+            ingested += 1
+        else:
+            rejected.append(board_code)
 
-    print(f"\nIngested {success}/{len(summary_files)} summaries.")
-    return success
+    rejected_str = f" ({', '.join(rejected)})" if rejected else ""
+    print(f"\nINGEST: {ingested} ok, {len(rejected)} rejected{rejected_str}")
+    return ingested, rejected
 
 
 async def prepare_national_bundle() -> Path | None:

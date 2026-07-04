@@ -1,0 +1,1315 @@
+{
+  "boards": {
+    "AZ_MD": {
+      "all_prompt_dates": [
+        "2025-07-09",
+        "2025-07-28",
+        "2025-07-31",
+        "2025-08-06",
+        "2025-08-26",
+        "2025-08-27",
+        "2025-09-03",
+        "2025-09-17",
+        "2025-09-22",
+        "2025-10-06",
+        "2025-10-08",
+        "2025-10-20",
+        "2025-10-30",
+        "2025-11-05",
+        "2025-12-03",
+        "2026-01-07",
+        "2026-01-09",
+        "2026-02-04",
+        "2026-02-12",
+        "2026-02-17",
+        "2026-02-23",
+        "2026-02-25",
+        "2026-03-04",
+        "2026-04-01",
+        "2026-05-06",
+        "2026-07-01",
+        "2026-07-21"
+      ],
+      "code": "AZ_MD",
+      "gold_block_dates": [
+        "2025-07-09",
+        "2025-07-28",
+        "2025-07-31",
+        "2025-08-06",
+        "2025-08-26",
+        "2025-08-27",
+        "2025-09-03",
+        "2025-09-17",
+        "2025-09-22",
+        "2025-10-06",
+        "2025-10-08",
+        "2025-10-20",
+        "2025-10-30",
+        "2025-11-05",
+        "2025-12-03",
+        "2026-01-07",
+        "2026-01-09",
+        "2026-02-04",
+        "2026-02-12",
+        "2026-02-23",
+        "2026-02-25",
+        "2026-03-04",
+        "2026-04-01",
+        "2026-05-06",
+        "2026-07-01",
+        "2026-07-21"
+      ],
+      "gold_missing_text_dates": [],
+      "gold_names_by_date": {
+        "2025-07-09": [],
+        "2025-07-28": [],
+        "2025-07-31": [],
+        "2025-08-06": [],
+        "2025-08-26": [],
+        "2025-08-27": [],
+        "2025-09-03": [],
+        "2025-09-17": [],
+        "2025-09-22": [],
+        "2025-10-06": [],
+        "2025-10-08": [],
+        "2025-10-20": [],
+        "2025-10-30": [],
+        "2025-11-05": [],
+        "2025-12-03": [],
+        "2026-01-07": [],
+        "2026-01-09": [],
+        "2026-02-04": [],
+        "2026-02-12": [],
+        "2026-02-23": [],
+        "2026-02-25": [],
+        "2026-03-04": [],
+        "2026-04-01": [],
+        "2026-05-06": [],
+        "2026-07-01": [],
+        "2026-07-21": []
+      },
+      "gold_numbers_by_date": {
+        "2025-07-09": [
+          "1108",
+          "1395",
+          "2148"
+        ],
+        "2025-07-28": [
+          "2025"
+        ],
+        "2025-07-31": [
+          "150000",
+          "160",
+          "17000",
+          "8000"
+        ],
+        "2025-08-06": [],
+        "2025-08-26": [
+          "2025"
+        ],
+        "2025-08-27": [
+          "2024"
+        ],
+        "2025-09-03": [
+          "180"
+        ],
+        "2025-09-17": [
+          "2019",
+          "2024"
+        ],
+        "2025-09-22": [
+          "2025"
+        ],
+        "2025-10-06": [
+          "1395",
+          "2024",
+          "2026",
+          "2173"
+        ],
+        "2025-10-08": [],
+        "2025-10-20": [
+          "2023",
+          "2025"
+        ],
+        "2025-10-30": [
+          "2019",
+          "2025",
+          "2026"
+        ],
+        "2025-11-05": [
+          "2026"
+        ],
+        "2025-12-03": [
+          "1740",
+          "1800",
+          "2026",
+          "281",
+          "683",
+          "839750",
+          "855"
+        ],
+        "2026-01-07": [],
+        "2026-01-09": [
+          "2009",
+          "2019",
+          "2023",
+          "2024",
+          "2025"
+        ],
+        "2026-02-04": [
+          "1124",
+          "1740",
+          "2435",
+          "2660"
+        ],
+        "2026-02-12": [
+          "150000",
+          "2026",
+          "2027",
+          "2435"
+        ],
+        "2026-02-23": [
+          "180",
+          "2015",
+          "2025"
+        ],
+        "2026-02-25": [
+          "2025"
+        ],
+        "2026-03-04": [
+          "2248",
+          "2435",
+          "300"
+        ],
+        "2026-04-01": [
+          "1021",
+          "1124",
+          "2248",
+          "2660"
+        ],
+        "2026-05-06": [
+          "2026"
+        ],
+        "2026-07-01": [
+          "2027"
+        ],
+        "2026-07-21": [
+          "2026"
+        ]
+      },
+      "gold_topics_by_date": {
+        "2025-07-09": [
+          "disciplinary",
+          "legislation",
+          "licensing",
+          "workforce"
+        ],
+        "2025-07-28": [
+          "licensing"
+        ],
+        "2025-07-31": [
+          "rulemaking",
+          "scope-of-practice",
+          "workforce"
+        ],
+        "2025-08-06": [
+          "disciplinary",
+          "licensing",
+          "patient-safety",
+          "physician-wellness"
+        ],
+        "2025-08-26": [
+          "rulemaking",
+          "scope-of-practice",
+          "workforce"
+        ],
+        "2025-08-27": [],
+        "2025-09-03": [
+          "disciplinary",
+          "physician-wellness",
+          "workforce"
+        ],
+        "2025-09-17": [
+          "disciplinary",
+          "physician-wellness"
+        ],
+        "2025-09-22": [
+          "rulemaking",
+          "scope-of-practice"
+        ],
+        "2025-10-06": [
+          "disciplinary",
+          "legislation",
+          "scope-of-practice",
+          "workforce"
+        ],
+        "2025-10-08": [
+          "disciplinary"
+        ],
+        "2025-10-20": [
+          "disciplinary",
+          "patient-safety"
+        ],
+        "2025-10-30": [
+          "rulemaking",
+          "scope-of-practice",
+          "workforce"
+        ],
+        "2025-11-05": [
+          "IMLC",
+          "legislation",
+          "licensing"
+        ],
+        "2025-12-03": [
+          "AI",
+          "IMLC",
+          "disciplinary",
+          "legislation",
+          "public-health",
+          "workforce"
+        ],
+        "2026-01-07": [
+          "disciplinary",
+          "legislation"
+        ],
+        "2026-01-09": [
+          "controlled-substances",
+          "disciplinary",
+          "physician-wellness"
+        ],
+        "2026-02-04": [
+          "controlled-substances",
+          "disciplinary",
+          "legislation"
+        ],
+        "2026-02-12": [
+          "legislation",
+          "rulemaking",
+          "scope-of-practice",
+          "workforce"
+        ],
+        "2026-02-23": [],
+        "2026-02-25": [],
+        "2026-03-04": [
+          "disciplinary",
+          "legislation",
+          "rulemaking",
+          "scope-of-practice"
+        ],
+        "2026-04-01": [
+          "disciplinary",
+          "legislation",
+          "licensing",
+          "rulemaking"
+        ],
+        "2026-05-06": [
+          "licensing",
+          "patient-safety"
+        ],
+        "2026-07-01": [
+          "disciplinary",
+          "licensing",
+          "rulemaking"
+        ],
+        "2026-07-21": [
+          "rulemaking"
+        ]
+      },
+      "notes": [],
+      "prompt_file": "AZ_MD_prompt.md",
+      "rollup_word_count": 369,
+      "state": "AZ",
+      "summary_file": "AZ_MD_summary.md",
+      "text_meeting_dates": [
+        "2025-07-09",
+        "2025-07-28",
+        "2025-07-31",
+        "2025-08-06",
+        "2025-08-26",
+        "2025-08-27",
+        "2025-09-03",
+        "2025-09-17",
+        "2025-09-22",
+        "2025-10-06",
+        "2025-10-08",
+        "2025-10-20",
+        "2025-10-30",
+        "2025-11-05",
+        "2025-12-03",
+        "2026-01-07",
+        "2026-01-09",
+        "2026-02-04",
+        "2026-02-12",
+        "2026-02-23",
+        "2026-02-25",
+        "2026-03-04",
+        "2026-04-01",
+        "2026-05-06",
+        "2026-07-01",
+        "2026-07-21"
+      ],
+      "textless_dates": [
+        "2026-02-17"
+      ]
+    },
+    "CA_DO": {
+      "all_prompt_dates": [
+        "2025-08-14",
+        "2025-11-13",
+        "2026-01-22",
+        "2026-04-23"
+      ],
+      "code": "CA_DO",
+      "gold_block_dates": [
+        "2025-08-14",
+        "2025-11-13",
+        "2026-01-22",
+        "2026-04-23"
+      ],
+      "gold_missing_text_dates": [],
+      "gold_names_by_date": {
+        "2025-08-14": [
+          "James Michael Lally",
+          "Steven Duane Western"
+        ],
+        "2025-11-13": [
+          "Eman Abdallah"
+        ],
+        "2026-01-22": [],
+        "2026-04-23": [
+          "Jeff Douglas Lester"
+        ]
+      },
+      "gold_numbers_by_date": {
+        "2025-08-14": [
+          "1011",
+          "150000",
+          "2024",
+          "2025",
+          "2026",
+          "489",
+          "508",
+          "694000",
+          "876"
+        ],
+        "2025-11-13": [
+          "17012",
+          "1994",
+          "2023",
+          "2027",
+          "260",
+          "320",
+          "460",
+          "489",
+          "876"
+        ],
+        "2026-01-22": [
+          "17164",
+          "1996",
+          "2024",
+          "2025",
+          "2026",
+          "2028",
+          "432",
+          "460",
+          "489",
+          "630",
+          "733",
+          "742"
+        ],
+        "2026-04-23": [
+          "1002",
+          "1703",
+          "17407",
+          "2026",
+          "2398",
+          "2575",
+          "788",
+          "903",
+          "937"
+        ]
+      },
+      "gold_topics_by_date": {
+        "2025-08-14": [
+          "AI",
+          "disciplinary",
+          "legislation",
+          "licensing",
+          "patient-safety",
+          "rulemaking",
+          "telehealth",
+          "workforce"
+        ],
+        "2025-11-13": [
+          "AI",
+          "controlled-substances",
+          "disciplinary",
+          "legislation",
+          "licensing",
+          "patient-safety",
+          "rulemaking",
+          "workforce"
+        ],
+        "2026-01-22": [
+          "AI",
+          "controlled-substances",
+          "disciplinary",
+          "legislation",
+          "licensing",
+          "rulemaking",
+          "telehealth",
+          "workforce"
+        ],
+        "2026-04-23": [
+          "AI",
+          "disciplinary",
+          "legislation",
+          "licensing",
+          "rulemaking",
+          "scope-of-practice",
+          "telehealth",
+          "workforce"
+        ]
+      },
+      "notes": [],
+      "prompt_file": "CA_DO_prompt.md",
+      "rollup_word_count": 398,
+      "state": "CA",
+      "summary_file": "CA_DO_summary.md",
+      "text_meeting_dates": [
+        "2025-08-14",
+        "2025-11-13",
+        "2026-01-22",
+        "2026-04-23"
+      ],
+      "textless_dates": []
+    },
+    "HI_MD": {
+      "all_prompt_dates": [
+        "2025-08-01",
+        "2025-11-13",
+        "2025-12-11",
+        "2026-01-15",
+        "2026-02-12",
+        "2026-03-12"
+      ],
+      "code": "HI_MD",
+      "gold_block_dates": [
+        "2025-08-01",
+        "2025-11-13",
+        "2025-12-11",
+        "2026-01-15",
+        "2026-02-12"
+      ],
+      "gold_missing_text_dates": [],
+      "gold_names_by_date": {
+        "2025-08-01": [
+          "Aman Patel",
+          "Amir Qureshi",
+          "Brian Joseph Allen",
+          "Curtis Bekkum",
+          "Eesha Bhattacharyya",
+          "Franklin C.H. Lee",
+          "Henry Sakow",
+          "Jordon Ryan Post",
+          "Joseph Palumbo",
+          "Kerisimasi Reynolds",
+          "Kieran Melody",
+          "Paul Dillaway",
+          "Qasem Noori",
+          "Roy Matsuyama",
+          "Thomas Craig III",
+          "William Dang"
+        ],
+        "2025-11-13": [
+          "Alexander D. Lee",
+          "Bernard K. Chun",
+          "David Nathaniel Smith",
+          "Diana Gliga",
+          "Elizabeth Char",
+          "Frank Joseph Suppa",
+          "Jim Seraj",
+          "Ronald Kuroda",
+          "Wayne Tran"
+        ],
+        "2025-12-11": [
+          "Alan Brewer",
+          "Aman K. Patel",
+          "Dheeraj Makkar",
+          "Diana Gliga",
+          "Elias Elias",
+          "Frank Hiroshi Harris",
+          "Kamshad Raiszadeh",
+          "Kenneth Carl Russ",
+          "Paul E. Cox",
+          "Sinikka Liisa Green",
+          "Stephen A. Feig",
+          "Sue Xuan Poon"
+        ],
+        "2026-01-15": [
+          "Adlai Liburne Pappy",
+          "Alan Brewer",
+          "Aman K. Patel",
+          "Andrea Opalenik",
+          "Dheeraj Makkar",
+          "Diana Gliga",
+          "Elias Elias",
+          "Frank Hiroshi Harris",
+          "Jaclyn Tolentino",
+          "Jamey Joe Hawk",
+          "Kamshad Raiszadeh",
+          "Kenneth Carl Russ",
+          "Michael Robert Schwartz",
+          "Paul E. Cox",
+          "Robert Edward Bilbao",
+          "Samuel E. Fuller",
+          "Sue Xuan Poon"
+        ],
+        "2026-02-12": [
+          "Jaclyn Tolentino",
+          "Jim Seraj",
+          "Miles Wayne Howard",
+          "Nessa Seangmany",
+          "Robert Matthew Bernstein",
+          "Timothy R. Taylor",
+          "Wayne Tran"
+        ]
+      },
+      "gold_numbers_by_date": {
+        "2025-08-01": [
+          "2025"
+        ],
+        "2025-11-13": [
+          "2025"
+        ],
+        "2025-12-11": [
+          "49000"
+        ],
+        "2026-01-15": [
+          "2025",
+          "2026"
+        ],
+        "2026-02-12": [
+          "2026"
+        ]
+      },
+      "gold_topics_by_date": {
+        "2025-08-01": [
+          "disciplinary",
+          "licensing"
+        ],
+        "2025-11-13": [
+          "disciplinary",
+          "licensing"
+        ],
+        "2025-12-11": [
+          "IMLC",
+          "disciplinary",
+          "legislation",
+          "licensing"
+        ],
+        "2026-01-15": [
+          "IMLC",
+          "disciplinary",
+          "licensing"
+        ],
+        "2026-02-12": [
+          "CME",
+          "IMLC",
+          "legislation",
+          "licensing",
+          "telehealth"
+        ]
+      },
+      "notes": [],
+      "prompt_file": "HI_MD_prompt.md",
+      "rollup_word_count": 328,
+      "state": "HI",
+      "summary_file": "HI_MD_summary.md",
+      "text_meeting_dates": [
+        "2025-08-01",
+        "2025-11-13",
+        "2025-12-11",
+        "2026-01-15",
+        "2026-02-12"
+      ],
+      "textless_dates": [
+        "2026-03-12"
+      ]
+    },
+    "MI_DO": {
+      "all_prompt_dates": [
+        "2025-08-07",
+        "2025-10-02",
+        "2025-12-04",
+        "2026-02-05",
+        "2026-04-02",
+        "2026-06-04"
+      ],
+      "code": "MI_DO",
+      "gold_block_dates": [
+        "2025-08-07",
+        "2025-10-02",
+        "2025-12-04",
+        "2026-02-05",
+        "2026-04-02",
+        "2026-06-04"
+      ],
+      "gold_missing_text_dates": [],
+      "gold_names_by_date": {
+        "2025-08-07": [
+          "Billy Ralph Nordyke",
+          "Bruce D. Lawrence",
+          "George Edward Bonefeld",
+          "John O. Wycoff",
+          "Kameron Ravindra Budhram",
+          "Martin Facundo Quiroga",
+          "Michael A. Kia"
+        ],
+        "2025-10-02": [
+          "John O. Wycoff",
+          "Mary Chao",
+          "Ronald David Dean"
+        ],
+        "2025-12-04": [
+          "Bradley Wayne Bakotic",
+          "Ian Samuel Batson",
+          "Jon Michael Banas",
+          "Joseph N. Hagen",
+          "Joseph T. Naughton",
+          "Reginald Sharpe",
+          "Theresa Ann Kordish"
+        ],
+        "2026-02-05": [
+          "Annemarie Poleck",
+          "Charles Mok",
+          "Craig Ivan Schwartz",
+          "Gerard Joseph Mahoney",
+          "Jason Edward Brunt",
+          "John Patrick Swan",
+          "William John Powers"
+        ],
+        "2026-04-02": [
+          "Billy Ralph Nordyke",
+          "David P. Jankowski",
+          "Forrest Dean Robart",
+          "Joel Michael Adelsberg",
+          "Joel Steven Jones",
+          "Laurence Ernest Yung"
+        ],
+        "2026-06-04": []
+      },
+      "gold_numbers_by_date": {
+        "2025-08-07": [
+          "2026",
+          "5000"
+        ],
+        "2025-10-02": [
+          "1500",
+          "2025"
+        ],
+        "2025-12-04": [],
+        "2026-02-05": [
+          "4000"
+        ],
+        "2026-04-02": [
+          "2026"
+        ],
+        "2026-06-04": [
+          "1976",
+          "2026",
+          "267"
+        ]
+      },
+      "gold_topics_by_date": {
+        "2025-08-07": [
+          "controlled-substances",
+          "disciplinary",
+          "licensing"
+        ],
+        "2025-10-02": [
+          "disciplinary",
+          "licensing"
+        ],
+        "2025-12-04": [
+          "controlled-substances",
+          "disciplinary",
+          "licensing",
+          "telehealth"
+        ],
+        "2026-02-05": [
+          "controlled-substances",
+          "disciplinary",
+          "licensing"
+        ],
+        "2026-04-02": [
+          "controlled-substances",
+          "disciplinary",
+          "licensing"
+        ],
+        "2026-06-04": []
+      },
+      "notes": [],
+      "prompt_file": "MI_DO_prompt.md",
+      "rollup_word_count": 333,
+      "state": "MI",
+      "summary_file": "MI_DO_summary.md",
+      "text_meeting_dates": [
+        "2025-08-07",
+        "2025-10-02",
+        "2025-12-04",
+        "2026-02-05",
+        "2026-04-02",
+        "2026-06-04"
+      ],
+      "textless_dates": []
+    },
+    "NE_MD": {
+      "all_prompt_dates": [
+        "2026-01-09",
+        "2026-01-29",
+        "2026-02-09",
+        "2026-02-13",
+        "2026-03-13",
+        "2026-04-10",
+        "2026-05-08",
+        "2026-06-12"
+      ],
+      "code": "NE_MD",
+      "gold_block_dates": [
+        "2026-01-09",
+        "2026-02-09",
+        "2026-02-13",
+        "2026-03-13",
+        "2026-04-10",
+        "2026-05-08",
+        "2026-06-12"
+      ],
+      "gold_missing_text_dates": [],
+      "gold_names_by_date": {
+        "2026-01-09": [
+          "Mark Goodman",
+          "Wesley Zeger"
+        ],
+        "2026-02-09": [],
+        "2026-02-13": [
+          "Dariia Simchuk",
+          "Robert William Benson"
+        ],
+        "2026-03-13": [],
+        "2026-04-10": [
+          "Dariia Simchuk",
+          "Joshua T. Evans",
+          "Wazir Ali"
+        ],
+        "2026-05-08": [],
+        "2026-06-12": [
+          "Daniel Martin Wik"
+        ]
+      },
+      "gold_numbers_by_date": {
+        "2026-01-09": [
+          "1212",
+          "193",
+          "2025",
+          "2026",
+          "731"
+        ],
+        "2026-02-09": [
+          "1212",
+          "2026"
+        ],
+        "2026-02-13": [
+          "1212",
+          "1234",
+          "2026",
+          "933"
+        ],
+        "2026-03-13": [
+          "1212",
+          "2026",
+          "2477",
+          "400",
+          "407",
+          "933"
+        ],
+        "2026-04-10": [
+          "1212",
+          "2026",
+          "912",
+          "929",
+          "933",
+          "955",
+          "958"
+        ],
+        "2026-05-08": [
+          "2026",
+          "2027",
+          "527"
+        ],
+        "2026-06-12": [
+          "1212",
+          "2026",
+          "3508",
+          "3511",
+          "407",
+          "527"
+        ]
+      },
+      "gold_topics_by_date": {
+        "2026-01-09": [
+          "legislation",
+          "licensing"
+        ],
+        "2026-02-09": [
+          "legislation"
+        ],
+        "2026-02-13": [
+          "disciplinary",
+          "legislation",
+          "licensing"
+        ],
+        "2026-03-13": [
+          "disciplinary",
+          "legislation",
+          "rulemaking"
+        ],
+        "2026-04-10": [
+          "disciplinary",
+          "legislation",
+          "licensing",
+          "scope-of-practice"
+        ],
+        "2026-05-08": [
+          "AI",
+          "CME",
+          "legislation",
+          "scope-of-practice"
+        ],
+        "2026-06-12": [
+          "controlled-substances",
+          "disciplinary",
+          "legislation",
+          "rulemaking",
+          "scope-of-practice"
+        ]
+      },
+      "notes": [],
+      "prompt_file": "NE_MD_prompt.md",
+      "rollup_word_count": 355,
+      "state": "NE",
+      "summary_file": "NE_MD_summary.md",
+      "text_meeting_dates": [
+        "2026-01-09",
+        "2026-02-09",
+        "2026-02-13",
+        "2026-03-13",
+        "2026-04-10",
+        "2026-05-08",
+        "2026-06-12"
+      ],
+      "textless_dates": [
+        "2026-01-29"
+      ]
+    },
+    "TX_MD": {
+      "all_prompt_dates": [
+        "2025-08-14",
+        "2025-09-18",
+        "2025-10-16",
+        "2025-12-11",
+        "2026-03-26",
+        "2026-04-13",
+        "2026-05-13",
+        "2026-06-11",
+        "2026-06-29",
+        "2026-08-13",
+        "2026-08-19"
+      ],
+      "code": "TX_MD",
+      "gold_block_dates": [
+        "2025-10-16",
+        "2025-12-11"
+      ],
+      "gold_missing_text_dates": [],
+      "gold_names_by_date": {
+        "2025-10-16": [
+          "Cosmin Dobrescu",
+          "Karthik Sampath",
+          "Mary Talley Bowden",
+          "Sheridan Diaz"
+        ],
+        "2025-12-11": [
+          "Board President Sherif Zaafran",
+          "Maria Dolores Chapa",
+          "Mary Talley Bowden"
+        ]
+      },
+      "gold_numbers_by_date": {
+        "2025-10-16": [
+          "2025"
+        ],
+        "2025-12-11": [
+          "0309",
+          "1023",
+          "2025",
+          "2026",
+          "2028",
+          "226",
+          "447",
+          "705",
+          "943"
+        ]
+      },
+      "gold_topics_by_date": {
+        "2025-10-16": [
+          "disciplinary",
+          "licensing",
+          "rulemaking"
+        ],
+        "2025-12-11": [
+          "CME",
+          "IMLC",
+          "disciplinary",
+          "licensing",
+          "rulemaking",
+          "scope-of-practice"
+        ]
+      },
+      "notes": [],
+      "prompt_file": "TX_MD_prompt.md",
+      "rollup_word_count": 382,
+      "state": "TX",
+      "summary_file": "TX_MD_summary.md",
+      "text_meeting_dates": [
+        "2025-10-16",
+        "2025-12-11"
+      ],
+      "textless_dates": [
+        "2025-08-14",
+        "2025-09-18",
+        "2026-03-26",
+        "2026-04-13",
+        "2026-05-13",
+        "2026-06-11",
+        "2026-06-29",
+        "2026-08-13",
+        "2026-08-19"
+      ]
+    },
+    "VT_MD": {
+      "all_prompt_dates": [
+        "2025-07-09",
+        "2025-07-16",
+        "2025-08-06",
+        "2025-08-20",
+        "2025-09-03",
+        "2025-09-17",
+        "2025-10-15",
+        "2025-11-05",
+        "2025-11-19",
+        "2025-12-03",
+        "2025-12-10",
+        "2026-01-21",
+        "2026-02-04",
+        "2026-02-18",
+        "2026-03-06",
+        "2026-03-18",
+        "2026-04-15",
+        "2026-05-20",
+        "2026-06-03",
+        "2026-06-15"
+      ],
+      "code": "VT_MD",
+      "gold_block_dates": [
+        "2025-07-09",
+        "2025-07-16",
+        "2025-08-06",
+        "2025-08-20",
+        "2025-09-03",
+        "2025-09-17",
+        "2025-10-15",
+        "2025-11-05",
+        "2025-11-19",
+        "2025-12-03",
+        "2025-12-10",
+        "2026-01-21",
+        "2026-02-04",
+        "2026-02-18",
+        "2026-03-06",
+        "2026-03-18",
+        "2026-04-15",
+        "2026-05-20",
+        "2026-06-03",
+        "2026-06-15"
+      ],
+      "gold_missing_text_dates": [],
+      "gold_names_by_date": {
+        "2025-07-09": [],
+        "2025-07-16": [],
+        "2025-08-06": [],
+        "2025-08-20": [],
+        "2025-09-03": [],
+        "2025-09-17": [],
+        "2025-10-15": [],
+        "2025-11-05": [],
+        "2025-11-19": [],
+        "2025-12-03": [],
+        "2025-12-10": [],
+        "2026-01-21": [],
+        "2026-02-04": [],
+        "2026-02-18": [],
+        "2026-03-06": [],
+        "2026-03-18": [],
+        "2026-04-15": [],
+        "2026-05-20": [],
+        "2026-06-03": [],
+        "2026-06-15": []
+      },
+      "gold_numbers_by_date": {
+        "2025-07-09": [],
+        "2025-07-16": [
+          "148200",
+          "157",
+          "221800",
+          "370000",
+          "40000",
+          "911"
+        ],
+        "2025-08-06": [
+          "2000",
+          "2025"
+        ],
+        "2025-08-20": [
+          "2023",
+          "2024"
+        ],
+        "2025-09-03": [],
+        "2025-09-17": [
+          "1100",
+          "28000"
+        ],
+        "2025-10-15": [
+          "100",
+          "100901",
+          "2024",
+          "28000"
+        ],
+        "2025-11-05": [
+          "2023",
+          "911"
+        ],
+        "2025-11-19": [
+          "1970",
+          "32172"
+        ],
+        "2025-12-03": [
+          "2026"
+        ],
+        "2025-12-10": [
+          "100000",
+          "2026"
+        ],
+        "2026-01-21": [
+          "2025",
+          "2026"
+        ],
+        "2026-02-04": [],
+        "2026-02-18": [],
+        "2026-03-06": [],
+        "2026-03-18": [],
+        "2026-04-15": [],
+        "2026-05-20": [
+          "001",
+          "002",
+          "004",
+          "005",
+          "006",
+          "007",
+          "008",
+          "009"
+        ],
+        "2026-06-03": [
+          "001",
+          "2026"
+        ],
+        "2026-06-15": [
+          "2023",
+          "2024",
+          "2025"
+        ]
+      },
+      "gold_topics_by_date": {
+        "2025-07-09": [
+          "legislation",
+          "workforce"
+        ],
+        "2025-07-16": [
+          "public-health",
+          "workforce"
+        ],
+        "2025-08-06": [
+          "public-health",
+          "rulemaking",
+          "workforce"
+        ],
+        "2025-08-20": [
+          "CME",
+          "workforce"
+        ],
+        "2025-09-03": [
+          "public-health",
+          "workforce"
+        ],
+        "2025-09-17": [
+          "legislation",
+          "workforce"
+        ],
+        "2025-10-15": [
+          "public-health",
+          "rulemaking",
+          "workforce"
+        ],
+        "2025-11-05": [
+          "public-health",
+          "rulemaking",
+          "workforce"
+        ],
+        "2025-11-19": [
+          "legislation",
+          "public-health",
+          "workforce"
+        ],
+        "2025-12-03": [
+          "legislation",
+          "public-health",
+          "workforce"
+        ],
+        "2025-12-10": [
+          "legislation",
+          "rulemaking",
+          "workforce"
+        ],
+        "2026-01-21": [
+          "legislation",
+          "rulemaking",
+          "workforce"
+        ],
+        "2026-02-04": [
+          "rulemaking",
+          "workforce"
+        ],
+        "2026-02-18": [
+          "rulemaking",
+          "workforce"
+        ],
+        "2026-03-06": [
+          "CME",
+          "licensing",
+          "workforce"
+        ],
+        "2026-03-18": [
+          "public-health",
+          "rulemaking",
+          "workforce"
+        ],
+        "2026-04-15": [
+          "legislation",
+          "rulemaking",
+          "workforce"
+        ],
+        "2026-05-20": [
+          "licensing",
+          "rulemaking",
+          "workforce"
+        ],
+        "2026-06-03": [
+          "legislation",
+          "rulemaking",
+          "workforce"
+        ],
+        "2026-06-15": [
+          "disciplinary",
+          "licensing",
+          "rulemaking",
+          "workforce"
+        ]
+      },
+      "notes": [],
+      "prompt_file": "VT_MD_prompt.md",
+      "rollup_word_count": 372,
+      "state": "VT",
+      "summary_file": "VT_MD_summary.md",
+      "text_meeting_dates": [
+        "2025-07-09",
+        "2025-07-16",
+        "2025-08-06",
+        "2025-08-20",
+        "2025-09-03",
+        "2025-09-17",
+        "2025-10-15",
+        "2025-11-05",
+        "2025-11-19",
+        "2025-12-03",
+        "2025-12-10",
+        "2026-01-21",
+        "2026-02-04",
+        "2026-02-18",
+        "2026-03-06",
+        "2026-03-18",
+        "2026-04-15",
+        "2026-05-20",
+        "2026-06-03",
+        "2026-06-15"
+      ],
+      "textless_dates": []
+    },
+    "WY_MD": {
+      "all_prompt_dates": [
+        "2026-03-30"
+      ],
+      "code": "WY_MD",
+      "gold_block_dates": [
+        "2026-03-30"
+      ],
+      "gold_missing_text_dates": [],
+      "gold_names_by_date": {
+        "2026-03-30": []
+      },
+      "gold_numbers_by_date": {
+        "2026-03-30": [
+          "2024",
+          "2025"
+        ]
+      },
+      "gold_topics_by_date": {
+        "2026-03-30": [
+          "disciplinary",
+          "licensing",
+          "rulemaking"
+        ]
+      },
+      "notes": [],
+      "prompt_file": "WY_MD_prompt.md",
+      "rollup_word_count": 362,
+      "state": "WY",
+      "summary_file": "WY_MD_summary.md",
+      "text_meeting_dates": [
+        "2026-03-30"
+      ],
+      "textless_dates": []
+    }
+  },
+  "requested_boards": [
+    "HI_MD",
+    "NE_MD",
+    "VT_MD",
+    "CA_DO",
+    "TX_MD",
+    "AZ_MD",
+    "WY_MD",
+    "MI_DO"
+  ],
+  "schema_version": 1,
+  "substitutions": {}
+}
