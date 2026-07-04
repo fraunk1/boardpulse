@@ -1,6 +1,16 @@
 """Prompt templates for AI summarization."""
 from datetime import date
 
+from app.quality.taxonomy import TOPICS, TOPIC_DEFINITIONS
+
+# Rendered once from the taxonomy so the prompt's allowed-tag list can never
+# drift from the gate that validates against it. "other" stays available but is
+# omitted from the headline list to discourage lazy use.
+_TOPIC_TAGS_LINE = "  " + ", ".join(f"`{t}`" for t in TOPICS if t != "other")
+_TOPIC_DEFS_BLOCK = "\n".join(
+    f"    `{t}` — {TOPIC_DEFINITIONS[t]}"
+    for t in TOPICS if t in TOPIC_DEFINITIONS)
+
 # Cap per-document text so a board's full prompt fits in a standard subagent
 # context window with balanced coverage across all its meetings. Board minutes
 # front-load the substantive actions (agenda, votes, disciplinary decisions),
@@ -170,7 +180,9 @@ Rules for the per-meeting sections:
 - OMIT blocks for meetings marked "(No extracted text available)".
 - OMIT blocks for meetings marked "**[ALREADY SUMMARIZED — context only...]**" in the data below (and "*(already summarized — context only, no MEETING block)*" in the reference table). Those meetings already have stored summaries; their text is provided ONLY so you can ground the 12-month rollup narrative. Do NOT emit a `=== MEETING: date ===` block for them. Emit a MEETING block ONLY for the dates that carry full document text and are NOT flagged as already summarized.
 - The `topics:` line: assign a tag ONLY when that subject was a substantive part of the meeting — a distinct agenda item, a decision, a report, or sustained discussion — NOT for a passing mention. Aim for the 2-4 tags that best characterize the meeting; do not pad the list. These tags drive trend charts, so over-tagging distorts the signal. Use ONLY tags from this standard set (an empty `[]` is fine):
-  `AI`, `telehealth`, `opioids`, `IMLC`, `CME`, `scope-of-practice`, `disciplinary`, `rulemaking`, `workforce`, `patient-safety`, `controlled-substances`, `physician-wellness`, `licensing`, `legislation`, `public-health`
+{_TOPIC_TAGS_LINE}
+  Tag meanings (apply precisely):
+{_TOPIC_DEFS_BLOCK}
 - The frontmatter `topics` list is the union of the per-meeting topics.
 - End the file with `=== END ===`.
 
@@ -291,7 +303,9 @@ Rules for the per-meeting sections:
 - One `=== MEETING: YYYY-MM-DD ===` block for EVERY meeting above whose text is present, using the exact dates from the reference table, newest first.
 - OMIT blocks for meetings marked "(No extracted text available)".
 - The `topics:` line: assign a tag ONLY when that subject was a substantive part of the meeting — a distinct agenda item, a decision, a report, or sustained discussion — NOT for a passing mention. Aim for the 2-4 tags that best characterize the meeting; do not pad the list. These tags drive trend charts, so over-tagging distorts the signal. Use ONLY tags from this standard set (an empty `[]` is fine):
-  `AI`, `telehealth`, `opioids`, `IMLC`, `CME`, `scope-of-practice`, `disciplinary`, `rulemaking`, `workforce`, `patient-safety`, `controlled-substances`, `physician-wellness`, `licensing`, `legislation`, `public-health`
+{_TOPIC_TAGS_LINE}
+  Tag meanings (apply precisely):
+{_TOPIC_DEFS_BLOCK}
 - Do NOT write any 12-month rollup, board summary, YAML frontmatter, or `## Sources` table. The file is per-meeting blocks only.
 - End the file with `=== END ===`.
 

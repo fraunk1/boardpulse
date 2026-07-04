@@ -11,7 +11,7 @@ import json
 from app.config import DATA_DIR
 from app.quality.taxonomy import (
     CONFIDENCE, DISCIPLINE_CATEGORIES, INSTRUMENTS, INVOLVEMENTS, STAGES,
-    TOPICS,
+    TOPICS, TOPIC_DEFINITIONS,
 )
 
 # Per-document slice budget. Unlike the summary pipeline's head-only cap,
@@ -162,13 +162,15 @@ _CONFIDENCE_DEFS = {
 def _render_vocab(name: str, values: tuple, defs: dict) -> str:
     lines = [f"### `{name}`"]
     for v in values:
-        lines.append(f"- `{v}` — {defs[v]}")
+        desc = defs.get(v, "")
+        lines.append(f"- `{v}` — {desc}" if desc else f"- `{v}`")
     return "\n".join(lines)
 
 
 def _taxonomy_block() -> str:
     return "\n\n".join([
-        _render_vocab("topic", TOPICS, _TOPIC_DEFS),
+        # topic defs come from the taxonomy so new topics stay in sync
+        _render_vocab("topic", TOPICS, TOPIC_DEFINITIONS),
         _render_vocab("instrument (policy_actions)", INSTRUMENTS,
                       _INSTRUMENT_DEFS),
         _render_vocab("stage (policy_actions)", STAGES, _STAGE_DEFS),
