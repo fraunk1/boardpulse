@@ -1,0 +1,17 @@
+{
+  "source_excerpt": "Report of Board Counsel - FYI -SB 1062 - Delivering\n4 Better Health Care for our Veterans\n5 [Ashley B. Goshert, Esquire, Board Counsel, explained\n6 SB 1062 would implement a veteran specific training\n7 requirement through continuing education. Physicians\n8 and other covered providers would be required to\n9 complete the training as part of their existing\n10 licensure or renewal requirements. She noted the\n11 bill was currently with the Senate Health and Human\n12 Services Committee.]",
+  "correct_facts": [
+    {
+      "bill_number": "SB 1062",
+      "bill_state": "PA",
+      "subject": "Would require physicians and other covered providers to complete veteran-specific training through continuing education as part of licensure or renewal.",
+      "topic": "CME",
+      "involvement": "monitoring",
+      "status_note": "Reported FYI; bill was with the Senate Health and Human Services Committee.",
+      "quote": "She noted the\n11 bill was currently with the Senate Health and Human\n12 Services Committee.",
+      "source_document": "2026-02-03_f020326%20osteopathic%20medicine%20minutes%20-%20final.pdf",
+      "confidence": "high"
+    }
+  ],
+  "commentary": "involvement='monitoring' because Board Counsel reported the bill 'FYI' and only noted its committee status; the board took no supporting, opposing, or testifying action. bill_state='PA'; topic='CME' (a CE requirement)."
+}

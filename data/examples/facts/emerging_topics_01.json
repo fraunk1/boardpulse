@@ -1,0 +1,13 @@
+{
+  "source_excerpt": "Agenda Item 5\n\nPresentation: A Regulator’s Perspective on Artificial Intelligence (AI) in\nHealthcare – Frank Meyers, J.D., Director, Regulatory Innovation & Member\nServices, Federation of State Medical Boards (Link to Video)\n\nMs. Lawson introduced Frank Meyers, who is an attorney and the director of regulatory\ninnovation and member services at the Federation of State Medical Boards.",
+  "correct_facts": [
+    {
+      "topic_slug": "ai-in-healthcare-oversight",
+      "subject": "Board hosted its first briefing on a regulator's perspective on artificial intelligence in healthcare, covering the AI landscape, emerging regulatory frameworks, and implications for state medical board oversight.",
+      "quote": "Presentation: A Regulator’s Perspective on Artificial Intelligence (AI) in\nHealthcare",
+      "source_document": "2026-02-26_brd-Minutes-20260226.pdf",
+      "confidence": "high"
+    }
+  ],
+  "commentary": "A genuine emerging topic: the board's first dedicated AI-in-healthcare briefing, a new subject distinct from routine business. topic_slug is kebab-case; quote is REQUIRED for emerging_topics and is copied verbatim, preserving the curly apostrophe exactly as in the source."
+}

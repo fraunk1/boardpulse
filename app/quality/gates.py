@@ -37,11 +37,15 @@ Calibration notes (2026-07-03, against the live DB):
     a neighboring meeting's document (12 such blocks in the real files,
     all names present board-wide).
 """
+import json
 import re
 from dataclasses import dataclass, field
 from urllib.parse import urlparse
 
-from app.quality.taxonomy import TOPICS
+from app.quality.taxonomy import (
+    CONFIDENCE, DISCIPLINE_CATEGORIES, INSTRUMENTS, INVOLVEMENTS,
+    PROMPT_VERSION, STAGES, TOPICS,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -169,19 +173,36 @@ def check_summary(
     source_texts_by_date: dict[str, str],
     minutes_url: str | None,
     homepage: str | None,
+    mode: str = "rollup",
 ) -> GateResult:
     """Run every gate check against a normalized summary file.
 
     Pure function: callers supply the DB-derived inputs.
       db_text_dates        meeting dates (ISO) in the 12-month window that
-                           have at least one document with extracted text
+                           have at least one document with extracted text.
+                           In archive mode this is the set the file's blocks
+                           are checked against (the sidecar covered dates).
       db_all_dates         every meeting date the board has, any window
       source_texts_by_date concatenated document text per window date
       minutes_url/homepage the board's registered URLs (Sources host check)
+      mode                 'rollup' (default) runs the full two-layer gate:
+                           frontmatter, rollup citations, Sources table,
+                           rollup length, ghost citations, plus every
+                           per-block check. 'archive' is for a rollup-less
+                           archive file — it SKIPS the rollup-only checks
+                           (frontmatter requirement, citation format, Sources
+                           table, rollup length, ghost citations) and keeps
+                           the block-level checks: END terminator, blocks vs
+                           covered dates (S2), block length bands (S4), topics
+                           (S7), name verification (S8), and refusal (S10).
+                           Default 'rollup' keeps all existing behavior
+                           unchanged.
     """
     # Local import: summarizer imports this module for ingest wiring, so the
     # reverse import must happen at call time to avoid a cycle.
     from app.extractor.summarizer import parse_board_summary_file
+
+    archive = mode == "archive"
 
     errors: list[GateError] = []
     warnings: list[GateError] = []
@@ -189,27 +210,32 @@ def check_summary(
     valid_text_dates = ", ".join(sorted(db_text_dates)) or "(none)"
 
     # --- S1 STRUCTURE ------------------------------------------------------
-    fm_match = _FRONTMATTER_RE.match(text)
-    if not fm_match:
-        errors.append(GateError(
-            "STRUCTURE",
-            "Missing YAML frontmatter. The file must start with a '---' "
-            "block containing 'topics: [...]', 'board: <code>' and "
-            "'state: <ST>' lines."))
-    else:
-        fm = fm_match.group(1)
-        for key in ("topics", "board", "state"):
-            if not re.search(rf"^{key}\s*:", fm, re.MULTILINE):
-                errors.append(GateError(
-                    "STRUCTURE",
-                    f"Frontmatter is missing the '{key}:' key. Required "
-                    "keys: topics, board, state."))
-        bm = re.search(r"^board\s*:\s*(.+?)\s*$", fm, re.MULTILINE)
-        if bm and bm.group(1).strip("\"'") != board_code:
+    # Archive files carry NO frontmatter (no rollup layer), so the
+    # frontmatter requirement is skipped for them; the END terminator and
+    # per-meeting blocks are still required.
+    if not archive:
+        fm_match = _FRONTMATTER_RE.match(text)
+        if not fm_match:
             errors.append(GateError(
                 "STRUCTURE",
-                f"Frontmatter 'board:' is '{bm.group(1).strip()}' but this "
-                f"file is for board {board_code}. Set board: {board_code}."))
+                "Missing YAML frontmatter. The file must start with a '---' "
+                "block containing 'topics: [...]', 'board: <code>' and "
+                "'state: <ST>' lines."))
+        else:
+            fm = fm_match.group(1)
+            for key in ("topics", "board", "state"):
+                if not re.search(rf"^{key}\s*:", fm, re.MULTILINE):
+                    errors.append(GateError(
+                        "STRUCTURE",
+                        f"Frontmatter is missing the '{key}:' key. Required "
+                        "keys: topics, board, state."))
+            bm = re.search(r"^board\s*:\s*(.+?)\s*$", fm, re.MULTILINE)
+            if bm and bm.group(1).strip("\"'") != board_code:
+                errors.append(GateError(
+                    "STRUCTURE",
+                    f"Frontmatter 'board:' is '{bm.group(1).strip()}' but "
+                    f"this file is for board {board_code}. Set board: "
+                    f"{board_code}."))
 
     if not _END_RE.search(text):
         errors.append(GateError(
@@ -220,17 +246,28 @@ def check_summary(
     board_topics, rollup, sections = parse_board_summary_file(text)
 
     if not sections:
-        errors.append(GateError(
-            "LEGACY_FORMAT",
-            "No '=== MEETING: YYYY-MM-DD ===' blocks found — this is the "
-            "legacy single-blob format. Rewrite using the two-layer "
-            "contract: a 12-month rollup, then one '=== MEETING: date ===' "
-            f"block per text-bearing meeting date ({valid_text_dates}), "
-            "ending with '=== END ==='."))
+        if archive:
+            errors.append(GateError(
+                "STRUCTURE",
+                "No '=== MEETING: YYYY-MM-DD ===' blocks found. An archive "
+                "file is per-meeting blocks only: one '=== MEETING: date "
+                "===' block per covered meeting date "
+                f"({valid_text_dates}), ending with '=== END ==='."))
+        else:
+            errors.append(GateError(
+                "LEGACY_FORMAT",
+                "No '=== MEETING: YYYY-MM-DD ===' blocks found — this is the "
+                "legacy single-blob format. Rewrite using the two-layer "
+                "contract: a 12-month rollup, then one '=== MEETING: date "
+                "===' "
+                f"block per text-bearing meeting date ({valid_text_dates}), "
+                "ending with '=== END ==='."))
         # Block-level checks are meaningless without blocks.
         return GateResult(ok=False, errors=errors, warnings=warnings)
 
     # --- S2 BLOCKS vs DB text dates -----------------------------------------
+    # In archive mode db_text_dates == the sidecar covered_dates, so this is
+    # "blocks vs covered dates". In rollup mode it is the 12-month text dates.
     block_dates = set(sections)
     min_text_date = min(db_text_dates) if db_text_dates else None
     for d in sorted(block_dates - db_text_dates):
@@ -246,8 +283,8 @@ def check_summary(
         else:
             errors.append(GateError(
                 "GHOST_BLOCK",
-                f"Block dated {d} does not match any text-bearing meeting "
-                "in the last 12 months. Remove it or re-date it to one of "
+                f"Block dated {d} does not match any covered meeting date. "
+                "Remove it or re-date it to one of "
                 f"the valid dates: {valid_text_dates}."))
 
     missing = sorted(db_text_dates - block_dates)
@@ -258,56 +295,59 @@ def check_summary(
         # refresh pipeline treats this as its re-summarization trigger.
         warnings.append(GateError(
             "MISSING_BLOCK",
-            f"{len(missing)} text-bearing meeting date(s) have no "
+            f"{len(missing)} covered meeting date(s) have no "
             f"'=== MEETING: date ===' block: {', '.join(missing)}. "
             "Re-summarize this board to cover them (an agenda-only note is "
             f"acceptable). Valid dates: {valid_text_dates}."))
 
-    # --- S3 + S5 rollup citations -------------------------------------------
-    expected_path = f"/board/{state}/{board_code}"
-    well_formed = 0
-    for bracket, target in _BOARD_LINK_RE.findall(rollup):
-        anchor_m = re.search(r"#(\d{4}-\d{2}-\d{2})$", target)
-        anchor = anchor_m.group(1) if anchor_m else None
-        base = target.split("#")[0]
-        if (not _DATE_RE.match(bracket) or base != expected_path
-                or anchor != bracket):
+    # --- S3 + S5 rollup citations (rollup mode only) ------------------------
+    if not archive:
+        expected_path = f"/board/{state}/{board_code}"
+        well_formed = 0
+        for bracket, target in _BOARD_LINK_RE.findall(rollup):
+            anchor_m = re.search(r"#(\d{4}-\d{2}-\d{2})$", target)
+            anchor = anchor_m.group(1) if anchor_m else None
+            base = target.split("#")[0]
+            if (not _DATE_RE.match(bracket) or base != expected_path
+                    or anchor != bracket):
+                errors.append(GateError(
+                    "CITATION_FORMAT",
+                    f"Malformed citation '[{bracket}]({target})'. Every "
+                    "rollup citation must be ([YYYY-MM-DD](" + expected_path +
+                    "#YYYY-MM-DD)) with the SAME date in the brackets and the "
+                    "anchor."))
+            else:
+                well_formed += 1
+
+        for a in sorted(set(_ANCHOR_RE.findall(rollup)) - db_all_dates):
+            errors.append(GateError(
+                "GHOST_CITATION",
+                f"Citation anchor #{a} does not match any meeting this board "
+                "has in the database. Cite only real meeting dates: "
+                f"{', '.join(sorted(db_all_dates)) or '(none)'}."))
+
+        need = min(3, len(db_text_dates))
+        if well_formed < need:
             errors.append(GateError(
                 "CITATION_FORMAT",
-                f"Malformed citation '[{bracket}]({target})'. Every rollup "
-                "citation must be ([YYYY-MM-DD](" + expected_path +
-                "#YYYY-MM-DD)) with the SAME date in the brackets and the "
-                "anchor."))
-        else:
-            well_formed += 1
-
-    for a in sorted(set(_ANCHOR_RE.findall(rollup)) - db_all_dates):
-        errors.append(GateError(
-            "GHOST_CITATION",
-            f"Citation anchor #{a} does not match any meeting this board "
-            "has in the database. Cite only real meeting dates: "
-            f"{', '.join(sorted(db_all_dates)) or '(none)'}."))
-
-    need = min(3, len(db_text_dates))
-    if well_formed < need:
-        errors.append(GateError(
-            "CITATION_FORMAT",
-            f"Rollup has only {well_formed} well-formed citation(s); at "
-            f"least {need} required. Add citations in the form "
-            f"([YYYY-MM-DD]({expected_path}#YYYY-MM-DD)) for claims drawn "
-            f"from specific meetings ({valid_text_dates})."))
+                f"Rollup has only {well_formed} well-formed citation(s); at "
+                f"least {need} required. Add citations in the form "
+                f"([YYYY-MM-DD]({expected_path}#YYYY-MM-DD)) for claims drawn "
+                f"from specific meetings ({valid_text_dates})."))
 
     # --- S4 LENGTH + S6 SOURCES ----------------------------------------------
-    parts = _SOURCES_SPLIT_RE.split(rollup, maxsplit=1)
-    prose = parts[0]
-    rollup_words = len(prose.split())
-    lo, hi = ROLLUP_WORDS
-    if not lo <= rollup_words <= hi:
-        errors.append(GateError(
-            "LENGTH",
-            f"Rollup is {rollup_words} words (excluding the Sources table); "
-            f"it must be {lo}-{hi}. Target 300-600 words of cited "
-            "narrative."))
+    # Rollup length + Sources table are rollup-only; block bands run always.
+    if not archive:
+        parts = _SOURCES_SPLIT_RE.split(rollup, maxsplit=1)
+        prose = parts[0]
+        rollup_words = len(prose.split())
+        lo, hi = ROLLUP_WORDS
+        if not lo <= rollup_words <= hi:
+            errors.append(GateError(
+                "LENGTH",
+                f"Rollup is {rollup_words} words (excluding the Sources "
+                f"table); it must be {lo}-{hi}. Target 300-600 words of "
+                "cited narrative."))
 
     blo, bhi = BLOCK_WORDS
     for d in sorted(sections):
@@ -319,35 +359,36 @@ def check_summary(
                 f"be {blo}-{bhi}. Target 80-200 words summarizing only that "
                 "meeting."))
 
-    if len(parts) == 1:
-        errors.append(GateError(
-            "SOURCES",
-            "Rollup has no '## Sources' section. End the rollup with a "
-            "'## Sources' markdown table (| # | Date | Board | Source |) "
-            "with one row per meeting, linking to the board's minutes "
-            "page."))
-    else:
-        tail = parts[1]
-        data_rows = [ln for ln in tail.splitlines()
-                     if ln.strip().startswith("|")
-                     and re.search(r"\d{4}-\d{2}-\d{2}|https?://", ln)]
-        if not data_rows:
+    if not archive:
+        if len(parts) == 1:
             errors.append(GateError(
                 "SOURCES",
-                "The '## Sources' section has no table rows. Add at least "
-                "one row: | 1 | YYYY-MM-DD | Board name | [Minutes "
-                "page](URL) |."))
-        ref_hosts = {h for h in (_host(u) for u in (minutes_url, homepage)
-                                 if u) if h}
-        if ref_hosts:
-            for url in _HTTP_URL_RE.findall(tail):
-                h = _host(url)
-                if h and not _hosts_compatible(h, ref_hosts):
-                    errors.append(GateError(
-                        "SOURCE_HOST",
-                        f"Sources URL host '{h}' does not belong to this "
-                        "board. Use the board's own site(s): "
-                        f"{', '.join(sorted(ref_hosts))}."))
+                "Rollup has no '## Sources' section. End the rollup with a "
+                "'## Sources' markdown table (| # | Date | Board | Source |) "
+                "with one row per meeting, linking to the board's minutes "
+                "page."))
+        else:
+            tail = parts[1]
+            data_rows = [ln for ln in tail.splitlines()
+                         if ln.strip().startswith("|")
+                         and re.search(r"\d{4}-\d{2}-\d{2}|https?://", ln)]
+            if not data_rows:
+                errors.append(GateError(
+                    "SOURCES",
+                    "The '## Sources' section has no table rows. Add at "
+                    "least one row: | 1 | YYYY-MM-DD | Board name | [Minutes "
+                    "page](URL) |."))
+            ref_hosts = {h for h in (_host(u) for u in (minutes_url, homepage)
+                                     if u) if h}
+            if ref_hosts:
+                for url in _HTTP_URL_RE.findall(tail):
+                    h = _host(url)
+                    if h and not _hosts_compatible(h, ref_hosts):
+                        errors.append(GateError(
+                            "SOURCE_HOST",
+                            f"Sources URL host '{h}' does not belong to this "
+                            "board. Use the board's own site(s): "
+                            f"{', '.join(sorted(ref_hosts))}."))
 
     # --- S7 TOPICS ------------------------------------------------------------
     valid_topics = ", ".join(TOPICS)
@@ -367,7 +408,9 @@ def check_summary(
                     "BAD_TOPIC",
                     f"Meeting block {d} topic '{t}' is not in the taxonomy. "
                     f"Valid values: {valid_topics}."))
-    if set(board_topics) != union:
+    # Archive files have no frontmatter, so there is no frontmatter-vs-block
+    # union to reconcile — skip the TOPIC_UNION reconciliation for them.
+    if not archive and set(board_topics) != union:
         extra = sorted(set(board_topics) - union)
         missing_t = sorted(union - set(board_topics))
         warnings.append(GateError(
@@ -429,12 +472,459 @@ def check_summary(
                     "the documents."))
 
     # --- S10 REFUSAL: instruction echo in the rollup ---------------------------
-    if "Output Format" in rollup or "=== MEETING:" in rollup:
+    # Rollup-only: archive files have no rollup, so there is nothing to echo.
+    if not archive and ("Output Format" in rollup or "=== MEETING:" in rollup):
         errors.append(GateError(
             "REFUSAL",
             "The rollup echoes the prompt instructions ('Output Format' / "
             "'=== MEETING:' found inside the rollup). Write only the "
             "12-month narrative and Sources table in the rollup; meeting "
             "blocks belong after it, delimited by '=== MEETING: date ==='."))
+
+    return GateResult(ok=not errors, errors=errors, warnings=warnings)
+
+
+# ===========================================================================
+# Gate F — structured-facts ingest gate (facts-v1)
+#
+# Same design rules as Gate S above: check_facts() is PURE (no DB access —
+# callers pass the covered dates, the board's text-bearing dates, and the
+# source texts), and every error message is written for a RETRY AGENT: what
+# is wrong, what to change, and the valid values.
+#
+# One deliberate impurity: F5 downgrades a mismatched quote's confidence to
+# 'low' IN PLACE on the parsed dict the caller passed (plus a warning), so
+# the ingest that follows stores the downgraded value. That is the only
+# mutation this gate performs, and it never changes fact content — only the
+# model's self-reported confidence.
+# ===========================================================================
+
+_FACTS_TOP_KEYS = ("schema_version", "board_code", "model", "meetings")
+_FACT_ARRAYS = ("policy_actions", "legislation", "disciplinary",
+                "emerging_topics")
+
+FACTS_TITLE_MAX = 200
+FACTS_QUOTE_MAX = 400
+FACTS_SLUG_MAX = 60          # emerging_topics.topic_slug column width
+FACTS_BILL_NUMBER_MAX = 30   # legislation_mentions.bill_number column width
+FACTS_RULE_REF_MAX = 120     # policy_actions.rule_reference column width
+FACTS_MAX_PER_FILE = 100
+QUOTE_MISMATCH_MAX_FRACTION = 0.30
+
+_ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+_BILL_STATE_RE = re.compile(r"^[A-Z]{2}$")
+
+# (field, nullable) per fact type. 'count' is checked separately (int).
+_POLICY_FIELDS = (
+    ("instrument", False), ("stage", False), ("topic", False),
+    ("title", False), ("description", False), ("rule_reference", True),
+    ("action_date", False), ("quote", True), ("source_document", False),
+    ("confidence", False),
+)
+_LEGISLATION_FIELDS = (
+    ("bill_number", False), ("bill_state", False), ("subject", False),
+    ("topic", True), ("involvement", False), ("status_note", True),
+    ("quote", True), ("source_document", False), ("confidence", False),
+)
+_DISCIPLINARY_FIELDS = (
+    ("category", False), ("quote", True), ("source_document", False),
+    ("confidence", False),
+)
+_EMERGING_FIELDS = (
+    ("topic_slug", False), ("subject", False), ("quote", False),
+    ("source_document", False), ("confidence", False),
+)
+
+
+def _ws(text) -> str:
+    """Whitespace-normalize: collapse all runs of whitespace to one space."""
+    return " ".join(str(text or "").split())
+
+
+def _check_fields(
+    fact: dict, spec, where: str, errors: list,
+) -> bool:
+    """F2 for one fact: required keys present, string/None types, caps.
+
+    Returns True when the fact is structurally sound enough for the
+    content checks (F4-F6) to run on it.
+    """
+    if not isinstance(fact, dict):
+        errors.append(GateError(
+            "FIELD",
+            f"{where} is {type(fact).__name__}, not an object. Each fact "
+            "must be a JSON object with the contract's fields."))
+        return False
+    ok = True
+    for key, nullable in spec:
+        if key not in fact:
+            errors.append(GateError(
+                "FIELD",
+                f"{where} is missing required key '{key}'. Optional fields "
+                "must be null, never omitted."))
+            ok = False
+            continue
+        val = fact[key]
+        if val is None:
+            if not nullable:
+                errors.append(GateError(
+                    "FIELD",
+                    f"{where} has null '{key}' but that field is required. "
+                    "Fill it from the source text or drop the fact."))
+                ok = False
+            continue
+        if not isinstance(val, str):
+            errors.append(GateError(
+                "FIELD",
+                f"{where} field '{key}' is {type(val).__name__}, not a "
+                "string. All contract fields are strings (or null where "
+                "the contract says |null)."))
+            ok = False
+            continue
+        if not nullable and not val.strip():
+            errors.append(GateError(
+                "FIELD",
+                f"{where} field '{key}' is an empty string. Required "
+                "fields must carry real content."))
+            ok = False
+    # length caps (only when the value is a string)
+    caps = (("title", FACTS_TITLE_MAX), ("quote", FACTS_QUOTE_MAX),
+            ("topic_slug", FACTS_SLUG_MAX),
+            ("bill_number", FACTS_BILL_NUMBER_MAX),
+            ("rule_reference", FACTS_RULE_REF_MAX))
+    for key, cap in caps:
+        val = fact.get(key)
+        if isinstance(val, str) and len(val) > cap:
+            hint = (" Move detail into 'description'." if key == "title"
+                    else " Quote a shorter span." if key == "quote" else "")
+            errors.append(GateError(
+                "FIELD",
+                f"{where} field '{key}' is {len(val)} chars; the cap is "
+                f"{cap}.{hint}"))
+            ok = False
+    return ok
+
+
+def _check_enum(
+    fact: dict, key: str, values: tuple, where: str, errors: list,
+    *, nullable: bool = False,
+) -> None:
+    """F4 for one enum field (skips values F2 already rejected)."""
+    val = fact.get(key)
+    if val is None and nullable:
+        return
+    if isinstance(val, str) and val not in values:
+        errors.append(GateError(
+            "BAD_ENUM",
+            f"{where} {key} '{val}' is not in the taxonomy. Valid values: "
+            f"{', '.join(values)}."))
+
+
+def check_facts(
+    board_code: str,
+    data,
+    *,
+    covered_dates: set[str],
+    db_text_dates: set[str],
+    source_texts_by_date: dict[str, str],
+) -> GateResult:
+    """Run every Gate F check against a facts-v1 extraction file.
+
+    Pure function: callers supply the DB-derived inputs.
+      data                  the parsed JSON dict — or the raw file text
+                            (str), which is normalized and parsed here.
+                            Pass the DICT when you intend to ingest: the F5
+                            confidence downgrade mutates it in place.
+      covered_dates         meeting dates (ISO) this prompt chunk covered,
+                            from the {code}_{NN}_facts_prompt.meta.json
+                            sidecar
+      db_text_dates         this board's meeting dates (ISO) that have at
+                            least one document with extracted text
+      source_texts_by_date  concatenated document text per meeting date
+    """
+    errors: list[GateError] = []
+    warnings: list[GateError] = []
+
+    # --- F1 JSON + top-level structure --------------------------------------
+    if isinstance(data, str):
+        try:
+            data = json.loads(normalize_summary(data))
+        except json.JSONDecodeError as exc:
+            errors.append(GateError(
+                "BAD_JSON",
+                f"File is not valid JSON ({exc.msg} at line {exc.lineno}). "
+                "Output ONLY the JSON object — no fences, no commentary, "
+                "no trailing text."))
+            return GateResult(ok=False, errors=errors, warnings=warnings)
+
+    if not isinstance(data, dict):
+        errors.append(GateError(
+            "STRUCTURE",
+            f"Top level is {type(data).__name__}, not an object. The file "
+            "must be a single JSON object per the facts-v1 contract."))
+        return GateResult(ok=False, errors=errors, warnings=warnings)
+
+    expected = set(_FACTS_TOP_KEYS)
+    actual = set(data)
+    for k in sorted(expected - actual):
+        errors.append(GateError(
+            "STRUCTURE",
+            f"Missing top-level key '{k}'. The top level must have exactly: "
+            f"{', '.join(_FACTS_TOP_KEYS)}."))
+    for k in sorted(actual - expected):
+        errors.append(GateError(
+            "STRUCTURE",
+            f"Unexpected top-level key '{k}'. The top level must have "
+            f"exactly: {', '.join(_FACTS_TOP_KEYS)}."))
+
+    if data.get("schema_version") != PROMPT_VERSION:
+        errors.append(GateError(
+            "STRUCTURE",
+            f"schema_version is '{data.get('schema_version')}' but this "
+            f"gate accepts only '{PROMPT_VERSION}'. Set schema_version: "
+            f"{PROMPT_VERSION}."))
+    if data.get("board_code") != board_code:
+        errors.append(GateError(
+            "STRUCTURE",
+            f"board_code is '{data.get('board_code')}' but this file is "
+            f"for board {board_code}. Set board_code: {board_code}."))
+
+    meetings = data.get("meetings")
+    if not isinstance(meetings, list):
+        errors.append(GateError(
+            "STRUCTURE",
+            "'meetings' must be an array of meeting objects (one per "
+            "covered meeting date)."))
+        return GateResult(ok=False, errors=errors, warnings=warnings)
+
+    valid_dates = ", ".join(
+        sorted(covered_dates & db_text_dates)) or "(none)"
+    norm_sources = {d: _ws(t) for d, t in source_texts_by_date.items()}
+
+    total_facts = 0
+    quote_checked = 0
+    quote_mismatched = 0
+    seen_keys: set[tuple] = set()
+    json_dates: set[str] = set()
+
+    for mi, mrec in enumerate(meetings):
+        if not isinstance(mrec, dict):
+            errors.append(GateError(
+                "STRUCTURE",
+                f"meetings[{mi}] is {type(mrec).__name__}, not an object."))
+            continue
+
+        d = mrec.get("meeting_date")
+        if not isinstance(d, str) or not _ISO_DATE_RE.match(d):
+            errors.append(GateError(
+                "STRUCTURE",
+                f"meetings[{mi}] meeting_date '{d}' is not a YYYY-MM-DD "
+                f"date. Use one of the covered dates: {valid_dates}."))
+            continue
+        json_dates.add(d)
+
+        # --- F3 date must be covered by the chunk AND text-bearing in DB ---
+        if d not in covered_dates or d not in db_text_dates:
+            where_bad = ("this prompt chunk" if d not in covered_dates
+                         else "the board's text-bearing meetings")
+            errors.append(GateError(
+                "GHOST_MEETING",
+                f"Meeting date {d} does not match {where_bad}. Extract "
+                f"facts only for the covered dates: {valid_dates}."))
+            continue
+
+        missing_arrays = [k for k in _FACT_ARRAYS
+                          if not isinstance(mrec.get(k), list)]
+        if missing_arrays:
+            errors.append(GateError(
+                "STRUCTURE",
+                f"Meeting {d} is missing fact array(s): "
+                f"{', '.join(missing_arrays)}. Every meeting carries all "
+                f"four arrays ({', '.join(_FACT_ARRAYS)}); empty arrays "
+                "mean examined-nothing-found."))
+            continue
+
+        source = norm_sources.get(d, "")
+
+        def _quote_ok(quote: str) -> bool:
+            # Never false-reject when a date has no source text on file.
+            return not source or _ws(quote) in source
+
+        def _subject_check(fact: dict, where: str) -> None:
+            # F6: the subject should be traceable to the quote or the text.
+            subject = fact.get("subject")
+            if not isinstance(subject, str) or not subject.strip():
+                return
+            hay = (_ws(fact.get("quote")) + " " + source).lower()
+            if _ws(subject).lower() not in hay:
+                warnings.append(GateError(
+                    "SUBJECT_CHECK",
+                    f"{where} subject '{subject}' does not appear in its "
+                    "quote or in that meeting's source text. Verify it "
+                    "against the documents."))
+
+        # --- policy_actions -------------------------------------------------
+        for i, fact in enumerate(mrec["policy_actions"]):
+            where = f"Meeting {d} policy_actions[{i}]"
+            total_facts += 1
+            if not _check_fields(fact, _POLICY_FIELDS, where, errors):
+                continue
+            _check_enum(fact, "instrument", INSTRUMENTS, where, errors)
+            _check_enum(fact, "stage", STAGES, where, errors)
+            _check_enum(fact, "topic", TOPICS, where, errors)
+            _check_enum(fact, "confidence", CONFIDENCE, where, errors)
+            ad = fact.get("action_date")
+            if isinstance(ad, str) and not _ISO_DATE_RE.match(ad):
+                errors.append(GateError(
+                    "FIELD",
+                    f"{where} action_date '{ad}' is not a YYYY-MM-DD date. "
+                    "Use the date the action occurred (normally the "
+                    "meeting date)."))
+            key = ("policy", d, fact.get("instrument"), fact.get("stage"),
+                   fact.get("topic"), _ws(fact.get("title")).lower())
+            if key in seen_keys:
+                errors.append(GateError(
+                    "DUPLICATE_FACT",
+                    f"{where} duplicates another policy action in this "
+                    "file (same meeting, instrument, stage, topic, and "
+                    "title). Merge them into one fact."))
+            seen_keys.add(key)
+            quote = fact.get("quote")
+            if isinstance(quote, str) and quote.strip():
+                quote_checked += 1
+                if not _quote_ok(quote):
+                    quote_mismatched += 1
+                    fact["confidence"] = "low"
+                    warnings.append(GateError(
+                        "QUOTE_MISMATCH",
+                        f"{where} quote is not a verbatim substring of "
+                        "that meeting's source text — confidence forced "
+                        "to 'low'. Copy quotes exactly from the source."))
+
+        # --- legislation ----------------------------------------------------
+        for i, fact in enumerate(mrec["legislation"]):
+            where = f"Meeting {d} legislation[{i}]"
+            total_facts += 1
+            if not _check_fields(fact, _LEGISLATION_FIELDS, where, errors):
+                continue
+            _check_enum(fact, "involvement", INVOLVEMENTS, where, errors)
+            _check_enum(fact, "topic", TOPICS, where, errors, nullable=True)
+            _check_enum(fact, "confidence", CONFIDENCE, where, errors)
+            bs = fact.get("bill_state")
+            if isinstance(bs, str) and not _BILL_STATE_RE.match(bs):
+                errors.append(GateError(
+                    "FIELD",
+                    f"{where} bill_state '{bs}' must be a two-letter "
+                    "uppercase code ('US' for federal bills)."))
+            key = ("legislation", d, _ws(fact.get("bill_number")).lower(),
+                   (fact.get("bill_state") or "").upper())
+            if key in seen_keys:
+                errors.append(GateError(
+                    "DUPLICATE_FACT",
+                    f"{where} duplicates another mention of bill "
+                    f"{fact.get('bill_number')} at this meeting. Merge "
+                    "them into one fact."))
+            seen_keys.add(key)
+            quote = fact.get("quote")
+            if isinstance(quote, str) and quote.strip():
+                quote_checked += 1
+                if not _quote_ok(quote):
+                    quote_mismatched += 1
+                    fact["confidence"] = "low"
+                    warnings.append(GateError(
+                        "QUOTE_MISMATCH",
+                        f"{where} quote is not a verbatim substring of "
+                        "that meeting's source text — confidence forced "
+                        "to 'low'. Copy quotes exactly from the source."))
+            _subject_check(fact, where)
+
+        # --- disciplinary ---------------------------------------------------
+        for i, fact in enumerate(mrec["disciplinary"]):
+            where = f"Meeting {d} disciplinary[{i}]"
+            total_facts += 1
+            if not _check_fields(fact, _DISCIPLINARY_FIELDS, where, errors):
+                continue
+            _check_enum(fact, "category", DISCIPLINE_CATEGORIES, where,
+                        errors)
+            _check_enum(fact, "confidence", CONFIDENCE, where, errors)
+            count = fact.get("count")
+            if not isinstance(count, int) or isinstance(count, bool) \
+                    or count < 0:
+                errors.append(GateError(
+                    "FIELD",
+                    f"{where} count is {count!r}; it must be a "
+                    "non-negative integer (the number of actions in that "
+                    "category at that meeting)."))
+            key = ("disciplinary", d, fact.get("category"))
+            if key in seen_keys:
+                errors.append(GateError(
+                    "DUPLICATE_FACT",
+                    f"{where} duplicates category "
+                    f"'{fact.get('category')}' at this meeting. Emit one "
+                    "entry per category per meeting with the total count."))
+            seen_keys.add(key)
+            quote = fact.get("quote")
+            if isinstance(quote, str) and quote.strip():
+                quote_checked += 1
+                if not _quote_ok(quote):
+                    quote_mismatched += 1
+                    fact["confidence"] = "low"
+                    warnings.append(GateError(
+                        "QUOTE_MISMATCH",
+                        f"{where} quote is not a verbatim substring of "
+                        "that meeting's source text — confidence forced "
+                        "to 'low'. Copy quotes exactly from the source."))
+
+        # --- emerging_topics (quote REQUIRED + always hard-checked) ---------
+        for i, fact in enumerate(mrec["emerging_topics"]):
+            where = f"Meeting {d} emerging_topics[{i}]"
+            total_facts += 1
+            if not _check_fields(fact, _EMERGING_FIELDS, where, errors):
+                continue
+            _check_enum(fact, "confidence", CONFIDENCE, where, errors)
+            key = ("emerging", _ws(fact.get("topic_slug")).lower())
+            if key in seen_keys:
+                errors.append(GateError(
+                    "DUPLICATE_FACT",
+                    f"{where} duplicates topic_slug "
+                    f"'{fact.get('topic_slug')}' elsewhere in this file. "
+                    "Keep only the EARLIEST mention of an emerging topic."))
+            seen_keys.add(key)
+            if not _quote_ok(fact["quote"]):
+                errors.append(GateError(
+                    "FABRICATED_QUOTE",
+                    f"{where} quote is not a verbatim substring of that "
+                    "meeting's source text. Emerging-topic quotes are the "
+                    "fabrication anchor and must be copied exactly from "
+                    "the source."))
+            _subject_check(fact, where)
+
+    # --- F5 file-level mismatch rate -----------------------------------------
+    if quote_checked and \
+            quote_mismatched / quote_checked > QUOTE_MISMATCH_MAX_FRACTION:
+        errors.append(GateError(
+            "QUOTE_MISMATCH_RATE",
+            f"{quote_mismatched} of {quote_checked} quotes are not "
+            "verbatim substrings of their meeting's source text (over "
+            f"{QUOTE_MISMATCH_MAX_FRACTION:.0%} of the file). Re-extract "
+            "with quotes copied exactly from the source."))
+
+    # --- F7 every covered meeting must appear --------------------------------
+    missing = sorted(covered_dates - json_dates)
+    if missing:
+        errors.append(GateError(
+            "MISSING_MEETING",
+            f"{len(missing)} covered meeting date(s) are absent from the "
+            f"file: {', '.join(missing)}. Every covered meeting MUST "
+            "appear; empty arrays mean examined-nothing-found."))
+
+    # --- F8 volume -------------------------------------------------------------
+    if total_facts > FACTS_MAX_PER_FILE:
+        errors.append(GateError(
+            "TOO_MANY_FACTS",
+            f"File contains {total_facts} facts; the cap is "
+            f"{FACTS_MAX_PER_FILE} per board-file. Keep only the clearly "
+            "supported facts (routine meetings correctly produce empty "
+            "arrays)."))
 
     return GateResult(ok=not errors, errors=errors, warnings=warnings)

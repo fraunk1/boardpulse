@@ -1,0 +1,5 @@
+{
+  "source_excerpt": "Ms.\nWebb discussed petitions for penalty relief and the costs associated with processing\nand adjudicating the petitions.\n\nMs. Webb indicated that the Board received nine comments during the 45-day public\ncomment period, and that the comments and proposed responses were included in the\nmaterials.\n\nMs. Webb advised that Board staff developed modified text to address some of the\nconcerns raised by several commenters regarding the proposed upfront costs for\npetitions for penalty relief posing a barrier to individuals seeking such relief, among\nother things.",
+  "correct_facts": [],
+  "commentary": "NEGATIVE example. Handling public comments received during a rulemaking comment period is routine board procedure, not a genuinely new subject, so emerging_topics is empty. (This passage IS a policy action, but it is not an EMERGING topic.)"
+}

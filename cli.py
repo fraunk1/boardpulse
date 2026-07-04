@@ -46,6 +46,29 @@ def main():
         "--force", action="store_true",
         help="Bypass the ingest quality gate (manual overrides only)",
     )
+    summ.add_argument(
+        "--archive", action="store_true",
+        help="Prepare rollup-less archive prompts for out-of-window meetings "
+             "(back-history summaries; written to data/reports/archive/)",
+    )
+    summ.add_argument(
+        "--prune", action="store_true",
+        help="On ingest, clear summaries for covered meetings absent from the "
+             "file (rollup files only; off by default so backfill is safe)",
+    )
+
+    # facts — structured-fact extraction (policy, legislation, discipline, emerging)
+    fx = sub.add_parser("facts", help="Structured-facts extraction: prep / ingest / status")
+    fx.add_argument("--board", metavar="CODE", help="Limit to one board (e.g. HI_MD)")
+    fx.add_argument("--force", action="store_true",
+                    help="Prep: clear facts_extracted_at in scope first; "
+                         "ingest: skip the gate (writes unvalidated facts)")
+    fx.add_argument("--ingest", action="store_true",
+                    help="Ingest data/reports/facts/*_facts.json instead of prep")
+    fx.add_argument("--validate", action="store_true",
+                    help="Gate the facts files without writing (dry run)")
+    fx.add_argument("--status", action="store_true",
+                    help="Print per-board facts coverage and exit")
 
     # eval — gold-standard model eval harness
     ev = sub.add_parser("eval", help="Gold-standard eval harness (prepare|score|judge)")
@@ -180,6 +203,9 @@ async def dispatch(args):
     elif args.command == "summarize":
         await handle_summarize(args)
 
+    elif args.command == "facts":
+        await handle_facts(args)
+
     elif args.command == "exhibits":
         await handle_exhibits(args)
 
@@ -244,10 +270,32 @@ async def seed_boards(force: bool = False):
     print(f"\nNext: run 'python cli.py discover' to find meeting minutes pages.")
 
 
+async def handle_facts(args):
+    """Structured-facts extraction: prep / ingest / validate / status."""
+    from app.extractor.facts import (
+        prepare_facts_bundles, ingest_all_facts, ingest_facts_file,
+        facts_status, FACTS_DIR,
+    )
+    if args.status:
+        facts_status()
+        return
+    if args.validate:
+        rejected = [p.name for p in sorted(FACTS_DIR.glob("*_facts.json"))
+                    if not ingest_facts_file(p, dry_run=True)]
+        print(f"\nVALIDATE: {len(rejected)} file(s) failed the gate"
+              + (f" ({', '.join(rejected)})" if rejected else ""))
+        sys.exit(1 if rejected else 0)
+    if args.ingest:
+        ingested, rejected = ingest_all_facts()
+        sys.exit(1 if rejected else 0)
+    await prepare_facts_bundles(board_code=args.board, force=args.force)
+
+
 async def handle_summarize(args):
     """Handle the summarize command and its flags."""
     from app.extractor.summarizer import (
         prepare_all_bundles,
+        prepare_archive_bundles,
         ingest_all_summaries,
         ingest_board_summary,
         prepare_national_bundle,
@@ -260,10 +308,22 @@ async def handle_summarize(args):
         # (rejected boards leave data/reports/{code}_summary.errors.txt).
         if args.board:
             ok = await ingest_board_summary(
-                args.board, force=getattr(args, "force", False))
+                args.board, force=getattr(args, "force", False),
+                prune=getattr(args, "prune", False))
             sys.exit(0 if ok else 1)
-        ingested, rejected = await ingest_all_summaries()
+        ingested, rejected = await ingest_all_summaries(
+            force=getattr(args, "force", False),
+            prune=getattr(args, "prune", False))
         sys.exit(1 if rejected else 0)
+
+    if getattr(args, "archive", False):
+        # Prepare rollup-less archive prompts for out-of-window back-history.
+        paths = await prepare_archive_bundles(board_code=args.board)
+        print(f"\nARCHIVE PROMPTS READY: {len(paths)} chunk file(s) in "
+              f"{REPORTS_DIR}/archive/")
+        for p in paths:
+            print(f"  {p.name}")
+        return
 
     if args.national:
         # National synthesis mode: build synthesis prompt from per-board summaries

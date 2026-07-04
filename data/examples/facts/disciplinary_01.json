@@ -1,0 +1,20 @@
+{
+  "source_excerpt": "Dr. Soin moved to ratify the following proposed settlement agreements:\n\n•\nProposed consent agreements with Scott Steven Katzman, M.D.; Son M. Bach, M.D.; Michael D.\nBobb, Jr., D.O.; Seamus J. Walsh, D.O.; and Roman Kosiborod, D.O.\n•  Proposed step II consent agreement with Marshall Bahr, M.D.\n9\n\nState Medical Board of Ohio Meeting Minutes – May 8, 2024\n\n•  Proposed permanent surrenders with Maura Andronic, M.D.; Gerard Cosgrove, R.C.P.; Sean H.\nMcGrath, L.M.T.; Rodney Wayne Sosa, M.D.; Paris Richardson, L.M.T.; Paul S. Mitch, M.D. and\nAlphonso Vincent Monzo, L.M.T.",
+  "correct_facts": [
+    {
+      "category": "consent_order",
+      "count": 6,
+      "quote": "Proposed consent agreements with Scott Steven Katzman, M.D.; Son M. Bach, M.D.; Michael D.",
+      "source_document": "2024-05-08_Approved_May_2024_Board_Minutes.pdf",
+      "confidence": "high"
+    },
+    {
+      "category": "surrender",
+      "count": 7,
+      "quote": "Proposed permanent surrenders with Maura Andronic, M.D.; Gerard Cosgrove, R.C.P.; Sean H.",
+      "source_document": "2024-05-08_Approved_May_2024_Board_Minutes.pdf",
+      "confidence": "high"
+    }
+  ],
+  "commentary": "One row per category with a count. category='consent_order' covers the five listed consent agreements plus the one step-II consent agreement (count=6); category='surrender' covers the seven listed permanent surrenders (count=7). Counts come from enumerating the named individuals."
+}
