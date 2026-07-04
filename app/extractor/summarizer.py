@@ -797,7 +797,9 @@ async def ingest_all_summaries(
     await db.init_db()
 
     summary_files = sorted(REPORTS_DIR.glob("*_summary.md"))
-    archive_files = sorted(ARCHIVE_DIR.glob("*_summary.md"))
+    # Resolve the archive dir from the current REPORTS_DIR (not the frozen
+    # module constant) so tests that repoint REPORTS_DIR stay isolated.
+    archive_files = sorted((REPORTS_DIR / "archive").glob("*_summary.md"))
     if not summary_files and not archive_files:
         print("No summary files found in data/reports/ or archive/")
         return 0, []
