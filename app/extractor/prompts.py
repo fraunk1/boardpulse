@@ -169,7 +169,7 @@ Rules for the per-meeting sections:
 - One `=== MEETING: YYYY-MM-DD ===` block for EVERY meeting above whose text is present, using the exact dates from the reference table, newest first.
 - OMIT blocks for meetings marked "(No extracted text available)".
 - OMIT blocks for meetings marked "**[ALREADY SUMMARIZED — context only...]**" in the data below (and "*(already summarized — context only, no MEETING block)*" in the reference table). Those meetings already have stored summaries; their text is provided ONLY so you can ground the 12-month rollup narrative. Do NOT emit a `=== MEETING: date ===` block for them. Emit a MEETING block ONLY for the dates that carry full document text and are NOT flagged as already summarized.
-- The `topics:` line uses ONLY tags from this standard set that genuinely appear in THAT meeting (an empty `[]` is fine):
+- The `topics:` line: assign a tag ONLY when that subject was a substantive part of the meeting — a distinct agenda item, a decision, a report, or sustained discussion — NOT for a passing mention. Aim for the 2-4 tags that best characterize the meeting; do not pad the list. These tags drive trend charts, so over-tagging distorts the signal. Use ONLY tags from this standard set (an empty `[]` is fine):
   `AI`, `telehealth`, `opioids`, `IMLC`, `CME`, `scope-of-practice`, `disciplinary`, `rulemaking`, `workforce`, `patient-safety`, `controlled-substances`, `physician-wellness`, `licensing`, `legislation`, `public-health`
 - The frontmatter `topics` list is the union of the per-meeting topics.
 - End the file with `=== END ===`.
@@ -290,7 +290,7 @@ topics: []
 Rules for the per-meeting sections:
 - One `=== MEETING: YYYY-MM-DD ===` block for EVERY meeting above whose text is present, using the exact dates from the reference table, newest first.
 - OMIT blocks for meetings marked "(No extracted text available)".
-- The `topics:` line uses ONLY tags from this standard set that genuinely appear in THAT meeting (an empty `[]` is fine):
+- The `topics:` line: assign a tag ONLY when that subject was a substantive part of the meeting — a distinct agenda item, a decision, a report, or sustained discussion — NOT for a passing mention. Aim for the 2-4 tags that best characterize the meeting; do not pad the list. These tags drive trend charts, so over-tagging distorts the signal. Use ONLY tags from this standard set (an empty `[]` is fine):
   `AI`, `telehealth`, `opioids`, `IMLC`, `CME`, `scope-of-practice`, `disciplinary`, `rulemaking`, `workforce`, `patient-safety`, `controlled-substances`, `physician-wellness`, `licensing`, `legislation`, `public-health`
 - Do NOT write any 12-month rollup, board summary, YAML frontmatter, or `## Sources` table. The file is per-meeting blocks only.
 - End the file with `=== END ===`.

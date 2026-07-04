@@ -1,0 +1,368 @@
+{
+  "absent_boards": [],
+  "aggregate": {
+    "block_coverage": 1.0,
+    "boards_absent": 0,
+    "boards_scored": 8,
+    "citation_validity": 1.0,
+    "gold_name_recall": 0.9499,
+    "gold_number_recall": 0.8043,
+    "meeting_in_band_rate": 0.9792,
+    "name_verification": 1.0,
+    "topic_jaccard": 0.6795
+  },
+  "boards": {
+    "AZ_MD": {
+      "detail": {
+        "candidate_block_dates": [
+          "2025-07-09",
+          "2025-07-28",
+          "2025-07-31",
+          "2025-08-06",
+          "2025-08-26",
+          "2025-08-27",
+          "2025-09-03",
+          "2025-09-17",
+          "2025-09-22",
+          "2025-10-06",
+          "2025-10-08",
+          "2025-10-20",
+          "2025-10-30",
+          "2025-11-05",
+          "2025-12-03",
+          "2026-01-07",
+          "2026-01-09",
+          "2026-02-04",
+          "2026-02-12",
+          "2026-02-23",
+          "2026-02-25",
+          "2026-03-04",
+          "2026-04-01",
+          "2026-05-06",
+          "2026-07-01",
+          "2026-07-21"
+        ],
+        "candidate_names_total": 0,
+        "citation_note": "21/21 valid",
+        "extra_block_dates": [],
+        "gold_names_total": 0,
+        "gold_numbers_total": 58,
+        "missed_gold_names": [],
+        "missing_text_dates": [],
+        "unverified_names": []
+      },
+      "gate": {
+        "available": true,
+        "detail": "",
+        "passed": true
+      },
+      "metrics": {
+        "block_coverage": 1.0,
+        "citation_validity": 1.0,
+        "gold_name_recall": 1.0,
+        "gold_number_recall": 0.6724,
+        "meeting_in_band_rate": 1.0,
+        "name_verification": 1.0,
+        "rollup_in_band": true,
+        "rollup_words": 337,
+        "topic_jaccard": 0.6438
+      },
+      "pass": true,
+      "present": true,
+      "threshold_failures": []
+    },
+    "CA_DO": {
+      "detail": {
+        "candidate_block_dates": [
+          "2025-08-14",
+          "2025-11-13",
+          "2026-01-22",
+          "2026-04-23"
+        ],
+        "candidate_names_total": 4,
+        "citation_note": "18/18 valid",
+        "extra_block_dates": [],
+        "gold_names_total": 4,
+        "gold_numbers_total": 39,
+        "missed_gold_names": [],
+        "missing_text_dates": [],
+        "unverified_names": []
+      },
+      "gate": {
+        "available": true,
+        "detail": "",
+        "passed": true
+      },
+      "metrics": {
+        "block_coverage": 1.0,
+        "citation_validity": 1.0,
+        "gold_name_recall": 1.0,
+        "gold_number_recall": 0.641,
+        "meeting_in_band_rate": 1.0,
+        "name_verification": 1.0,
+        "rollup_in_band": true,
+        "rollup_words": 369,
+        "topic_jaccard": 0.748
+      },
+      "pass": true,
+      "present": true,
+      "threshold_failures": []
+    },
+    "HI_MD": {
+      "detail": {
+        "candidate_block_dates": [
+          "2025-08-01",
+          "2025-11-13",
+          "2025-12-11",
+          "2026-01-15",
+          "2026-02-12"
+        ],
+        "candidate_names_total": 39,
+        "citation_note": "22/22 valid",
+        "extra_block_dates": [],
+        "gold_names_total": 61,
+        "gold_numbers_total": 6,
+        "missed_gold_names": [
+          "2025-11-13: Elizabeth Char",
+          "2025-11-13: Ronald Kuroda",
+          "2026-01-15: Alan Brewer",
+          "2026-01-15: Elias Elias",
+          "2026-01-15: Frank Hiroshi Harris",
+          "2026-01-15: Kamshad Raiszadeh",
+          "2026-01-15: Kenneth Carl Russ"
+        ],
+        "missing_text_dates": [],
+        "unverified_names": []
+      },
+      "gate": {
+        "available": true,
+        "detail": "",
+        "passed": true
+      },
+      "metrics": {
+        "block_coverage": 1.0,
+        "citation_validity": 1.0,
+        "gold_name_recall": 0.8852,
+        "gold_number_recall": 1.0,
+        "meeting_in_band_rate": 1.0,
+        "name_verification": 1.0,
+        "rollup_in_band": true,
+        "rollup_words": 330,
+        "topic_jaccard": 0.741
+      },
+      "pass": true,
+      "present": true,
+      "threshold_failures": []
+    },
+    "MI_DO": {
+      "detail": {
+        "candidate_block_dates": [
+          "2025-08-07",
+          "2025-10-02",
+          "2025-12-04",
+          "2026-02-05",
+          "2026-04-02",
+          "2026-06-04"
+        ],
+        "candidate_names_total": 30,
+        "citation_note": "17/17 valid",
+        "extra_block_dates": [],
+        "gold_names_total": 30,
+        "gold_numbers_total": 9,
+        "missed_gold_names": [],
+        "missing_text_dates": [],
+        "unverified_names": []
+      },
+      "gate": {
+        "available": true,
+        "detail": "",
+        "passed": true
+      },
+      "metrics": {
+        "block_coverage": 1.0,
+        "citation_validity": 1.0,
+        "gold_name_recall": 1.0,
+        "gold_number_recall": 1.0,
+        "meeting_in_band_rate": 0.8333,
+        "name_verification": 1.0,
+        "rollup_in_band": true,
+        "rollup_words": 336,
+        "topic_jaccard": 0.6083
+      },
+      "pass": true,
+      "present": true,
+      "threshold_failures": []
+    },
+    "NE_MD": {
+      "detail": {
+        "candidate_block_dates": [
+          "2026-01-09",
+          "2026-02-09",
+          "2026-02-13",
+          "2026-03-13",
+          "2026-04-10",
+          "2026-05-08",
+          "2026-06-12"
+        ],
+        "candidate_names_total": 10,
+        "citation_note": "16/16 valid",
+        "extra_block_dates": [],
+        "gold_names_total": 8,
+        "gold_numbers_total": 33,
+        "missed_gold_names": [],
+        "missing_text_dates": [],
+        "unverified_names": []
+      },
+      "gate": {
+        "available": true,
+        "detail": "",
+        "passed": true
+      },
+      "metrics": {
+        "block_coverage": 1.0,
+        "citation_validity": 1.0,
+        "gold_name_recall": 1.0,
+        "gold_number_recall": 0.8788,
+        "meeting_in_band_rate": 1.0,
+        "name_verification": 1.0,
+        "rollup_in_band": true,
+        "rollup_words": 320,
+        "topic_jaccard": 0.5973
+      },
+      "pass": true,
+      "present": true,
+      "threshold_failures": []
+    },
+    "TX_MD": {
+      "detail": {
+        "candidate_block_dates": [
+          "2025-10-16",
+          "2025-12-11"
+        ],
+        "candidate_names_total": 5,
+        "citation_note": "15/15 valid",
+        "extra_block_dates": [],
+        "gold_names_total": 7,
+        "gold_numbers_total": 10,
+        "missed_gold_names": [
+          "2025-12-11: Maria Dolores Chapa",
+          "2025-12-11: Mary Talley Bowden"
+        ],
+        "missing_text_dates": [],
+        "unverified_names": []
+      },
+      "gate": {
+        "available": true,
+        "detail": "",
+        "passed": true
+      },
+      "metrics": {
+        "block_coverage": 1.0,
+        "citation_validity": 1.0,
+        "gold_name_recall": 0.7143,
+        "gold_number_recall": 0.4,
+        "meeting_in_band_rate": 1.0,
+        "name_verification": 1.0,
+        "rollup_in_band": true,
+        "rollup_words": 350,
+        "topic_jaccard": 0.6528
+      },
+      "pass": true,
+      "present": true,
+      "threshold_failures": []
+    },
+    "VT_MD": {
+      "detail": {
+        "candidate_block_dates": [
+          "2025-07-09",
+          "2025-07-16",
+          "2025-08-06",
+          "2025-08-20",
+          "2025-09-03",
+          "2025-09-17",
+          "2025-10-15",
+          "2025-11-05",
+          "2025-11-19",
+          "2025-12-03",
+          "2025-12-10",
+          "2026-01-21",
+          "2026-02-04",
+          "2026-02-18",
+          "2026-03-06",
+          "2026-03-18",
+          "2026-04-15",
+          "2026-05-20",
+          "2026-06-03",
+          "2026-06-15"
+        ],
+        "candidate_names_total": 0,
+        "citation_note": "21/21 valid",
+        "extra_block_dates": [],
+        "gold_names_total": 0,
+        "gold_numbers_total": 38,
+        "missed_gold_names": [],
+        "missing_text_dates": [],
+        "unverified_names": []
+      },
+      "gate": {
+        "available": true,
+        "detail": "",
+        "passed": true
+      },
+      "metrics": {
+        "block_coverage": 1.0,
+        "citation_validity": 1.0,
+        "gold_name_recall": 1.0,
+        "gold_number_recall": 0.8421,
+        "meeting_in_band_rate": 1.0,
+        "name_verification": 1.0,
+        "rollup_in_band": true,
+        "rollup_words": 309,
+        "topic_jaccard": 0.4446
+      },
+      "pass": false,
+      "present": true,
+      "threshold_failures": [
+        "topic_jaccard"
+      ]
+    },
+    "WY_MD": {
+      "detail": {
+        "candidate_block_dates": [
+          "2026-03-30"
+        ],
+        "candidate_names_total": 0,
+        "citation_note": "10/10 valid",
+        "extra_block_dates": [],
+        "gold_names_total": 0,
+        "gold_numbers_total": 2,
+        "missed_gold_names": [],
+        "missing_text_dates": [],
+        "unverified_names": []
+      },
+      "gate": {
+        "available": true,
+        "detail": "",
+        "passed": true
+      },
+      "metrics": {
+        "block_coverage": 1.0,
+        "citation_validity": 1.0,
+        "gold_name_recall": 1.0,
+        "gold_number_recall": 1.0,
+        "meeting_in_band_rate": 1.0,
+        "name_verification": 1.0,
+        "rollup_in_band": true,
+        "rollup_words": 310,
+        "topic_jaccard": 1.0
+      },
+      "pass": true,
+      "present": true,
+      "threshold_failures": []
+    }
+  },
+  "gate_evaluated": true,
+  "model_label": "opus-4.8",
+  "pass": false,
+  "run_id": "opus48-rehearsal"
+}
