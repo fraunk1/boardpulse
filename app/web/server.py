@@ -1,6 +1,7 @@
 """boardpulse web dashboard — Palantir-style intelligence interface."""
 import json
 import os
+import re
 import time
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -827,6 +828,22 @@ async def board_view(request: Request, code: str):
 _PAGE_COUNT_CACHE: dict = {}
 
 
+def _document_display_name(filename: str) -> str:
+    """Turn a stored filename into a readable document title.
+
+    Strips the `YYYY-MM-DD_` date prefix and extension, URL-decodes the
+    escaped spaces/punctuation, and tidies whitespace — so a reader sees
+    "Utilization of Medical Assistants" instead of
+    "2025-03-07_Utilization%20of%20Medical%20Assistants.pdf".
+    """
+    from urllib.parse import unquote
+    name = unquote(filename)
+    name = re.sub(r"^\d{4}-\d{2}-\d{2}[_-]+", "", name)   # drop date prefix
+    name = re.sub(r"\.(pdf|docx?|xlsx?|html?)$", "", name, flags=re.I)
+    name = re.sub(r"[_]+", " ", name).strip()
+    return name or filename
+
+
 @app.get("/meeting/{meeting_id}", response_class=HTMLResponse)
 async def meeting_view(request: Request, meeting_id: int):
     """Meeting detail — full summary, documents, exhibits."""
@@ -876,6 +893,7 @@ async def meeting_view(request: Request, meeting_id: int):
             "doc": d,
             "page_count": page_count,
             "is_pdf": file_path.suffix.lower() == ".pdf",
+            "display_name": _document_display_name(d.filename),
         })
 
     state_name = STATE_NAMES.get(board.state, board.state)
