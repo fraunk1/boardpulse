@@ -506,7 +506,8 @@ _FACT_ARRAYS = ("policy_actions", "legislation", "disciplinary",
 FACTS_TITLE_MAX = 200
 FACTS_QUOTE_MAX = 400
 FACTS_SLUG_MAX = 60          # emerging_topics.topic_slug column width
-FACTS_BILL_NUMBER_MAX = 30   # legislation_mentions.bill_number column width
+FACTS_BILL_NUMBER_MAX = 60   # bill numbers vary (compound refs, prefixes);
+#                              SQLite ignores the String(30) column hint
 FACTS_RULE_REF_MAX = 120     # policy_actions.rule_reference column width
 FACTS_MAX_PER_FILE = 100
 QUOTE_MISMATCH_MAX_FRACTION = 0.30
