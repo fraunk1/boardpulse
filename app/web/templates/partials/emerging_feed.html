@@ -11,9 +11,9 @@
         <i data-lucide="radar" class="w-3.5 h-3.5"></i> Emerging Issues
     </h2>
 
-    {% if emerging.has_data and emerging.items %}
+    {% if emerging.has_data and emerging['items'] %}
     <div class="space-y-3 stagger-in">
-        {% for it in emerging.items %}
+        {% for it in emerging['items'] %}
         <div class="summary-feed-item block">
             <div class="flex items-center gap-2 mb-1">
                 {% if it.first_mentioned_on %}
