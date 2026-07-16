@@ -81,6 +81,18 @@ def main():
     br.add_argument("--ym", type=str, default=None,
                     help="Target brief month YYYY-MM (default: latest / now)")
 
+    # artifact — self-contained dashboard HTML for the claude.ai Artifact
+    art = sub.add_parser(
+        "artifact",
+        help="Build the self-contained dashboard artifact HTML")
+    art.add_argument("--out", type=str, default=None,
+                     help="Output path (default: "
+                          "data/reports/artifact/boardpulse-dashboard.html)")
+    art.add_argument("--open", action="store_true",
+                     help="Open the built file in Chrome")
+    art.add_argument("--max-bytes", type=int, default=4_500_000,
+                     help="Fail if output exceeds this size (bytes)")
+
     # eval — gold-standard model eval harness
     ev = sub.add_parser("eval", help="Gold-standard eval harness (prepare|score|judge)")
     evsub = ev.add_subparsers(dest="eval_command", required=True)
@@ -243,6 +255,9 @@ async def dispatch(args):
     elif args.command == "exhibits":
         await handle_exhibits(args)
 
+    elif args.command == "artifact":
+        await handle_artifact(args)
+
     elif args.command == "status":
         await show_status()
 
@@ -393,6 +408,53 @@ async def handle_summarize(args):
         print("  2. Each subagent reads the prompt and writes the summary file")
         print("  3. Run 'python cli.py summarize --ingest' to store summaries in the DB")
         print("  4. Run 'python cli.py summarize --national' to prepare the synthesis prompt")
+
+
+async def handle_artifact(args):
+    """Build the self-contained dashboard artifact HTML (and maybe open it)."""
+    from pathlib import Path
+    from app.reports.artifact import (
+        build_artifact, ArtifactValidationError, ARTIFACT_DIR)
+    import app.database as db
+    import json
+
+    try:
+        path = await build_artifact(
+            out_path=Path(args.out) if args.out else None,
+            max_bytes=args.max_bytes)
+    except ArtifactValidationError as exc:
+        print("ARTIFACT VALIDATION FAILED:")
+        for v in exc.violations:
+            print(f"  - {v}")
+        if db.engine is not None:
+            await db.engine.dispose()
+        sys.exit(1)
+
+    if db.engine is not None:
+        await db.engine.dispose()
+
+    print(f"Artifact HTML written: {path}")
+
+    meta_path = ARTIFACT_DIR / "ARTIFACT.json"
+    if meta_path.exists():
+        try:
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            url = meta.get("artifact_url")
+            if url:
+                print(f"Published artifact URL (republish to keep it): {url}")
+        except (OSError, json.JSONDecodeError):
+            pass
+    else:
+        print("Not yet published as a claude.ai Artifact "
+              "(no ARTIFACT.json). See the boardpulse-refresh skill, step 7.")
+
+    if args.open:
+        if sys.platform == "win32":
+            subprocess.Popen(["cmd", "/c", "start", "chrome", str(path)])
+        elif sys.platform == "darwin":
+            subprocess.call(["open", "-a", "Google Chrome", str(path)])
+        else:
+            subprocess.call(["google-chrome", str(path)])
 
 
 async def handle_exhibits(args):

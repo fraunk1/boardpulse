@@ -363,6 +363,10 @@ def _sec_watchlist(con: sqlite3.Connection, since: str, until: str) -> list[dict
     A 'new hit' = a meeting_document whose text matches the term AND whose
     meeting was scraped inside the window. Up to 3 example citations per term.
     """
+    # Shared FTS5 sanitizer (same definition the search page uses). Imported
+    # here, not at module top, so importing brief stays dependency-light.
+    from app.stats import sanitize_fts_query
+
     cur = con.cursor()
     try:
         terms = cur.execute(
@@ -374,13 +378,7 @@ def _sec_watchlist(con: sqlite3.Connection, since: str, until: str) -> list[dict
     results = []
     for t in terms:
         term = t["term"]
-        # Sanitize into a safe FTS5 phrase (mirror server's _sanitize_fts_query).
-        tokens = term.split()
-        if tokens:
-            escaped = [tok.replace('"', '""') for tok in tokens]
-            fts_query = " ".join(f'"{tok}"' for tok in escaped)
-        else:
-            fts_query = f'"{term}"'
+        fts_query = sanitize_fts_query(term) or f'"{term}"'
         try:
             hits = cur.execute(
                 """

@@ -516,19 +516,8 @@ async def state_view(request: Request, abbr: str):
 _SEARCH_PAGE_SIZE = 25
 
 
-def _sanitize_fts_query(q: str) -> str:
-    """Turn free-typed user input into a safe FTS5 MATCH expression.
-
-    Splits on whitespace and wraps each token in double quotes, joined by
-    spaces. Quoting each token neutralizes FTS5 operators (AND/OR/NOT/NEAR,
-    column filters, prefix `*`) and unbalanced quotes — every token becomes
-    a literal phrase match, so the query can't raise a syntax error.
-    """
-    tokens = q.split()
-    if not tokens:
-        return ""
-    escaped = [tok.replace('"', '""') for tok in tokens]
-    return " ".join(f'"{tok}"' for tok in escaped)
+# Shared with the brief and artifact exporters — single definition in stats.
+_sanitize_fts_query = stats.sanitize_fts_query
 
 
 @app.get("/search", response_class=HTMLResponse)
@@ -650,44 +639,18 @@ def _load_coverage_ledger() -> dict:
 @app.get("/ops", response_class=HTMLResponse)
 async def ops_view(request: Request):
     """Operational status page — refresh health, per-board coverage, failures."""
-    async with db.async_session() as session:
-        boards = (await session.execute(
-            select(Board).order_by(Board.state, Board.code)
-        )).scalars().all()
-
-    per_board = await stats.per_board_counts()
     failures = await stats.extraction_failures()
     rollup = await stats.status_rollup()
-
-    coverage_rows = []
-    accounted = 0
-    have_docs = 0
-    for b in boards:
-        counts = per_board.get(b.code, {"mtgs": 0, "docs": 0, "docs_text": 0})
-        row_has_docs = counts["docs_text"] > 0
-        if row_has_docs:
-            have_docs += 1
-        is_accounted = b.discovery_status in ("none_published", "blocked") or row_has_docs
-        if is_accounted:
-            accounted += 1
-        coverage_rows.append({
-            "board": b,
-            "mtgs": counts["mtgs"],
-            "docs": counts["docs"],
-            "docs_text": counts["docs_text"],
-            "discovery_status": b.discovery_status,
-            "accounted": is_accounted,
-        })
-
-    total_boards = len(boards)
+    coverage = await stats.coverage_rollup()
+    total_boards = coverage["total_boards"]
 
     return templates.TemplateResponse(request, "ops.html", context={
         "last_refresh": _latest_refresh_log(),
-        "coverage_rows": coverage_rows,
+        "coverage_rows": coverage["rows"],
         "total_boards": total_boards,
-        "have_docs": have_docs,
-        "accounted": accounted,
-        "unaccounted": total_boards - accounted,
+        "have_docs": coverage["have_docs"],
+        "accounted": coverage["accounted"],
+        "unaccounted": total_boards - coverage["accounted"],
         "status_rollup": sorted(rollup.items()),
         "failures": failures,
         "failure_count": len(failures),

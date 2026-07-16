@@ -25,3 +25,11 @@ data/logs/
 # data/gold/ is COMMITTED on purpose — do not add an ignore rule for it
 data/eval/
 _targets.md
+# the artifact publish pointer IS committed — later sessions must republish to
+# the same claude.ai URL instead of minting a new artifact (last match wins,
+# so this unignore chain must stay BELOW the data/reports/ ignore lines)
+!data/reports/
+data/reports/*
+!data/reports/artifact/
+data/reports/artifact/*
+!data/reports/artifact/ARTIFACT.json
