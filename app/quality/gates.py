@@ -509,7 +509,11 @@ FACTS_SLUG_MAX = 60          # emerging_topics.topic_slug column width
 FACTS_BILL_NUMBER_MAX = 60   # bill numbers vary (compound refs, prefixes);
 #                              SQLite ignores the String(30) column hint
 FACTS_RULE_REF_MAX = 120     # policy_actions.rule_reference column width
-FACTS_MAX_PER_FILE = 100
+FACTS_RESPONDENT_MAX = 200   # disciplinary_actions.respondent column width
+# facts-v2 itemizes disciplinary actions (one entry per case), so a
+# discipline-heavy chunk legitimately carries hundreds of facts. The cap is
+# an anti-spam backstop, not a target.
+FACTS_MAX_PER_FILE = 500
 QUOTE_MISMATCH_MAX_FRACTION = 0.30
 
 _ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
@@ -527,9 +531,12 @@ _LEGISLATION_FIELDS = (
     ("topic", True), ("involvement", False), ("status_note", True),
     ("quote", True), ("source_document", False), ("confidence", False),
 )
+# facts-v2: respondent nullable (null = bulk entry); quote REQUIRED — each
+# disciplinary entry anchors on a verbatim quote, hard-checked like
+# emerging_topics.
 _DISCIPLINARY_FIELDS = (
-    ("category", False), ("quote", True), ("source_document", False),
-    ("confidence", False),
+    ("category", False), ("respondent", True), ("quote", False),
+    ("source_document", False), ("confidence", False),
 )
 _EMERGING_FIELDS = (
     ("topic_slug", False), ("subject", False), ("quote", False),
@@ -540,6 +547,27 @@ _EMERGING_FIELDS = (
 def _ws(text) -> str:
     """Whitespace-normalize: collapse all runs of whitespace to one space."""
     return " ".join(str(text or "").split())
+
+
+# Number words a quote might use instead of a digit — for the bulk-entry
+# rule (a count >= 2 must be visible in its own quote). Shared with the
+# provenance audit (app.quality.audit).
+NUM_WORDS = {
+    2: ("two", "both"), 3: ("three",), 4: ("four",), 5: ("five",),
+    6: ("six",), 7: ("seven",), 8: ("eight",), 9: ("nine",), 10: ("ten",),
+    11: ("eleven",), 12: ("twelve",), 13: ("thirteen",), 14: ("fourteen",),
+    15: ("fifteen",), 16: ("sixteen",), 17: ("seventeen",), 18: ("eighteen",),
+    19: ("nineteen",), 20: ("twenty",),
+}
+
+
+def count_visible(count: int, quote: str) -> bool:
+    """True when a numeric count is visible in the quote — as a digit string
+    or a number word. The anchor for bulk disciplinary entries."""
+    q = _ws(quote).lower()
+    if str(count) in q:
+        return True
+    return any(w in q for w in NUM_WORDS.get(count, ()))
 
 
 def _check_fields(
@@ -592,7 +620,8 @@ def _check_fields(
     caps = (("title", FACTS_TITLE_MAX), ("quote", FACTS_QUOTE_MAX),
             ("topic_slug", FACTS_SLUG_MAX),
             ("bill_number", FACTS_BILL_NUMBER_MAX),
-            ("rule_reference", FACTS_RULE_REF_MAX))
+            ("rule_reference", FACTS_RULE_REF_MAX),
+            ("respondent", FACTS_RESPONDENT_MAX))
     for key, cap in caps:
         val = fact.get(key)
         if isinstance(val, str) and len(val) > cap:
@@ -839,7 +868,7 @@ def check_facts(
                         "to 'low'. Copy quotes exactly from the source."))
             _subject_check(fact, where)
 
-        # --- disciplinary ---------------------------------------------------
+        # --- disciplinary (facts-v2: itemized; quote hard-checked) ----------
         for i, fact in enumerate(mrec["disciplinary"]):
             where = f"Meeting {d} disciplinary[{i}]"
             total_facts += 1
@@ -849,32 +878,51 @@ def check_facts(
                         errors)
             _check_enum(fact, "confidence", CONFIDENCE, where, errors)
             count = fact.get("count")
+            respondent = fact.get("respondent")
             if not isinstance(count, int) or isinstance(count, bool) \
-                    or count < 0:
+                    or count < 1:
                 errors.append(GateError(
                     "FIELD",
-                    f"{where} count is {count!r}; it must be a "
-                    "non-negative integer (the number of actions in that "
-                    "category at that meeting)."))
-            key = ("disciplinary", d, fact.get("category"))
-            if key in seen_keys:
+                    f"{where} count is {count!r}; it must be an integer "
+                    ">= 1 (1 for an itemized action; the stated total for "
+                    "a bulk entry). Never emit zero-count entries."))
+                continue
+            if respondent is not None and count != 1:
                 errors.append(GateError(
-                    "DUPLICATE_FACT",
-                    f"{where} duplicates category "
-                    f"'{fact.get('category')}' at this meeting. Emit one "
-                    "entry per category per meeting with the total count."))
+                    "COUNT_RULE",
+                    f"{where} names respondent '{respondent}' but has "
+                    f"count {count}. An itemized action is always count 1 "
+                    "— emit one entry per action."))
+            if respondent is None and count > 1 \
+                    and not count_visible(count, fact["quote"]):
+                errors.append(GateError(
+                    "COUNT_NOT_IN_QUOTE",
+                    f"{where} is a bulk entry (count {count}) but its "
+                    "quote does not contain that number. Bulk entries are "
+                    "allowed ONLY when the document itself states the "
+                    "total — quote the sentence stating it, or itemize "
+                    "the actions one entry each."))
+            if respondent is not None:
+                key = ("disciplinary", d, fact.get("category"),
+                       _ws(respondent).lower())
+                dup_msg = (f"{where} duplicates respondent '{respondent}' "
+                           f"for category '{fact.get('category')}' at this "
+                           "meeting. One entry per action.")
+            else:
+                key = ("disciplinary-bulk", d, fact.get("category"),
+                       _ws(fact["quote"]).lower())
+                dup_msg = (f"{where} duplicates a bulk entry with the same "
+                           "quote at this meeting. Merge them.")
+            if key in seen_keys:
+                errors.append(GateError("DUPLICATE_FACT", dup_msg))
             seen_keys.add(key)
-            quote = fact.get("quote")
-            if isinstance(quote, str) and quote.strip():
-                quote_checked += 1
-                if not _quote_ok(quote):
-                    quote_mismatched += 1
-                    fact["confidence"] = "low"
-                    warnings.append(GateError(
-                        "QUOTE_MISMATCH",
-                        f"{where} quote is not a verbatim substring of "
-                        "that meeting's source text — confidence forced "
-                        "to 'low'. Copy quotes exactly from the source."))
+            if not _quote_ok(fact["quote"]):
+                errors.append(GateError(
+                    "FABRICATED_QUOTE",
+                    f"{where} quote is not a verbatim substring of that "
+                    "meeting's source text. Disciplinary quotes anchor "
+                    "each action and must be copied exactly from the "
+                    "source."))
 
         # --- emerging_topics (quote REQUIRED + always hard-checked) ---------
         for i, fact in enumerate(mrec["emerging_topics"]):

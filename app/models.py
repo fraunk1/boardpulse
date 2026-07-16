@@ -161,10 +161,18 @@ class LegislationMention(Base):
 
 
 class DisciplinaryAction(Base):
-    """Fact class 3: per-meeting action counts by outcome category."""
+    """Fact class 3: itemized disciplinary actions (facts-v2).
+
+    One row per action: an ITEMIZED row carries the respondent (practitioner
+    name or case number as written) with action_count=1, so totals are
+    arithmetic over rows, not model-made tallies. A BULK row (respondent
+    NULL, action_count>=2) is allowed only when the document itself states
+    the total — the gate requires the number to be visible in the quote.
+    Legacy facts-v1 tally rows (respondent NULL, count unverified) remain
+    until the re-extraction backfill replaces them.
+    """
     __tablename__ = "disciplinary_actions"
     __table_args__ = (
-        UniqueConstraint("meeting_id", "category"),
         CheckConstraint(_check("category", DISCIPLINE_CATEGORIES)),
         CheckConstraint("action_count >= 0"),
         CheckConstraint(_check("confidence", CONFIDENCE)),
@@ -176,6 +184,8 @@ class DisciplinaryAction(Base):
     document_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("meeting_documents.id"), nullable=True)
     category: Mapped[str] = mapped_column(String(20))
+    respondent: Mapped[Optional[str]] = mapped_column(
+        String(200), nullable=True)
     action_count: Mapped[int] = mapped_column(Integer)
     quote: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     confidence: Mapped[str] = mapped_column(String(10))

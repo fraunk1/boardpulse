@@ -110,6 +110,39 @@ async def init_db(url: str | None = None):
                     await conn.exec_driver_sql(
                         f"ALTER TABLE {table} ADD COLUMN {col} {ddl}")
 
+        # facts-v2: itemized disciplinary rows. A pre-v2 table (no
+        # 'respondent' column) also carries UNIQUE(meeting_id, category),
+        # which SQLite can't drop in place — rebuild the table from the
+        # current model, preserving all legacy rows. Named indexes on the
+        # old table must be dropped first (RENAME keeps them attached under
+        # their old names, which would collide with the new table's).
+        rows = await conn.exec_driver_sql(
+            "PRAGMA table_info(disciplinary_actions)")
+        disc_cols = {r[1] for r in rows.fetchall()}
+        if disc_cols and "respondent" not in disc_cols:
+            await conn.exec_driver_sql(
+                "ALTER TABLE disciplinary_actions "
+                "RENAME TO _disciplinary_actions_v1")
+            idx = await conn.exec_driver_sql(
+                "PRAGMA index_list(_disciplinary_actions_v1)")
+            for r in idx.fetchall():
+                name = r[1]
+                if not name.startswith("sqlite_autoindex"):
+                    await conn.exec_driver_sql(
+                        f'DROP INDEX IF EXISTS "{name}"')
+            await conn.run_sync(
+                lambda c: Base.metadata.tables[
+                    "disciplinary_actions"].create(c))
+            await conn.exec_driver_sql(
+                "INSERT INTO disciplinary_actions "
+                "(id, run_id, meeting_id, document_id, category, "
+                " action_count, quote, confidence) "
+                "SELECT id, run_id, meeting_id, document_id, category, "
+                "       action_count, quote, confidence "
+                "FROM _disciplinary_actions_v1")
+            await conn.exec_driver_sql(
+                "DROP TABLE _disciplinary_actions_v1")
+
         for name, table, column in _SCHEMA_INDEXES:
             await conn.exec_driver_sql(
                 f"CREATE INDEX IF NOT EXISTS {name} ON {table} ({column})")

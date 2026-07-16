@@ -78,7 +78,7 @@ DISCIPLINE_CATEGORIES = (
 CONFIDENCE = ("high", "medium", "low")
 
 # Bumped only when the extraction contract itself changes shape.
-PROMPT_VERSION = "facts-v1"
+PROMPT_VERSION = "facts-v2"
 
 
 def _check(column: str, values: tuple[str, ...]) -> str:

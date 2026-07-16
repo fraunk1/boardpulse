@@ -583,18 +583,18 @@ def _write_facts(
                  fact.get("confidence"), fh))
             inserted += 1
 
-        # --- disciplinary (JSON 'count' -> column 'action_count') ---
+        # --- disciplinary (facts-v2 itemized; JSON 'count' -> 'action_count') ---
         for fact in mrec.get("disciplinary", []) or []:
             did = _resolve_doc(meeting_id, fact.get("source_document"),
                                docs_cache)
             con.execute(
                 """INSERT INTO disciplinary_actions
-                   (run_id, meeting_id, document_id, category, action_count,
-                    quote, confidence)
-                   VALUES (?,?,?,?,?,?,?)""",
+                   (run_id, meeting_id, document_id, category, respondent,
+                    action_count, quote, confidence)
+                   VALUES (?,?,?,?,?,?,?,?)""",
                 (run_id, meeting_id, did, fact.get("category"),
-                 fact.get("count"), fact.get("quote"),
-                 fact.get("confidence")))
+                 fact.get("respondent"), fact.get("count"),
+                 fact.get("quote"), fact.get("confidence")))
             inserted += 1
 
         # --- emerging_topics: UPSERT keeping earliest first_mentioned_on ---

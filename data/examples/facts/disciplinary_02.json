@@ -3,11 +3,12 @@
   "correct_facts": [
     {
       "category": "reprimand",
+      "respondent": "Benjamin M. Kotinsley, M.D.",
       "count": 1,
       "quote": "The Proposed Order, if adopted by the Board, will reprimand Dr. Kotinsley, establish probationary terms",
       "source_document": "2024-05-08_Approved_May_2024_Board_Minutes.pdf",
       "confidence": "medium"
     }
   ],
-  "commentary": "A single physician order carrying multiple sanctions. category='reprimand' is the primary outcome named ('will reprimand Dr. Kotinsley'), count=1. confidence='medium' because the order is described as 'if adopted by the Board' - proposed rather than already-final in this excerpt."
+  "commentary": "A single physician order carrying multiple sanctions. One itemized entry: respondent as written in the heading, category='reprimand' is the primary outcome named ('will reprimand Dr. Kotinsley'), count=1. confidence='medium' because the order is described as 'if adopted by the Board' - proposed rather than already-final in this excerpt."
 }

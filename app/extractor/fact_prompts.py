@@ -1,17 +1,23 @@
-"""Prompt builder for the structured-facts extraction pipeline (facts-v1).
+"""Prompt builder for the structured-facts extraction pipeline (facts-v2).
 
 Clones the summarize pattern (app/extractor/prompts.py): this module builds
 prompt bundle files that external Claude Code subagents consume — it never
 calls an LLM itself. The output contract is validated at ingest by
 app.quality.gates.check_facts, so every rule stated here is enforced by a
 deterministic check on the way into the database.
+
+facts-v2 (2026-07-16, Frank's V1-A ruling): disciplinary actions are
+ITEMIZED — one entry per action with the respondent named, so totals are
+arithmetic over rows instead of model-made tallies. Bulk entries survive
+only when the document itself states the total and the quote contains it.
 """
 import json
 
 from app.config import DATA_DIR
+from app.quality.gates import FACTS_MAX_PER_FILE
 from app.quality.taxonomy import (
-    CONFIDENCE, DISCIPLINE_CATEGORIES, INSTRUMENTS, INVOLVEMENTS, STAGES,
-    TOPICS, TOPIC_DEFINITIONS,
+    CONFIDENCE, DISCIPLINE_CATEGORIES, INSTRUMENTS, INVOLVEMENTS,
+    PROMPT_VERSION, STAGES, TOPICS, TOPIC_DEFINITIONS,
 )
 
 # Per-document slice budget. Unlike the summary pipeline's head-only cap,
@@ -37,13 +43,14 @@ EXAMPLES_DIR = DATA_DIR / "examples" / "facts"
 # The JSON contract, embedded verbatim in the prompt AND used as the single
 # reference for gate checks and tests.
 FACTS_CONTRACT = (
-    '{"schema_version":"facts-v1","board_code":"XX_MD",'
+    '{"schema_version":"' + PROMPT_VERSION + '","board_code":"XX_MD",'
     '"model":"<filled by agent>","meetings":[{"meeting_date":"YYYY-MM-DD",'
     '"policy_actions":[{instrument,stage,topic,title,description,'
     'rule_reference|null,action_date,quote|null,source_document,confidence}],'
     '"legislation":[{bill_number,bill_state,subject,topic|null,involvement,'
     'status_note|null,quote|null,source_document,confidence}],'
-    '"disciplinary":[{category,count,quote|null,source_document,confidence}],'
+    '"disciplinary":[{category,respondent|null,count,quote,source_document,'
+    'confidence}],'
     '"emerging_topics":[{topic_slug,subject,quote,source_document,'
     'confidence}]}]}'
 )
@@ -243,7 +250,7 @@ empty arrays if the meeting yields no facts):
 
 {covered_lines}
 
-## Output contract (schema_version "facts-v1")
+## Output contract (schema_version "{PROMPT_VERSION}")
 
 Emit exactly this shape — four fact arrays per meeting:
 
@@ -261,9 +268,16 @@ Field notes:
   in the minutes (e.g. "SB 123", "HB 4001"); `bill_state` is the two-letter
   state code (or "US" for federal bills). `involvement` is the board's
   described relationship to the bill.
-- `disciplinary` — per-meeting COUNTS of actions by outcome category.
-  `count` is a non-negative integer. One entry per category per meeting.
-  Disciplinary tables often sit at the END of the minutes — read to the end.
+- `disciplinary` — ONE ENTRY PER disciplinary action (itemized, never a
+  tally). `respondent` is the practitioner's name or case number EXACTLY as
+  written in the minutes; `count` is 1 for every itemized entry. When the
+  minutes state only a total ("closed the following fifteen complaints")
+  without listing individual cases, emit ONE bulk entry: respondent null,
+  `count` = the stated total, and a `quote` that CONTAINS that number — a
+  bulk count whose number is not in its quote is rejected. Every entry's
+  quote must name that specific action (`quote` is REQUIRED here and
+  hard-checked against the source). Disciplinary tables often sit at the
+  END of the minutes — read to the end.
 - `emerging_topics` — the first time this board discusses a genuinely NEW
   subject (not routine business). `topic_slug` is a short lowercase-hyphen
   slug (<= 60 chars, e.g. "ai-scribes"). Use sparingly.
@@ -286,8 +300,11 @@ Field notes:
 5. Use ONLY information contained in this file. Never invent facts, dates,
    counts, or rule numbers. When the text is ambiguous, prefer fewer facts
    at higher confidence over many facts at low confidence.
-6. Emit at most 100 facts total in this file. Routine procedural meetings
-   correctly produce empty arrays.
+6. Emit at most {FACTS_MAX_PER_FILE} facts total in this file. Routine
+   procedural meetings correctly produce empty arrays.
+7. Disciplinary entries are itemized — one entry per action, respondent
+   named as written, count 1. A bulk total is allowed only when its number
+   appears verbatim inside the quote.
 
 ## Examples
 

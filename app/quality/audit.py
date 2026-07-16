@@ -27,7 +27,7 @@ from pathlib import Path
 from typing import Optional
 
 from app.config import REPORTS_DIR
-from app.quality.gates import _ws
+from app.quality.gates import _ws, count_visible
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 DB_PATH = PROJECT_ROOT / "boardpulse.db"
@@ -35,16 +35,6 @@ AUDIT_PATH = REPORTS_DIR / "facts_audit.json"
 
 FACT_TABLES = ("disciplinary_actions", "policy_actions",
                "legislation_mentions", "emerging_topics")
-
-# For the count-visibility heuristic: number words a quote might use instead
-# of a digit. A miss means "needs human eyes", not "wrong".
-_NUM_WORDS = {
-    2: ("two", "both"), 3: ("three",), 4: ("four",), 5: ("five",),
-    6: ("six",), 7: ("seven",), 8: ("eight",), 9: ("nine",), 10: ("ten",),
-    11: ("eleven",), 12: ("twelve",), 13: ("thirteen",), 14: ("fourteen",),
-    15: ("fifteen",), 16: ("sixteen",), 17: ("seventeen",), 18: ("eighteen",),
-    19: ("nineteen",), 20: ("twenty",),
-}
 
 
 def _connect_ro(db_path: Optional[Path] = None) -> sqlite3.Connection:
@@ -54,10 +44,10 @@ def _connect_ro(db_path: Optional[Path] = None) -> sqlite3.Connection:
     return con
 
 
-def _count_visible(count: int, quote_norm_lower: str) -> bool:
-    if str(count) in quote_norm_lower:
-        return True
-    return any(w in quote_norm_lower for w in _NUM_WORDS.get(count, ()))
+# The bulk-entry visibility rule now lives in gates (the ingest gate
+# enforces it for facts-v2); the audit re-checks stored rows with the same
+# definition. Kept under the old name for callers/tests.
+_count_visible = count_visible
 
 
 def audit_facts(db_path: Optional[Path] = None,
