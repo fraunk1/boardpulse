@@ -433,8 +433,15 @@ def _sec_discipline(con: sqlite3.Connection, since: str, until: str) -> dict:
             """,
             (since[:10], until[:10]),
         ).fetchall()
+        boards_contributing = cur.execute(
+            "SELECT COUNT(DISTINCT board_code) FROM v_disciplinary "
+            "WHERE meeting_date > ? AND meeting_date <= ?",
+            (since[:10], until[:10]),
+        ).fetchone()[0]
+        total_boards = cur.execute("SELECT count(*) FROM boards").fetchone()[0]
     except sqlite3.OperationalError:
-        return {"rows": [], "trailing_start": None, "trailing_end": None}
+        return {"rows": [], "trailing_start": None, "trailing_end": None,
+                "boards_contributing": 0, "total_boards": 0}
 
     since_date = _parse_iso(since).date()
     trailing_start = (since_date - timedelta(days=90)).isoformat()
@@ -468,6 +475,8 @@ def _sec_discipline(con: sqlite3.Connection, since: str, until: str) -> dict:
         "rows": rows,
         "trailing_start": trailing_start,
         "trailing_end": trailing_end,
+        "boards_contributing": boards_contributing,
+        "total_boards": total_boards,
     }
 
 
@@ -629,6 +638,11 @@ def _render_markdown(data: dict) -> str:
         for r in disc["rows"]:
             L.append(f"| {r['category']} | {r['this_window']} | "
                      f"{r['trailing_avg']} |")
+        if disc.get("total_boards"):
+            L.append("")
+            L.append(f"_Basis: {disc.get('boards_contributing', 0)} of "
+                     f"{disc['total_boards']} boards reported discipline in "
+                     f"this window; meetings with readable documents only._")
     else:
         L.append("_Nothing this period._")
     L.append("")

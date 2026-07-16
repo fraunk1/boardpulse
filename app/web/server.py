@@ -281,7 +281,12 @@ async def trends_view(request: Request):
     legislation = await trends.legislation_table()
     discipline = await trends.discipline_trends()
 
+    async with db.async_session() as session:
+        total_boards = (await session.execute(
+            select(func.count(Board.id)))).scalar()
+
     return templates.TemplateResponse(request, "trends.html", context={
+        "total_boards": total_boards,
         "gaining": gaining,
         "topics_over_time": tot,
         "rulemaking": rulemaking,
@@ -639,12 +644,15 @@ def _load_coverage_ledger() -> dict:
 @app.get("/ops", response_class=HTMLResponse)
 async def ops_view(request: Request):
     """Operational status page — refresh health, per-board coverage, failures."""
+    from app.quality.audit import latest_audit
+
     failures = await stats.extraction_failures()
     rollup = await stats.status_rollup()
     coverage = await stats.coverage_rollup()
     total_boards = coverage["total_boards"]
 
     return templates.TemplateResponse(request, "ops.html", context={
+        "facts_audit": latest_audit(),
         "last_refresh": _latest_refresh_log(),
         "coverage_rows": coverage["rows"],
         "total_boards": total_boards,

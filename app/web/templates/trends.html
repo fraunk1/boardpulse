@@ -94,6 +94,7 @@
             <i data-lucide="line-chart" class="w-3.5 h-3.5"></i> Topics Over Time
         </h2>
         <p class="text-xs text-bp-steel mb-4 max-w-2xl">How often the six most-discussed topics came up in board meetings, quarter by quarter.</p>
+        <p class="text-[11px] text-bp-mist italic mb-4 max-w-2xl">Basis: counts are of meetings; the topic label on each meeting is AI-assigned during summarization.</p>
         <div class="bg-white border border-bp-cloud rounded-xl p-4">
             {% if topics_over_time.series %}
             <div id="chart-topics"></div>
@@ -113,6 +114,7 @@
 
         {% if rulemaking.has_data %}
         <p class="text-xs text-bp-steel mb-4 max-w-2xl">Where board rulemaking sits in its lifecycle, and how many rules boards have formally adopted each quarter.</p>
+        <p class="text-[11px] text-bp-mist italic mb-4 max-w-2xl">Basis: {{ rulemaking.boards_contributing }} of {{ total_boards }} boards; meetings with readable documents only.</p>
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div class="bg-white border border-bp-cloud rounded-xl p-4">
                 <div class="text-xs font-semibold text-bp-navy mb-3">Rulemaking pipeline</div>
@@ -137,6 +139,7 @@
         </h2>
 
         {% if legislation.has_data %}
+        <p class="text-[11px] text-bp-mist italic mb-4 max-w-2xl">Basis: {{ legislation.boards_contributing }} of {{ total_boards }} boards; meetings with readable documents only.</p>
         <div class="bg-white border border-bp-cloud rounded-xl overflow-hidden">
             <div class="overflow-x-auto">
                 <table class="w-full text-sm">
@@ -179,7 +182,8 @@
         <h2 class="section-label flex items-center gap-1.5 mb-4">
             <i data-lucide="scale" class="w-3.5 h-3.5"></i> Disciplinary Actions
         </h2>
-        <p class="text-xs text-bp-mist italic mb-4 max-w-2xl">Counts reflect what boards reported in minutes; reporting practices differ by state.</p>
+        <p class="text-xs text-bp-mist italic mb-4 max-w-2xl">Counts reflect what boards reported in minutes; reporting practices differ by state.
+        {% if discipline.has_data %}Basis: {{ discipline.boards_contributing }} of {{ total_boards }} boards; meetings with readable documents only.{% endif %}</p>
 
         {% if discipline.has_data %}
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">

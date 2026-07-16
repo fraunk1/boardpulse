@@ -69,6 +69,58 @@
         </div>
     </div>
 
+    <!-- Provenance Audit -->
+    <div class="mb-8">
+        <h2 class="section-label flex items-center gap-1.5 mb-3">
+            <i data-lucide="shield-check" class="w-3.5 h-3.5"></i>
+            Provenance Audit
+        </h2>
+        <div class="bg-white border border-bp-cloud rounded-xl p-5">
+            {% if facts_audit %}
+            <div class="flex items-center gap-3 mb-3">
+                <span class="w-1.5 h-1.5 rounded-full {% if facts_audit.overall.quote_verified == facts_audit.overall.quoted %}bg-bp-teal{% else %}bg-amber-500{% endif %}"></span>
+                <span class="text-sm text-bp-navy font-semibold">
+                    {{ "{:,}".format(facts_audit.overall.quote_verified) }} of
+                    {{ "{:,}".format(facts_audit.overall.quoted) }} stored quotes verify verbatim
+                    against stored document text
+                    {% if facts_audit.overall.quote_verified_pct is not none %}({{ facts_audit.overall.quote_verified_pct }}%){% endif %}
+                </span>
+                <span class="text-xs text-bp-mist">{{ facts_audit.generated_at[:19] }}Z</span>
+            </div>
+            <table class="w-full text-xs">
+                <thead>
+                    <tr class="text-left text-[10px] font-mono text-bp-mist uppercase tracking-wider">
+                        <th class="py-1.5 pr-4">Fact type</th>
+                        <th class="py-1.5 pr-4">Rows</th>
+                        <th class="py-1.5 pr-4">Quotes verified</th>
+                        <th class="py-1.5 pr-4">Doc-linked</th>
+                        <th class="py-1.5 pr-4">Boards</th>
+                        <th class="py-1.5">Legacy tallies flagged</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for table, t in facts_audit.tables.items() %}
+                    <tr class="border-t border-bp-cloud text-bp-steel">
+                        <td class="py-1.5 pr-4 font-mono text-bp-navy">{{ table.replace('_', ' ') }}</td>
+                        <td class="py-1.5 pr-4">{{ "{:,}".format(t.rows) }}</td>
+                        <td class="py-1.5 pr-4 {% if t.quote_verified < t.quoted %}text-amber-600 font-semibold{% endif %}">{{ "{:,}".format(t.quote_verified) }}/{{ "{:,}".format(t.quoted) }}</td>
+                        <td class="py-1.5 pr-4">{{ "{:,}".format(t.doc_linked) }}</td>
+                        <td class="py-1.5 pr-4">{{ t.boards_contributing }}/{{ facts_audit.total_boards }}</td>
+                        <td class="py-1.5">{% if t.multi_count_rows is defined %}{{ "{:,}".format(t.count_not_in_quote) }} of {{ "{:,}".format(t.multi_count_rows) }} multi-counts not visible in their quote{% else %}—{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <p class="text-[11px] text-bp-mist italic mt-3">Re-run with <span class="font-mono">python cli.py facts --audit</span>. Legacy tally rows retire as the itemized re-extraction lands.</p>
+            {% else %}
+            <div class="flex items-center gap-2 text-bp-mist text-sm">
+                <i data-lucide="circle-slash" class="w-4 h-4"></i>
+                No audit run yet — run <span class="font-mono">python cli.py facts --audit</span>.
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
     <!-- Status Rollup -->
     <div class="mb-8">
         <h2 class="section-label flex items-center gap-1.5 mb-3">

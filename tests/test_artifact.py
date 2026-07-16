@@ -66,7 +66,8 @@ async def _seed(db_file: Path, now: datetime):
         s.add(MeetingDocument(
             meeting_id=m1.id, doc_type="minutes", filename="min.pdf",
             file_path="XX_MD/min.pdf",
-            content_text="The board discussed AI and telehealth policy.",
+            content_text="The board discussed AI and telehealth policy. "
+                         "Dr. Case was fined for late renewal.",
             scraped_at=now - timedelta(days=2)))
         s.add(WatchlistTerm(term="AI", label="AI",
                             created_at=now - timedelta(days=90)))
@@ -78,6 +79,17 @@ async def _seed(db_file: Path, now: datetime):
 
     async with db.engine.begin() as conn:
         await conn.exec_driver_sql("INSERT INTO doc_fts(doc_fts) VALUES('rebuild')")
+        # One in-window disciplinary fact so the Sources card has a quote.
+        await conn.exec_driver_sql(
+            "INSERT INTO extraction_runs (id, board_id, prompt_version, "
+            "source_file, meetings_covered, facts_inserted, status, "
+            "created_at) VALUES (1,1,'facts-v1','x.json',1,1,'ingested',"
+            "'2026-07-01 10:00:00')")
+        await conn.exec_driver_sql(
+            "INSERT INTO disciplinary_actions (run_id, meeting_id, "
+            "document_id, category, action_count, quote, confidence) "
+            "VALUES (1,1,1,'fine',1,"
+            "'Dr. Case was fined for late renewal','high')")
     await db.engine.dispose()
 
 
@@ -119,10 +131,13 @@ def built(tmp_path, monkeypatch):
 
     Returns (html, out_path).
     """
+    from app.quality import audit as audit_mod
+
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     briefs, reports = _write_inputs(tmp_path, now)
     monkeypatch.setattr(brief_mod, "BRIEFS_DIR", briefs)
     monkeypatch.setattr(artifact_mod, "REPORTS_DIR", reports)
+    monkeypatch.setattr(audit_mod, "AUDIT_PATH", tmp_path / "facts_audit.json")
     # Point the ledger lookup at tmp (no coverage_ledger.json -> []).
     monkeypatch.setattr(artifact_mod, "PROJECT_ROOT", tmp_path)
 
@@ -130,6 +145,7 @@ def built(tmp_path, monkeypatch):
 
     async def run():
         await _seed(tmp_path / "a.db", now)
+        audit_mod.audit_facts(db_path=tmp_path / "a.db", write=True)
         path = await artifact_mod.build_artifact(out_path=out)
         await db.engine.dispose()
         return path
@@ -197,6 +213,20 @@ def test_rollup_script_escaped(built):
     assert "alert(2)" not in html
 
 
+def test_sources_and_verification_card(built):
+    html, _ = built
+    assert "Sources &amp; verification" in html
+    # Audit scorecard rendered (1 quoted fact, verified).
+    assert "stored quotes verify word-for-word" in html
+    # The in-window disciplinary fact's quote appears in the expander.
+    assert "Dr. Case was fined for late renewal" in html
+    # All four fact-type expanders present.
+    for label in ("Discipline", "Rules &amp; policy", "Bills", "Emerging topics"):
+        assert label in html
+    # Footer carries the audit line.
+    assert "Provenance audit" in html
+
+
 def test_theme_and_charts_present(built):
     html, _ = built
     assert "prefers-color-scheme: dark" in html
@@ -208,10 +238,13 @@ def test_theme_and_charts_present(built):
 
 
 def test_size_cap_enforced(tmp_path, monkeypatch):
+    from app.quality import audit as audit_mod
+
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     briefs, reports = _write_inputs(tmp_path, now)
     monkeypatch.setattr(brief_mod, "BRIEFS_DIR", briefs)
     monkeypatch.setattr(artifact_mod, "REPORTS_DIR", reports)
+    monkeypatch.setattr(audit_mod, "AUDIT_PATH", tmp_path / "facts_audit.json")
     monkeypatch.setattr(artifact_mod, "PROJECT_ROOT", tmp_path)
 
     async def run():
@@ -230,12 +263,15 @@ def test_size_cap_enforced(tmp_path, monkeypatch):
 def test_empty_db_degrades_gracefully(tmp_path, monkeypatch):
     """No boards, no brief, no landscape — build still succeeds with
     placeholder states (mirrors trends.py's has_data philosophy)."""
+    from app.quality import audit as audit_mod
+
     empty_briefs = tmp_path / "briefs"
     empty_reports = tmp_path / "reports"
     empty_briefs.mkdir()
     empty_reports.mkdir()
     monkeypatch.setattr(brief_mod, "BRIEFS_DIR", empty_briefs)
     monkeypatch.setattr(artifact_mod, "REPORTS_DIR", empty_reports)
+    monkeypatch.setattr(audit_mod, "AUDIT_PATH", tmp_path / "facts_audit.json")
     monkeypatch.setattr(artifact_mod, "PROJECT_ROOT", tmp_path)
 
     db.DATABASE_URL = f"sqlite+aiosqlite:///{(tmp_path / 'e.db').as_posix()}"

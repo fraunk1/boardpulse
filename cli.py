@@ -71,6 +71,10 @@ def main():
                     help="Gate the facts files without writing (dry run)")
     fx.add_argument("--status", action="store_true",
                     help="Print per-board facts coverage and exit")
+    fx.add_argument("--audit", action="store_true",
+                    help="Provenance audit: re-verify every stored quote "
+                         "against stored document text; write the scorecard "
+                         "to data/reports/facts_audit.json")
 
     # brief — monthly delta brief (build / ingest prose / render PDF)
     br = sub.add_parser("brief", help="Monthly delta brief: build / ingest prose / PDF")
@@ -327,6 +331,12 @@ async def handle_facts(args):
     )
     if args.status:
         facts_status()
+        return
+    if getattr(args, "audit", False):
+        from app.quality.audit import audit_facts, print_scorecard, AUDIT_PATH
+        scorecard = audit_facts()
+        print_scorecard(scorecard)
+        print(f"\nScorecard written: {AUDIT_PATH}")
         return
     if args.validate:
         rejected = [p.name for p in sorted(FACTS_DIR.glob("*_facts.json"))

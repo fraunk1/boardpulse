@@ -229,6 +229,7 @@ async def rulemaking_pipeline(today: date | None = None) -> dict:
         "pipeline": [],
         "quarters": last_n_quarters(12, today),
         "adopted_series": [{"name": "Rules adopted", "data": []}],
+        "boards_contributing": 0,
     }
     if not await _table_has_rows("policy_actions"):
         return empty
@@ -237,6 +238,9 @@ async def rulemaking_pipeline(today: date | None = None) -> dict:
     q_set = set(quarters)
 
     async with db.async_session() as session:
+        boards_contributing = (await session.execute(text(
+            "SELECT COUNT(DISTINCT board_code) FROM v_policy_actions"
+        ))).scalar() or 0
         stage_rows = (await session.execute(text("""
             SELECT stage, COUNT(*) AS n
             FROM v_policy_actions
@@ -265,6 +269,7 @@ async def rulemaking_pipeline(today: date | None = None) -> dict:
         "pipeline": pipeline,
         "quarters": quarters,
         "adopted_series": [{"name": "Rules adopted", "data": adopted_data}],
+        "boards_contributing": boards_contributing,
     }
 
 
@@ -275,11 +280,14 @@ async def legislation_table(limit: int = 40, today: date | None = None) -> dict:
     Otherwise: one row per (bill, state) with how the board engaged and how
     many boards touched it, most-recently-seen first.
     """
-    empty = {"has_data": False, "rows": []}
+    empty = {"has_data": False, "rows": [], "boards_contributing": 0}
     if not await _table_has_rows("legislation_mentions"):
         return empty
 
     async with db.async_session() as session:
+        boards_contributing = (await session.execute(text(
+            "SELECT COUNT(DISTINCT board_code) FROM v_legislation"
+        ))).scalar() or 0
         rows = (await session.execute(text("""
             SELECT bill_number,
                    bill_state,
@@ -312,7 +320,8 @@ async def legislation_table(limit: int = 40, today: date | None = None) -> dict:
             "last_seen": last_seen,
             "topic": (r.topic or "").replace("-", " "),
         })
-    return {"has_data": True, "rows": table_rows}
+    return {"has_data": True, "rows": table_rows,
+            "boards_contributing": boards_contributing}
 
 
 async def discipline_trends(today: date | None = None) -> dict:
@@ -331,12 +340,16 @@ async def discipline_trends(today: date | None = None) -> dict:
         "quarters": quarters,
         "category_series": [],
         "per_state": [],
+        "boards_contributing": 0,
     }
     if not await _table_has_rows("disciplinary_actions"):
         return empty
 
     q_set = set(quarters)
     async with db.async_session() as session:
+        boards_contributing = (await session.execute(text(
+            "SELECT COUNT(DISTINCT board_code) FROM v_disciplinary"
+        ))).scalar() or 0
         cat_rows = (await session.execute(text("""
             SELECT quarter, category, SUM(action_count) AS n
             FROM v_disciplinary
@@ -372,6 +385,7 @@ async def discipline_trends(today: date | None = None) -> dict:
         "quarters": quarters,
         "category_series": category_series,
         "per_state": per_state,
+        "boards_contributing": boards_contributing,
     }
 
 

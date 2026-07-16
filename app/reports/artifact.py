@@ -404,6 +404,68 @@ def _build_map_svg(state_statuses: dict[str, str]) -> str:
         + "".join(css) + paths + "</svg>")
 
 
+_SOURCE_ROW_CAP = 30
+_SOURCE_QUOTE_WORDS = 40
+
+
+async def _window_fact_sources(since: str, until: str) -> list[dict]:
+    """The verbatim quotes behind this window's fact-backed numbers, per
+    fact type — the artifact's expandable 'show your work' payload
+    (Frank's V4-C ruling). Rows capped; quotes truncated."""
+    s, u = since[:10], until[:10]
+    sections: list[dict] = []
+    async with db.async_session() as session:
+        async def grab(label, count_sql, rows_sql):
+            total = (await session.execute(
+                text(count_sql), {"s": s, "u": u})).scalar() or 0
+            rows = (await session.execute(
+                text(rows_sql), {"s": s, "u": u,
+                                 "l": _SOURCE_ROW_CAP})).all()
+            sections.append({"label": label, "total": total, "rows": [
+                {"who": r.who, "when": str(r.when_)[:10], "what": r.what,
+                 "quote": _truncate_words(r.quote or "",
+                                          _SOURCE_QUOTE_WORDS)}
+                for r in rows]})
+
+        await grab(
+            "Discipline",
+            "SELECT COUNT(*) FROM v_disciplinary "
+            "WHERE meeting_date > :s AND meeting_date <= :u",
+            "SELECT board_code AS who, meeting_date AS when_, "
+            "       category || ' x ' || action_count AS what, quote "
+            "FROM v_disciplinary "
+            "WHERE meeting_date > :s AND meeting_date <= :u "
+            "ORDER BY meeting_date DESC LIMIT :l")
+        await grab(
+            "Rules & policy",
+            "SELECT COUNT(*) FROM v_policy_actions "
+            "WHERE action_date > :s AND action_date <= :u",
+            "SELECT board_code AS who, action_date AS when_, "
+            "       title AS what, quote "
+            "FROM v_policy_actions "
+            "WHERE action_date > :s AND action_date <= :u "
+            "ORDER BY action_date DESC LIMIT :l")
+        await grab(
+            "Bills",
+            "SELECT COUNT(*) FROM v_legislation "
+            "WHERE meeting_date > :s AND meeting_date <= :u",
+            "SELECT board_code AS who, meeting_date AS when_, "
+            "       bill_state || ' ' || bill_number AS what, quote "
+            "FROM v_legislation "
+            "WHERE meeting_date > :s AND meeting_date <= :u "
+            "ORDER BY meeting_date DESC LIMIT :l")
+        await grab(
+            "Emerging topics",
+            "SELECT COUNT(*) FROM emerging_topics "
+            "WHERE first_mentioned_on > :s AND first_mentioned_on <= :u",
+            "SELECT b.code AS who, et.first_mentioned_on AS when_, "
+            "       et.subject AS what, et.quote "
+            "FROM emerging_topics et JOIN boards b ON b.id = et.board_id "
+            "WHERE et.first_mentioned_on > :s AND et.first_mentioned_on <= :u "
+            "ORDER BY et.first_mentioned_on DESC LIMIT :l")
+    return sections
+
+
 def _load_coverage_ledger() -> list[dict]:
     """coverage_ledger.json as [{code, status, date, note}], or []."""
     ledger_path = PROJECT_ROOT / "coverage_ledger.json"
@@ -465,6 +527,8 @@ async def build_artifact(out_path: Path | None = None,
     brief = _latest_brief()
     window_since = (brief or {}).get("window", {}).get("since") \
         or (datetime.now() - timedelta(days=35)).isoformat(sep=" ")
+    window_until = (brief or {}).get("window", {}).get("until") \
+        or datetime.now().isoformat(sep=" ")
 
     grid = await _board_grid(window_since)
     changed_count = sum(1 for r in grid if r["changed"])
@@ -502,6 +566,10 @@ async def build_artifact(out_path: Path | None = None,
         regressed = [c.strip() for c in run.boards_regressed.split(",")
                      if c.strip()]
 
+    from app.quality.audit import latest_audit
+    audit = latest_audit()
+    fact_sources = await _window_fact_sources(window_since, window_until)
+
     ctx = {
         "generated_on": today.isoformat(),
         "header": {
@@ -526,6 +594,8 @@ async def build_artifact(out_path: Path | None = None,
         "boards": grid,
         "changed_count": changed_count,
         "ledger": _load_coverage_ledger(),
+        "audit": audit,
+        "fact_sources": fact_sources,
         "chart_colors_light": CHART_COLORS_LIGHT,
         "chart_colors_dark": CHART_COLORS_DARK,
     }

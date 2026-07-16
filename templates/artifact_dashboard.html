@@ -348,6 +348,36 @@
         </div>
       </div>
     </div>
+
+    <div class="bp-card" id="bp-sources">
+      <h3>Sources &amp; verification</h3>
+      {% if audit %}
+      <p style="margin:0 0 10px;font-size:13.5px">
+        <b>{{ "{:,}".format(audit.overall.quote_verified) }}</b> of
+        <b>{{ "{:,}".format(audit.overall.quoted) }}</b> stored quotes verify word-for-word
+        against the stored meeting documents{% if audit.overall.quote_verified_pct is not none %}
+        ({{ audit.overall.quote_verified_pct }}%){% endif %}.
+        <span class="bp-statechip">audit {{ audit.generated_at[:10] }}</span>
+      </p>
+      {% else %}
+      <p class="bp-empty">No provenance audit on record yet.</p>
+      {% endif %}
+      {% for sec in fact_sources %}
+      <details class="bp-sec">
+        <summary>{{ sec.label }} &mdash; {{ sec.total }} record(s) this period{% if sec.total > sec.rows|length %} (showing {{ sec.rows|length }}){% endif %}</summary>
+        <div class="bp-md">
+          {% if sec.rows %}
+          <ul>
+            {% for r in sec.rows %}
+            <li><b>{{ r.who }}</b> &middot; {{ r.when }} &middot; {{ r.what }}{% if r.quote %}<br><em>&ldquo;{{ r.quote }}&rdquo;</em>{% endif %}</li>
+            {% endfor %}
+          </ul>
+          {% else %}<p class="bp-empty">Nothing this period.</p>{% endif %}
+        </div>
+      </details>
+      {% endfor %}
+      <div class="bp-key" style="margin-top:10px">Every fact row stores the word-for-word sentence it came from; the monthly audit re-checks all of them against the stored documents. Click-through to document pages lives on the local dashboard.</div>
+    </div>
   </section>
 
   <!-- ================= MONTH IN BRIEF ================= -->
@@ -377,6 +407,7 @@
         {% endfor %}
       </div>
       {% else %}<p class="bp-empty">No topic data yet.</p>{% endif %}
+      <div class="bp-key" style="margin-top:8px">Basis: counts are of meetings; the topic label on each meeting is AI-assigned during summarization.</div>
     </div>
     <div class="bp-cols">
       <div class="bp-card">
@@ -467,6 +498,7 @@
   <footer class="bp-foot">
     Board Pulse &middot; descriptive record of what state medical boards did and discussed &mdash; not guidance on what they should do.
     Snapshot {{ generated_on }} &middot; full interactive dashboard runs locally (cli.py serve).
+    {% if audit %}<br>Provenance audit {{ audit.generated_at[:10] }}: {{ "{:,}".format(audit.overall.quote_verified) }}/{{ "{:,}".format(audit.overall.quoted) }} quotes verified verbatim{% if audit.overall.quote_verified_pct is not none %} ({{ audit.overall.quote_verified_pct }}%){% endif %} &middot; details under Pulse &rarr; Sources &amp; verification.{% endif %}
   </footer>
 </div>
 
