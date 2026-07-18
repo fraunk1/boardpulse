@@ -48,8 +48,12 @@
     <div class="mb-8">
         <h2 class="section-label flex items-center gap-1.5 mb-3">
             <i data-lucide="bar-chart-3" class="w-3.5 h-3.5"></i>
-            Meetings mentioning {{ topic_name }} by quarter
+            {{ topic_name }} discussion by quarter
         </h2>
+        <p class="text-xs text-bp-steel max-w-2xl mb-3">
+            <span class="font-semibold text-bp-navy">Bars — meetings mentioning:</span> how many board meetings raised {{ topic_name }} that quarter (a board that discussed it at three meetings counts three).
+            <span class="font-semibold text-bp-navy">Line — boards discussing:</span> how many <em>different</em> boards raised it (that same board counts once). The bars show how often it came up; the line shows how widely, across boards.
+        </p>
         <div class="bg-white border border-bp-cloud rounded-xl p-4">
             <div id="chart-topic-quarterly"></div>
         </div>

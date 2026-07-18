@@ -93,8 +93,8 @@
         <h2 class="section-label flex items-center gap-1.5 mb-4">
             <i data-lucide="line-chart" class="w-3.5 h-3.5"></i> Topics Over Time
         </h2>
-        <p class="text-xs text-bp-steel mb-4 max-w-2xl">How often the six most-discussed topics came up in board meetings, quarter by quarter.</p>
-        <p class="text-[11px] text-bp-mist italic mb-4 max-w-2xl">Basis: counts are of meetings; the topic label on each meeting is AI-assigned during summarization.</p>
+        <p class="text-xs text-bp-steel mb-4 max-w-2xl">Each line is one of the six most-discussed topics; its height is how many board meetings raised it that quarter.</p>
+        <p class="text-[11px] text-bp-mist italic mb-4 max-w-2xl">Basis: counts are of meetings; the topic label on each meeting is AI-assigned during summarization. <span class="text-bp-teal">Click a topic's point or legend to see every meeting that discussed it.</span></p>
         <div class="bg-white border border-bp-cloud rounded-xl p-4">
             {% if topics_over_time.series %}
             <div id="chart-topics"></div>
@@ -117,11 +117,13 @@
         <p class="text-[11px] text-bp-mist italic mb-4 max-w-2xl">Basis: {{ rulemaking.boards_contributing }} of {{ total_boards }} boards; meetings with readable documents only.</p>
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div class="bg-white border border-bp-cloud rounded-xl p-4">
-                <div class="text-xs font-semibold text-bp-navy mb-3">Rulemaking pipeline</div>
+                <div class="text-xs font-semibold text-bp-navy mb-1">Rulemaking pipeline</div>
+                <div class="text-[11px] text-bp-mist mb-3">Each bar is a stage of the rule lifecycle; its length is how many rule/policy actions sit at that stage.</div>
                 <div id="chart-rulemaking-pipeline"></div>
             </div>
             <div class="bg-white border border-bp-cloud rounded-xl p-4">
-                <div class="text-xs font-semibold text-bp-navy mb-3">Rules adopted by quarter</div>
+                <div class="text-xs font-semibold text-bp-navy mb-1">Rules adopted by quarter</div>
+                <div class="text-[11px] text-bp-mist mb-3">How many rules boards formally finalized (adopted) in each quarter.</div>
                 <div id="chart-rulemaking-adopted"></div>
             </div>
         </div>
@@ -154,7 +156,8 @@
                     </thead>
                     <tbody class="divide-y divide-bp-cloud">
                         {% for r in legislation.rows %}
-                        <tr class="hover:bg-bp-frost transition-colors">
+                        <tr class="hover:bg-bp-frost transition-colors {% if r.meeting_id %}cursor-pointer{% endif %}"
+                            {% if r.meeting_id %}onclick="window.location='/meeting/{{ r.meeting_id }}'" title="Open the source meeting"{% endif %}>
                             <td class="px-4 py-2.5 whitespace-nowrap">
                                 <span class="font-mono font-semibold text-bp-navy">{{ r.bill_state }} {{ r.bill_number }}</span>
                             </td>
@@ -188,11 +191,13 @@
         {% if discipline.has_data %}
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div class="bg-white border border-bp-cloud rounded-xl p-4">
-                <div class="text-xs font-semibold text-bp-navy mb-3">Actions by outcome, by quarter</div>
+                <div class="text-xs font-semibold text-bp-navy mb-1">Actions by outcome, by quarter</div>
+                <div class="text-[11px] text-bp-mist mb-3">Each bar is a quarter; the colored segments are outcome types (revocation, suspension, fine…) and segment height is the number of actions.</div>
                 <div id="chart-discipline-stacked"></div>
             </div>
             <div class="bg-white border border-bp-cloud rounded-xl p-4">
-                <div class="text-xs font-semibold text-bp-navy mb-3">Actions by state, last 12 months</div>
+                <div class="text-xs font-semibold text-bp-navy mb-1">Actions by state, last 12 months</div>
+                <div class="text-[11px] text-bp-mist mb-3">Each bar is a state; its height is the total disciplinary actions reported there over the last year.</div>
                 <div id="chart-discipline-state"></div>
             </div>
         </div>
@@ -212,11 +217,26 @@ document.addEventListener('DOMContentLoaded', function () {
     // --- Topics over time (line) ---
     const totEl = document.getElementById('chart-topics');
     if (totEl) {
+        // Clicking a topic's line-point or its legend label drills into
+        // /topic/{slug} — every meeting that discussed it, on to the source.
+        const gotoTopic = function (name) {
+            if (name) window.location = '/topic/' + encodeURIComponent(name);
+        };
         const opts = BPCharts.merge(base, {
-            chart: { type: 'line', height: 320 },
+            chart: {
+                type: 'line', height: 320,
+                events: {
+                    markerClick: function (e, ctx, cfg) {
+                        gotoTopic(cfg.w.config.series[cfg.seriesIndex].name);
+                    },
+                    legendClick: function (ctx, i, cfg) {
+                        gotoTopic(cfg.config.series[i].name);
+                    },
+                },
+            },
             series: {{ topics_over_time.series | tojson }},
             stroke: { width: 2, curve: 'smooth' },
-            markers: { size: 0, hover: { size: 4 } },
+            markers: { size: 0, hover: { size: 6 } },
             xaxis: { categories: {{ topics_over_time.quarters | tojson }} },
             yaxis: { title: { text: 'Meetings mentioning', style: { fontSize: '11px', fontWeight: 500, color: '#97A8BD' } } },
             legend: { position: 'top', horizontalAlign: 'left' },

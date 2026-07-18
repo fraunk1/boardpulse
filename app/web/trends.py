@@ -289,16 +289,22 @@ async def legislation_table(limit: int = 40, today: date | None = None) -> dict:
             "SELECT COUNT(DISTINCT board_code) FROM v_legislation"
         ))).scalar() or 0
         rows = (await session.execute(text("""
-            SELECT bill_number,
-                   bill_state,
-                   MAX(subject) AS subject,
-                   GROUP_CONCAT(DISTINCT involvement) AS involvements,
-                   COUNT(DISTINCT board_code) AS boards,
-                   MAX(meeting_date) AS last_seen,
-                   MAX(topic) AS topic
-            FROM v_legislation
-            WHERE meeting_date <= date('now')
-            GROUP BY bill_number, bill_state
+            SELECT vl.bill_number,
+                   vl.bill_state,
+                   MAX(vl.subject) AS subject,
+                   GROUP_CONCAT(DISTINCT vl.involvement) AS involvements,
+                   COUNT(DISTINCT vl.board_code) AS boards,
+                   MAX(vl.meeting_date) AS last_seen,
+                   MAX(vl.topic) AS topic,
+                   -- meeting_id of this bill's most-recent mention, so the row
+                   -- links straight to a source meeting (drill-through).
+                   (SELECT vl2.meeting_id FROM v_legislation vl2
+                    WHERE vl2.bill_number = vl.bill_number
+                      AND vl2.bill_state = vl.bill_state
+                    ORDER BY vl2.meeting_date DESC LIMIT 1) AS meeting_id
+            FROM v_legislation vl
+            WHERE vl.meeting_date <= date('now')
+            GROUP BY vl.bill_number, vl.bill_state
             ORDER BY last_seen DESC
             LIMIT :limit
         """), {"limit": limit})).all()
@@ -319,6 +325,7 @@ async def legislation_table(limit: int = 40, today: date | None = None) -> dict:
             "boards": r.boards,
             "last_seen": last_seen,
             "topic": (r.topic or "").replace("-", " "),
+            "meeting_id": r.meeting_id,
         })
     return {"has_data": True, "rows": table_rows,
             "boards_contributing": boards_contributing}
