@@ -253,23 +253,6 @@ async def test_watchlist_counts_new_hits(seeded_db):
     assert "**AI**" in md
 
 
-async def test_discipline_this_window_vs_trailing(seeded_db):
-    run_id = _add_extraction_run(seeded_db)
-    con = sqlite3.connect(seeded_db)
-    # In-window discipline (meeting 1, 2026-06-18)
-    con.execute(
-        "INSERT INTO disciplinary_actions (run_id, meeting_id, category, "
-        "action_count, confidence) VALUES (?,1,'revocation',3,'high')", (run_id,))
-    con.commit()
-    con.close()
-
-    sidecar = brief_mod.build_brief("2026-07-01T12:00:00+00:00", db_path=seeded_db)
-    disc = sidecar["sections"]["discipline"]
-    rows = {r["category"]: r for r in disc["rows"]}
-    assert "revocation" in rows
-    assert rows["revocation"]["this_window"] == 3
-
-
 # ---------------------------------------------------------------------------
 # Empty fact tables -> 'nothing this period', no crash
 # ---------------------------------------------------------------------------
@@ -285,7 +268,6 @@ async def test_empty_fact_tables_degrade_gracefully(seeded_db):
     assert counts["rule_changes"] == 0
     assert counts["bills"] == 0
     assert counts["first_mentions"] == 0
-    assert counts["discipline_categories"] == 0
 
 
 async def test_no_watchlist_terms_message(seeded_db):

@@ -110,11 +110,11 @@ def test_trends_smoke(client):
     r = client.get("/trends")
     assert r.status_code == 200
     body = r.text
-    # all five anchored sections present
-    for anchor in ("emerging", "topics", "rulemaking", "legislation", "discipline"):
+    # the anchored sections present (disciplinary removed 2026-07-18)
+    for anchor in ("emerging", "topics", "rulemaking", "legislation"):
         assert f'id="{anchor}"' in body
-    # discipline caveat line is present verbatim
-    assert "reporting practices differ by state" in body
+    # disciplinary is gone entirely
+    assert 'id="discipline"' not in body
     # ApexCharts is loaded on this page (vendored, offline)
     assert "/static/vendor/apexcharts.min.js" in body
 

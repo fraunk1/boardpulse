@@ -226,7 +226,6 @@ def _sec_by_the_numbers(con: sqlite3.Connection, prior: Optional[dict]) -> dict:
         "documents": one("SELECT count(*) FROM meeting_documents"),
         "policy_actions": one("SELECT count(*) FROM policy_actions"),
         "legislation": one("SELECT count(*) FROM legislation_mentions"),
-        "disciplinary": one("SELECT count(*) FROM disciplinary_actions"),
         "emerging_topics": one("SELECT count(*) FROM emerging_topics"),
     }
 
@@ -237,7 +236,6 @@ def _sec_by_the_numbers(con: sqlite3.Connection, prior: Optional[dict]) -> dict:
         "documents": "Documents held",
         "policy_actions": "Rule / policy actions",
         "legislation": "Bills mentioned",
-        "disciplinary": "Discipline records",
         "emerging_topics": "First-mention topics",
     }
     for key, label in labels.items():
@@ -415,71 +413,6 @@ def _sec_watchlist(con: sqlite3.Connection, since: str, until: str) -> list[dict
     return results
 
 
-def _sec_discipline(con: sqlite3.Connection, since: str, until: str) -> dict:
-    """Section 8 — discipline category counts this window vs. trailing-3-month avg.
-
-    'This window' = disciplinary_actions whose meeting_date is in the window.
-    'Trailing avg' = the monthly average over the 3 full months preceding the
-    window start (a stable baseline to say 'more than usual / less than usual').
-    """
-    cur = con.cursor()
-    try:
-        this_rows = cur.execute(
-            """
-            SELECT da.category, COALESCE(SUM(da.action_count), 0) AS n
-            FROM v_disciplinary da
-            WHERE da.meeting_date > ? AND da.meeting_date <= ?
-            GROUP BY da.category
-            """,
-            (since[:10], until[:10]),
-        ).fetchall()
-        boards_contributing = cur.execute(
-            "SELECT COUNT(DISTINCT board_code) FROM v_disciplinary "
-            "WHERE meeting_date > ? AND meeting_date <= ?",
-            (since[:10], until[:10]),
-        ).fetchone()[0]
-        total_boards = cur.execute("SELECT count(*) FROM boards").fetchone()[0]
-    except sqlite3.OperationalError:
-        return {"rows": [], "trailing_start": None, "trailing_end": None,
-                "boards_contributing": 0, "total_boards": 0}
-
-    since_date = _parse_iso(since).date()
-    trailing_start = (since_date - timedelta(days=90)).isoformat()
-    trailing_end = since_date.isoformat()
-    try:
-        trail_rows = cur.execute(
-            """
-            SELECT da.category, COALESCE(SUM(da.action_count), 0) AS n
-            FROM v_disciplinary da
-            WHERE da.meeting_date > ? AND da.meeting_date <= ?
-            GROUP BY da.category
-            """,
-            (trailing_start, trailing_end),
-        ).fetchall()
-    except sqlite3.OperationalError:
-        trail_rows = []
-
-    this_map = {r["category"]: r["n"] for r in this_rows}
-    trail_map = {r["category"]: r["n"] for r in trail_rows}
-    categories = sorted(set(this_map) | set(trail_map))
-    rows = []
-    for cat in categories:
-        this_n = this_map.get(cat, 0)
-        trail_avg = round(trail_map.get(cat, 0) / 3.0, 1)
-        rows.append({
-            "category": cat.replace("_", " "),
-            "this_window": this_n,
-            "trailing_avg": trail_avg,
-        })
-    return {
-        "rows": rows,
-        "trailing_start": trailing_start,
-        "trailing_end": trailing_end,
-        "boards_contributing": boards_contributing,
-        "total_boards": total_boards,
-    }
-
-
 def _sec_new_meetings(con: sqlite3.Connection, since: str, until: str) -> list[dict]:
     """Section 9 (appendix) — new meetings grouped by state.
 
@@ -628,24 +561,6 @@ def _render_markdown(data: dict) -> str:
         L.append("_No watchlist terms configured._")
     L.append("")
 
-    # Section 8 — discipline
-    L.append("## Discipline")
-    L.append("")
-    disc = data["sections"]["discipline"]
-    if disc["rows"]:
-        L.append("| Category | This window | Trailing 3-mo avg |")
-        L.append("| --- | ---: | ---: |")
-        for r in disc["rows"]:
-            L.append(f"| {r['category']} | {r['this_window']} | "
-                     f"{r['trailing_avg']} |")
-        if disc.get("total_boards"):
-            L.append("")
-            L.append(f"_Basis: {disc.get('boards_contributing', 0)} of "
-                     f"{disc['total_boards']} boards reported discipline in "
-                     f"this window; meetings with readable documents only._")
-    else:
-        L.append("_Nothing this period._")
-    L.append("")
 
     # Section 9 — appendix: new meetings by state
     L.append("## Appendix — new meetings by state")
@@ -799,7 +714,6 @@ def build_brief(now_iso: str, db_path: Optional[Path] = None) -> dict:
             "rule_changes": _sec_rule_changes(con, since, until),
             "bills": _sec_bills(con, since, until),
             "watchlist": _sec_watchlist(con, since, until),
-            "discipline": _sec_discipline(con, since, until),
             "new_meetings": _sec_new_meetings(con, since, until),
         }
     finally:
@@ -833,10 +747,8 @@ def build_brief(now_iso: str, db_path: Optional[Path] = None) -> dict:
                 "bills": len(sections["bills"]),
                 "watchlist_terms": len(sections["watchlist"]),
                 "watchlist_hits": sum(w["count"] for w in sections["watchlist"]),
-                "discipline_categories": len(sections["discipline"]["rows"]),
                 "new_meetings": len(sections["new_meetings"]),
             },
-            "discipline": sections["discipline"],
         },
         "generated_at": _to_naive_utc_iso(datetime.now(timezone.utc)),
     }

@@ -583,19 +583,11 @@ def _write_facts(
                  fact.get("confidence"), fh))
             inserted += 1
 
-        # --- disciplinary (facts-v2 itemized; JSON 'count' -> 'action_count') ---
-        for fact in mrec.get("disciplinary", []) or []:
-            did = _resolve_doc(meeting_id, fact.get("source_document"),
-                               docs_cache)
-            con.execute(
-                """INSERT INTO disciplinary_actions
-                   (run_id, meeting_id, document_id, category, respondent,
-                    action_count, quote, confidence)
-                   VALUES (?,?,?,?,?,?,?,?)""",
-                (run_id, meeting_id, did, fact.get("category"),
-                 fact.get("respondent"), fact.get("count"),
-                 fact.get("quote"), fact.get("confidence")))
-            inserted += 1
+        # --- disciplinary: NOT ingested (Frank's decision 2026-07-18) ---
+        # boardpulse tracks boards' topics of interest/concern, not individual
+        # disciplinary cases. The DELETE above clears any stray rows; the
+        # extraction may still emit a "disciplinary" array (contract unchanged),
+        # but it is intentionally dropped here and never stored.
 
         # --- emerging_topics: UPSERT keeping earliest first_mentioned_on ---
         for fact in mrec.get("emerging_topics", []) or []:

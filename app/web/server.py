@@ -272,14 +272,12 @@ async def national_overview(request: Request):
 
 @app.get("/trends", response_class=HTMLResponse)
 async def trends_view(request: Request):
-    """Trends dashboard — topics over time (live), plus rulemaking,
-    legislation, and discipline (fact-backed, empty-guarded until extraction
-    runs)."""
+    """Trends dashboard — topics over time (live), plus rulemaking and
+    legislation (fact-backed, empty-guarded until extraction runs)."""
     gaining = await trends.gaining_traction(limit=6)
     tot = await trends.topics_over_time(top_n=6)
     rulemaking = await trends.rulemaking_pipeline()
     legislation = await trends.legislation_table()
-    discipline = await trends.discipline_trends()
 
     async with db.async_session() as session:
         total_boards = (await session.execute(
@@ -291,7 +289,6 @@ async def trends_view(request: Request):
         "topics_over_time": tot,
         "rulemaking": rulemaking,
         "legislation": legislation,
-        "discipline": discipline,
         "current_quarter": trends.current_quarter_label(),
         "breadcrumbs": [
             {"label": "National", "url": "/"},

@@ -421,7 +421,9 @@ async def test_ingest_success_writes_all_tables(facts_db):
     c = _counts(db_file)
     assert c["policy"] == 1
     assert c["legislation"] == 1
-    assert c["disciplinary"] == 2
+    # disciplinary is validated by the gate but NOT ingested (removed
+    # 2026-07-18: boardpulse tracks topics/concerns, not case tallies).
+    assert c["disciplinary"] == 0
     assert c["emerging"] == 1
     assert c["runs_ingested"] == 1
     # BOTH covered meetings marked, including the all-empty D2.
@@ -461,39 +463,6 @@ async def test_double_ingest_is_idempotent(facts_db):
         assert first[k] == second[k], f"{k} count changed on re-ingest"
     assert second["runs_ingested"] == 2  # provenance rows accumulate...
     assert second["facts_extracted"] == 2  # ...but facts do not duplicate
-
-
-async def test_disciplinary_replaced_not_duplicated(facts_db):
-    """Re-ingesting a meeting REPLACES its disciplinary rows (facts-v2:
-    a bulk tally corrected into two itemized rows)."""
-    from app.extractor.facts import ingest_facts_file
-    db_file, out_dir, _ = facts_db
-
-    # First ingest: one bulk revocation row (count=2).
-    ingest_facts_file(_write_facts_file(out_dir, _good_data()))
-
-    # Second ingest: the same meeting, now itemized into two entries.
-    data = _good_data()
-    data["meetings"][0]["disciplinary"] = [
-        {"category": "revocation", "respondent": "Dr. A", "count": 1,
-         "quote": "two licenses were revoked",
-         "source_document": "may.pdf", "confidence": "high"},
-        {"category": "revocation", "respondent": "Dr. B", "count": 1,
-         "quote": "two licenses were revoked",
-         "source_document": "may.pdf", "confidence": "high"},
-    ]
-    assert ingest_facts_file(_write_facts_file(out_dir, data)) is True
-
-    con = sqlite3.connect(db_file)
-    try:
-        rows = con.execute(
-            "SELECT respondent, action_count FROM disciplinary_actions "
-            "WHERE category='revocation' ORDER BY respondent").fetchall()
-    finally:
-        con.close()
-    # Delete-and-replace per meeting: the bulk row is gone, two itemized
-    # rows remain, and the total is arithmetic (1+1 = the old tally).
-    assert rows == [("Dr. A", 1), ("Dr. B", 1)]
 
 
 async def test_emerging_earliest_date_wins(facts_db):

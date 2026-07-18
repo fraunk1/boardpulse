@@ -29,7 +29,7 @@
     <div class="flex items-end justify-between mb-6">
         <div>
             <h1 class="text-2xl font-bold text-bp-navy tracking-tight">What Boards Are Working On</h1>
-            <p class="text-sm text-bp-steel mt-1">How topics, rules, bills, and discipline are trending across state medical boards</p>
+            <p class="text-sm text-bp-steel mt-1">How topics, rules, and bills are trending across state medical boards</p>
         </div>
         <div class="text-[10px] font-mono text-bp-mist uppercase tracking-wider text-right">
             LAST 12 QUARTERS &bull; {{ current_quarter }} in progress
@@ -42,8 +42,7 @@
             ("emerging", "Gaining traction"),
             ("topics", "Topics over time"),
             ("rulemaking", "Rulemaking"),
-            ("legislation", "Legislation"),
-            ("discipline", "Discipline")
+            ("legislation", "Legislation")
         ] %}
         <a href="#{{ anchor }}" class="trend-nav-link text-xs font-medium text-bp-steel hover:text-bp-teal px-3 py-1.5 rounded-lg hover:bg-bp-frost transition-colors">
             {{ label }}
@@ -178,33 +177,6 @@
         {% endif %}
     </section>
 
-    <!-- ================================================================= -->
-    <!-- 5. DISCIPLINE (facts — empty-guarded) -->
-    <!-- ================================================================= -->
-    <section id="discipline" class="trend-section mb-12">
-        <h2 class="section-label flex items-center gap-1.5 mb-4">
-            <i data-lucide="scale" class="w-3.5 h-3.5"></i> Disciplinary Actions
-        </h2>
-        <p class="text-xs text-bp-mist italic mb-4 max-w-2xl">Counts reflect what boards reported in minutes; reporting practices differ by state.
-        {% if discipline.has_data %}Basis: {{ discipline.boards_contributing }} of {{ total_boards }} boards; meetings with readable documents only.{% endif %}</p>
-
-        {% if discipline.has_data %}
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div class="bg-white border border-bp-cloud rounded-xl p-4">
-                <div class="text-xs font-semibold text-bp-navy mb-1">Actions by outcome, by quarter</div>
-                <div class="text-[11px] text-bp-mist mb-3">Each bar is a quarter; the colored segments are outcome types (revocation, suspension, fine…) and segment height is the number of actions.</div>
-                <div id="chart-discipline-stacked"></div>
-            </div>
-            <div class="bg-white border border-bp-cloud rounded-xl p-4">
-                <div class="text-xs font-semibold text-bp-navy mb-1">Actions by state, last 12 months</div>
-                <div class="text-[11px] text-bp-mist mb-3">Each bar is a state; its height is the total disciplinary actions reported there over the last year.</div>
-                <div id="chart-discipline-state"></div>
-            </div>
-        </div>
-        {% else %}
-        {{ fact_empty("Disciplinary action counts will appear here once minutes are run through fact extraction.") }}
-        {% endif %}
-    </section>
 
 </div>
 {% endblock %}
@@ -272,33 +244,6 @@ document.addEventListener('DOMContentLoaded', function () {
         new ApexCharts(raEl, opts).render();
     }
 
-    // --- Discipline stacked (column) ---
-    const dsEl = document.getElementById('chart-discipline-stacked');
-    if (dsEl) {
-        const opts = BPCharts.merge(base, {
-            chart: { type: 'bar', height: 320, stacked: true },
-            series: {{ discipline.category_series | tojson }},
-            plotOptions: { bar: { columnWidth: '60%', borderRadius: 2 } },
-            xaxis: { categories: {{ discipline.quarters | tojson }} },
-            legend: { position: 'top', horizontalAlign: 'left' },
-        });
-        new ApexCharts(dsEl, opts).render();
-    }
-
-    // --- Discipline by state (horizontal bar) ---
-    const dstEl = document.getElementById('chart-discipline-state');
-    if (dstEl) {
-        const per = {{ discipline.per_state | tojson }};
-        const opts = BPCharts.merge(base, {
-            chart: { type: 'bar', height: 320 },
-            series: [{ name: 'Actions', data: per.map(s => s.count) }],
-            colors: ['#576A83'],
-            plotOptions: { bar: { horizontal: true, borderRadius: 2, barHeight: '70%' } },
-            xaxis: { categories: per.map(s => s.state) },
-            legend: { show: false },
-        });
-        new ApexCharts(dstEl, opts).render();
-    }
 });
 </script>
 {% endblock %}
