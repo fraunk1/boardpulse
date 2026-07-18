@@ -19,6 +19,11 @@
         </div>
     </div>
 
+    <!-- What you're looking at -->
+    <p class="text-sm text-bp-steel max-w-2xl -mt-4 mb-8">
+        These are the boards that license and discipline physicians in {{ state_name }}{% if board_data | length > 1 %} — some states run separate MD and DO boards{% endif %}. Select a board to open its meeting timeline, AI-generated summaries, and links to the source minutes.
+    </p>
+
     <!-- Board Cards -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 stagger-in">
         {% for item in board_data %}

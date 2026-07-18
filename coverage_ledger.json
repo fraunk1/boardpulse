@@ -2,12 +2,14 @@
   "KS_MD": {
     "date": "2026-07-02",
     "status": "blocked",
-    "note": "Current site (ksbha.ks.gov) sits behind a state-level bot wall that rejects automated collection. Archived 2023-24 minutes/agendas were recovered from the Internet Archive and are in the library; CURRENT minutes need either a records request or a hand download from the live site."
+    "note": "Current site (ksbha.ks.gov) sits behind a state-level bot wall that rejects automated collection. Archived 2023-24 minutes/agendas were recovered from the Internet Archive and are in the library; CURRENT minutes need either a records request or a hand download from the live site.",
+    "public_note": "The Kansas board's current website blocks automated collection. Archived 2023–2024 minutes are included here; for the most current minutes, download them directly from the board's site or submit a records request."
   },
   "KY_MD": {
-    "date": "2026-07-02",
+    "date": "2026-07-18",
     "status": "none_published",
-    "note": "KBML publishes no meeting minutes or agendas anywhere (re-verified 2026-07-02: no minutes category in its document search, none in sitemap). It DOES publish monthly Board Action Reports, quarterly newsletters, and an annual report at kbml.ky.gov. Actual minutes require an open-records request."
+    "note": "KBML publishes no meeting minutes or agendas anywhere (re-verified 2026-07-02: no minutes category in its document search, none in sitemap). It DOES publish monthly Board Action Reports, quarterly newsletters, and an annual report at kbml.ky.gov. Actual minutes require an open-records request. NOTE (2026-07-18): a collector for the monthly Board Action Reports was built and tested (PDFs downloadable 2020-present with browser UA+Referer at https://kbml.ky.gov/board/Board Action Reports/YYYY-MM MonthName.pdf) but Frank reviewed them and DECLINED — they are bare disciplinary case lists, not substantive meeting content. Do not ingest without a new decision.",
+    "public_note": "The Kentucky Board of Medical Licensure does not post its meeting minutes online. Under Kentucky's Open Meetings Act (KRS 61.835), minutes must be recorded and open to public inspection on request, but the state does not require them to be published on the web. To obtain the minutes, submit a Kentucky Open Records request to the board."
   },
   "WY_MD": {
     "date": "2026-07-03",
@@ -27,6 +29,7 @@
   "WV_DO": {
     "date": "2026-07-02",
     "status": "none_published",
-    "note": "Board site is wvbdosteo.org (bdosteo.wv.gov no longer resolves). Minutes page exists but has not been updated since May 2019, though SOS open-meetings filings confirm the board meets regularly through June 2026. Board Orders library is current. Minutes require a records request (board contact: Jamie Frame, Jamie.C.Frame@wv.gov, 304-558-6095)."
+    "note": "Board site is wvbdosteo.org (bdosteo.wv.gov no longer resolves). Minutes page exists but has not been updated since May 2019, though SOS open-meetings filings confirm the board meets regularly through June 2026. Board Orders library is current. Minutes require a records request (board contact: Jamie Frame, Jamie.C.Frame@wv.gov, 304-558-6095).",
+    "public_note": "The West Virginia osteopathic board's online minutes page has not been updated since 2019, though the board continues to meet. Current minutes require an open-records request — board contact: Jamie Frame (Jamie.C.Frame@wv.gov, 304-558-6095)."
   }
 }

@@ -777,12 +777,18 @@ async def board_view(request: Request, code: str):
     # (replaces the meeting-count sparkline as the quick "focus" metric).
     topic_breakdown = await trends.board_topic_breakdown(board.id, months=24)
 
+    # Coverage-ledger entry (why this board has no/partial minutes online, and
+    # how to obtain them) — surfaced on the page for none_published/blocked
+    # boards so a reader who clicks e.g. Kentucky finds an explanation.
+    ledger_entry = _load_coverage_ledger().get(board.code)
+
     return templates.TemplateResponse(request, "board.html", context={
         "board": board,
         "meeting_data": meeting_data,
         "topic_counts": topics_sorted,
         "state_name": state_name,
         "topic_breakdown": topic_breakdown,
+        "ledger_entry": ledger_entry,
         "breadcrumbs": [
             {"label": "National", "url": "/"},
             {"label": state_name, "url": f"/state/{board.state}"},
