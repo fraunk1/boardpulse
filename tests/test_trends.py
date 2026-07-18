@@ -156,7 +156,7 @@ def test_gaining_traction_function_direct(client):
 
 def test_fact_sections_empty_guard(client):
     """With the fact tables empty, /trends must render the 'Not yet extracted'
-    state for rulemaking / legislation / discipline without error."""
+    state for rulemaking / legislation without error."""
     r = client.get("/trends")
     assert r.status_code == 200
     assert "Not yet extracted" in r.text
@@ -166,16 +166,13 @@ def test_fact_functions_return_empty_flags(client):
     import app.web.trends as trends
     rulemaking = asyncio.run(trends.rulemaking_pipeline())
     legislation = asyncio.run(trends.legislation_table())
-    discipline = asyncio.run(trends.discipline_trends())
     emerging = asyncio.run(trends.emerging_national())
     assert rulemaking["has_data"] is False
     assert legislation["has_data"] is False
-    assert discipline["has_data"] is False
     assert emerging["has_data"] is False
     # empty payloads are still well-formed for the template
     assert rulemaking["pipeline"] == []
     assert legislation["rows"] == []
-    assert discipline["category_series"] == []
     assert emerging["items"] == []
 
 
