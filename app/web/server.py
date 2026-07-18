@@ -1,8 +1,9 @@
 """boardpulse web dashboard — Palantir-style intelligence interface."""
 import json
 import os
+import re
 import time
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 from fastapi import FastAPI, Request, HTTPException
@@ -12,10 +13,11 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy import select, func, distinct, text
 from sqlalchemy.orm import selectinload
 
-from app.models import Board, Meeting, MeetingDocument
+from app.models import Board, Meeting, MeetingDocument, WatchlistTerm
 from app.config import SCREENSHOTS_DIR, DOCUMENTS_DIR, REPORTS_DIR, EXHIBITS_DIR, DATA_DIR, PROJECT_ROOT, LOGS_DIR
 import app.database as db
 import app.stats as stats
+import app.web.trends as trends
 
 # Paths
 WEB_DIR = Path(__file__).resolve().parent
@@ -64,6 +66,11 @@ templates.env.globals["relative_screenshot"] = _relative_screenshot_path
 async def startup():
     from app.database import init_db
     await init_db()
+    # Seed the four default watch terms on first run (no-op if any exist).
+    try:
+        await trends.seed_watchlist_if_empty()
+    except Exception as exc:  # never block startup on the watchlist
+        print(f"Watchlist seed skipped: {exc}")
 
 
 # ---------------------------------------------------------------------------
@@ -241,14 +248,123 @@ async def national_overview(request: Request):
     # State colors for map
     state_colors = {s: d["status"] for s, d in state_data.items()}
 
+    # Watchlist (with new-hit counts) + emerging-issues feed. Both are
+    # resilient: watchlist counts fall back to 0 on FTS edge cases, the
+    # emerging feed is empty-guarded until fact extraction runs.
+    watchlist = await trends.watchlist_with_counts(_sanitize_fts_query)
+    emerging = await trends.emerging_national(limit=6)
+
     return templates.TemplateResponse(request, "national.html", context={
         "stats": stats,
         "topics": topics,
         "state_data": state_data,
         "state_colors": state_colors,
         "recent_summaries": recent_summaries,
+        "watchlist": watchlist,
+        "emerging": emerging,
         "breadcrumbs": [],
     })
+
+
+# ---------------------------------------------------------------------------
+# Pages — Trends Dashboard
+# ---------------------------------------------------------------------------
+
+@app.get("/trends", response_class=HTMLResponse)
+async def trends_view(request: Request):
+    """Trends dashboard — topics over time (live), plus rulemaking and
+    legislation (fact-backed, empty-guarded until extraction runs)."""
+    gaining = await trends.gaining_traction(limit=6)
+    tot = await trends.topics_over_time(top_n=6)
+    rulemaking = await trends.rulemaking_pipeline()
+    legislation = await trends.legislation_table()
+
+    async with db.async_session() as session:
+        total_boards = (await session.execute(
+            select(func.count(Board.id)))).scalar()
+
+    return templates.TemplateResponse(request, "trends.html", context={
+        "total_boards": total_boards,
+        "gaining": gaining,
+        "topics_over_time": tot,
+        "rulemaking": rulemaking,
+        "legislation": legislation,
+        "current_quarter": trends.current_quarter_label(),
+        "breadcrumbs": [
+            {"label": "National", "url": "/"},
+        ],
+        "page_title": "Trends",
+    })
+
+
+# ---------------------------------------------------------------------------
+# Watchlist — HTMX add / mark-seen / delete, all re-render the card partial
+# ---------------------------------------------------------------------------
+
+async def _render_watchlist_card(request: Request) -> HTMLResponse:
+    """Render just the watchlist card partial (for HTMX swaps)."""
+    watchlist = await trends.watchlist_with_counts(_sanitize_fts_query)
+    return templates.TemplateResponse(
+        request, "partials/watchlist_card.html", context={"watchlist": watchlist})
+
+
+def _parse_urlencoded_form(body: bytes) -> dict[str, str]:
+    """Parse an application/x-www-form-urlencoded body without needing
+    python-multipart (which isn't installed). HTMX posts this content type by
+    default, so this covers the watchlist add form. Last value wins per key.
+    """
+    from urllib.parse import parse_qsl
+    return dict(parse_qsl(body.decode("utf-8", errors="replace"),
+                          keep_blank_values=True))
+
+
+@app.post("/watchlist", response_class=HTMLResponse)
+async def watchlist_add(request: Request):
+    """Add a watch term. Label = the term, title-cased. Idempotent on term.
+
+    Reads the term from the urlencoded HTMX form body directly (Starlette's
+    request.form() would require python-multipart, which isn't a dependency
+    here).
+    """
+    form = _parse_urlencoded_form(await request.body())
+    term = (form.get("term") or "").strip()
+    if term:
+        label = term if term.isupper() else term.title()
+        async with db.async_session() as session:
+            existing = (await session.execute(
+                select(WatchlistTerm).where(WatchlistTerm.term == term)
+            )).scalar_one_or_none()
+            if existing is None:
+                session.add(WatchlistTerm(term=term, label=label))
+                await session.commit()
+    return await _render_watchlist_card(request)
+
+
+@app.post("/watchlist/{term_id}/delete", response_class=HTMLResponse)
+async def watchlist_delete(request: Request, term_id: int):
+    """Remove a watch term."""
+    async with db.async_session() as session:
+        term = (await session.execute(
+            select(WatchlistTerm).where(WatchlistTerm.id == term_id)
+        )).scalar_one_or_none()
+        if term is not None:
+            await session.delete(term)
+            await session.commit()
+    return await _render_watchlist_card(request)
+
+
+@app.post("/watchlist/{term_id}/seen", response_class=HTMLResponse)
+async def watchlist_seen(request: Request, term_id: int):
+    """Mark a watch term seen — sets acknowledged_at=now so its new-hit count
+    resets to zero until fresh documents arrive."""
+    async with db.async_session() as session:
+        term = (await session.execute(
+            select(WatchlistTerm).where(WatchlistTerm.id == term_id)
+        )).scalar_one_or_none()
+        if term is not None:
+            term.acknowledged_at = datetime.now(timezone.utc)
+            await session.commit()
+    return await _render_watchlist_card(request)
 
 
 # ---------------------------------------------------------------------------
@@ -283,6 +399,9 @@ async def topic_view(request: Request, slug: str):
         board_ids.add(b.id)
         state_set.add(b.state)
 
+    # Quarterly chart data: meetings mentioning + boards discussing this topic.
+    topic_quarterly = await trends.topic_quarterly(slug)
+
     return templates.TemplateResponse(request, "topic.html", context={
         "topic_slug": slug,
         "topic_name": display_name,
@@ -290,6 +409,7 @@ async def topic_view(request: Request, slug: str):
         "board_count": len(board_ids),
         "state_count": len(state_set),
         "meeting_count": len(filtered),
+        "topic_quarterly": topic_quarterly,
         "breadcrumbs": [
             {"label": "National", "url": "/"},
         ],
@@ -398,19 +518,8 @@ async def state_view(request: Request, abbr: str):
 _SEARCH_PAGE_SIZE = 25
 
 
-def _sanitize_fts_query(q: str) -> str:
-    """Turn free-typed user input into a safe FTS5 MATCH expression.
-
-    Splits on whitespace and wraps each token in double quotes, joined by
-    spaces. Quoting each token neutralizes FTS5 operators (AND/OR/NOT/NEAR,
-    column filters, prefix `*`) and unbalanced quotes — every token becomes
-    a literal phrase match, so the query can't raise a syntax error.
-    """
-    tokens = q.split()
-    if not tokens:
-        return ""
-    escaped = [tok.replace('"', '""') for tok in tokens]
-    return " ".join(f'"{tok}"' for tok in escaped)
+# Shared with the brief and artifact exporters — single definition in stats.
+_sanitize_fts_query = stats.sanitize_fts_query
 
 
 @app.get("/search", response_class=HTMLResponse)
@@ -532,44 +641,21 @@ def _load_coverage_ledger() -> dict:
 @app.get("/ops", response_class=HTMLResponse)
 async def ops_view(request: Request):
     """Operational status page — refresh health, per-board coverage, failures."""
-    async with db.async_session() as session:
-        boards = (await session.execute(
-            select(Board).order_by(Board.state, Board.code)
-        )).scalars().all()
+    from app.quality.audit import latest_audit
 
-    per_board = await stats.per_board_counts()
     failures = await stats.extraction_failures()
     rollup = await stats.status_rollup()
-
-    coverage_rows = []
-    accounted = 0
-    have_docs = 0
-    for b in boards:
-        counts = per_board.get(b.code, {"mtgs": 0, "docs": 0, "docs_text": 0})
-        row_has_docs = counts["docs_text"] > 0
-        if row_has_docs:
-            have_docs += 1
-        is_accounted = b.discovery_status in ("none_published", "blocked") or row_has_docs
-        if is_accounted:
-            accounted += 1
-        coverage_rows.append({
-            "board": b,
-            "mtgs": counts["mtgs"],
-            "docs": counts["docs"],
-            "docs_text": counts["docs_text"],
-            "discovery_status": b.discovery_status,
-            "accounted": is_accounted,
-        })
-
-    total_boards = len(boards)
+    coverage = await stats.coverage_rollup()
+    total_boards = coverage["total_boards"]
 
     return templates.TemplateResponse(request, "ops.html", context={
+        "facts_audit": latest_audit(),
         "last_refresh": _latest_refresh_log(),
-        "coverage_rows": coverage_rows,
+        "coverage_rows": coverage["rows"],
         "total_boards": total_boards,
-        "have_docs": have_docs,
-        "accounted": accounted,
-        "unaccounted": total_boards - accounted,
+        "have_docs": coverage["have_docs"],
+        "accounted": coverage["accounted"],
+        "unaccounted": total_boards - coverage["accounted"],
         "status_rollup": sorted(rollup.items()),
         "failures": failures,
         "failure_count": len(failures),
@@ -684,11 +770,22 @@ async def board_view(request: Request, code: str):
 
     state_name = STATE_NAMES.get(board.state, board.state)
 
+    # What this board discussed — topic breakdown over the trailing 24 months
+    # (replaces the meeting-count sparkline as the quick "focus" metric).
+    topic_breakdown = await trends.board_topic_breakdown(board.id, months=24)
+
+    # Coverage-ledger entry (why this board has no/partial minutes online, and
+    # how to obtain them) — surfaced on the page for none_published/blocked
+    # boards so a reader who clicks e.g. Kentucky finds an explanation.
+    ledger_entry = _load_coverage_ledger().get(board.code)
+
     return templates.TemplateResponse(request, "board.html", context={
         "board": board,
         "meeting_data": meeting_data,
         "topic_counts": topics_sorted,
         "state_name": state_name,
+        "topic_breakdown": topic_breakdown,
+        "ledger_entry": ledger_entry,
         "breadcrumbs": [
             {"label": "National", "url": "/"},
             {"label": state_name, "url": f"/state/{board.state}"},
@@ -704,6 +801,22 @@ async def board_view(request: Request, code: str):
 # No TTL/eviction: the mtime in the key means a changed file just gets a
 # new entry; stale entries for ~1,400 files cost negligible memory.
 _PAGE_COUNT_CACHE: dict = {}
+
+
+def _document_display_name(filename: str) -> str:
+    """Turn a stored filename into a readable document title.
+
+    Strips the `YYYY-MM-DD_` date prefix and extension, URL-decodes the
+    escaped spaces/punctuation, and tidies whitespace — so a reader sees
+    "Utilization of Medical Assistants" instead of
+    "2025-03-07_Utilization%20of%20Medical%20Assistants.pdf".
+    """
+    from urllib.parse import unquote
+    name = unquote(filename)
+    name = re.sub(r"^\d{4}-\d{2}-\d{2}[_-]+", "", name)   # drop date prefix
+    name = re.sub(r"\.(pdf|docx?|xlsx?|html?)$", "", name, flags=re.I)
+    name = re.sub(r"[_]+", " ", name).strip()
+    return name or filename
 
 
 @app.get("/meeting/{meeting_id}", response_class=HTMLResponse)
@@ -755,6 +868,7 @@ async def meeting_view(request: Request, meeting_id: int):
             "doc": d,
             "page_count": page_count,
             "is_pdf": file_path.suffix.lower() == ".pdf",
+            "display_name": _document_display_name(d.filename),
         })
 
     state_name = STATE_NAMES.get(board.state, board.state)
@@ -838,6 +952,48 @@ async def serve_exhibit_page(board_code: str, exhibit_name: str, page_num: int):
 # writes a new/changed file) invalidates it automatically. Intentionally
 # NOT an LRU — only the latest report is ever kept.
 _REPORT_CACHE: dict = {}
+
+
+@app.get("/briefs", response_class=HTMLResponse)
+async def briefs_latest(request: Request):
+    from app.reports import brief as brief_mod
+    return await _render_brief(request, brief_mod.latest_brief_ym())
+
+
+@app.get("/briefs/{ym}", response_class=HTMLResponse)
+async def briefs_month(request: Request, ym: str):
+    return await _render_brief(request, ym)
+
+
+@app.get("/briefs/{ym}/email", response_class=HTMLResponse)
+async def briefs_email(ym: str):
+    from app.reports import brief as brief_mod
+    html_path = brief_mod.BRIEFS_DIR / f"{ym}.html"
+    if not html_path.exists():
+        raise HTTPException(status_code=404,
+                            detail="Email version not generated for this brief")
+    return HTMLResponse(html_path.read_text(encoding="utf-8"))
+
+
+async def _render_brief(request: Request, ym):
+    import re
+    import markdown as _markdown
+    from app.reports import brief as brief_mod
+    all_briefs = sorted(
+        (p.stem for p in brief_mod.BRIEFS_DIR.glob("*.md")
+         if re.fullmatch(r"\d{4}-\d{2}", p.stem)), reverse=True)
+    brief_html, has_html = None, False
+    if ym:
+        md_path = brief_mod.BRIEFS_DIR / f"{ym}.md"
+        if md_path.exists():
+            brief_html = _markdown.markdown(
+                md_path.read_text(encoding="utf-8"), extensions=["tables"])
+        has_html = (brief_mod.BRIEFS_DIR / f"{ym}.html").exists()
+    return templates.TemplateResponse(request, "brief.html", {
+        "brief_ym": ym, "brief_html": brief_html,
+        "all_briefs": all_briefs, "has_html": has_html,
+        "page_title": "Monthly Delta Brief",
+    })
 
 
 @app.get("/report", response_class=HTMLResponse)

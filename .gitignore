@@ -6,6 +6,7 @@ venv/
 *.db
 *.db-wal
 *.db-shm
+*.db.bak*
 data/screenshots/
 data/documents/
 data/reports/
@@ -21,4 +22,7 @@ data/_research/
 data/_verify/
 data/cache/
 data/logs/
+# eval-harness candidate runs are throwaway; the frozen gold set in
+# data/gold/ is COMMITTED on purpose — do not add an ignore rule for it
+data/eval/
 _targets.md

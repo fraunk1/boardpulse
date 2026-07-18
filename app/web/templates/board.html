@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "partials/charts.html" import sparkline %}
 
 {% set page_title = board.name %}
 {% block title %}{{ board.name }} — boardpulse{% endblock %}
@@ -72,14 +73,33 @@
                 {% endif %}
             </div>
 
-            <!-- Topics -->
-            {% if topic_counts %}
+            <!-- What this board is working on — topic breakdown, last 24 months -->
+            {% if topic_breakdown %}
+            <div class="mt-6 bg-white rounded-xl border border-bp-cloud p-5">
+                <div class="flex items-center gap-1.5 mb-4">
+                    <i data-lucide="bar-chart-3" class="w-4 h-4 text-bp-teal"></i>
+                    <h2 class="text-sm font-semibold text-bp-navy">What this board is working on</h2>
+                    <span class="text-[10px] text-bp-mist uppercase tracking-wider">topics discussed · last 24 months</span>
+                </div>
+                <div class="space-y-2.5">
+                    {% for t in topic_breakdown %}
+                    <a href="/topic/{{ t.topic }}" class="block group">
+                        <div class="flex items-center justify-between text-xs mb-1">
+                            <span class="text-bp-steel group-hover:text-bp-teal transition-colors font-medium">{{ t.topic | replace("-", " ") }}</span>
+                            <span class="text-bp-mist font-mono">{{ t.count }} meeting{{ 's' if t.count != 1 else '' }}</span>
+                        </div>
+                        <div class="h-2 rounded-full bg-bp-frost overflow-hidden">
+                            <div class="h-full rounded-full bg-bp-teal group-hover:bg-bp-teal-d transition-colors" style="width: {{ t.pct }}%"></div>
+                        </div>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+            {% elif topic_counts %}
             <div class="mt-4 flex flex-wrap gap-1.5">
                 {% for tag, count in topic_counts %}
-                <a href="/topic/{{ tag }}" class="tag-pill">
-                    {{ tag | replace("-", " ") }}
-                    <span class="text-[10px] text-bp-mist font-mono">{{ count }}</span>
-                </a>
+                <a href="/topic/{{ tag }}" class="tag-pill">{{ tag | replace("-", " ") }}
+                    <span class="text-[10px] text-bp-mist font-mono">{{ count }}</span></a>
                 {% endfor %}
             </div>
             {% endif %}
@@ -112,6 +132,13 @@
         <h2 class="section-label flex items-center gap-1.5 mb-4">
             <i data-lucide="calendar-days" class="w-3.5 h-3.5"></i> Meeting Timeline
         </h2>
+
+        {% if meeting_data and ledger_entry and ledger_entry.public_note %}
+        <div class="bg-bp-frost border border-bp-cloud rounded-lg px-4 py-3 mb-4 flex items-start gap-2.5 max-w-3xl">
+            <i data-lucide="info" class="w-4 h-4 text-bp-steel flex-none mt-0.5"></i>
+            <p class="text-xs text-bp-steel leading-relaxed">{{ ledger_entry.public_note }}</p>
+        </div>
+        {% endif %}
 
         {% if meeting_data %}
         <div class="space-y-3 stagger-in">
@@ -188,6 +215,24 @@
                 {% endif %}
             </div>
             {% endfor %}
+        </div>
+        {% elif ledger_entry and ledger_entry.public_note %}
+        <div class="bg-bp-frost border border-bp-cloud rounded-xl p-6 max-w-3xl">
+            <div class="flex items-start gap-3">
+                <div class="flex-none w-9 h-9 rounded-lg bg-white border border-bp-cloud flex items-center justify-center">
+                    <i data-lucide="file-lock" class="w-4 h-4 text-bp-steel"></i>
+                </div>
+                <div>
+                    <h3 class="text-sm font-semibold text-bp-navy mb-1">Meeting minutes aren&rsquo;t posted online</h3>
+                    <p class="text-sm text-bp-steel leading-relaxed">{{ ledger_entry.public_note }}</p>
+                    {% if board.homepage %}
+                    <a href="{{ board.homepage }}" target="_blank" rel="noopener"
+                       class="inline-flex items-center gap-1.5 mt-3 text-xs font-medium text-bp-teal hover:text-bp-teal-d">
+                        <i data-lucide="external-link" class="w-3.5 h-3.5"></i> Visit the board&rsquo;s website
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
         </div>
         {% else %}
         <div class="text-center py-16 text-bp-mist">

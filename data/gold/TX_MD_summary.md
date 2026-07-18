@@ -1,0 +1,34 @@
+---
+topics: ["licensing", "IMLC", "disciplinary", "rulemaking", "CME", "scope-of-practice"]
+board: TX_MD
+state: TX
+---
+
+# Texas Medical Board — 12-Month Board Summary
+
+**Period:** 2025-08-14 to 2026-08-19
+**Meetings analyzed:** 11
+
+Extracted text is available for only two of the eleven scheduled meeting dates in this period, both from late 2025; no text was available for the August 2025, September 2025, or any of the 2026 meeting dates. The most substantive record comes from the December 2025 committee and full-board cycle ([2025-12-11](/board/TX/TX_MD#2025-12-11)). The Disciplinary Process Review Committee (DPRC) worked through a large backlog of complaint dispositions that day, voting to dismiss the large majority of non-standard-of-care and standard-of-care cases on its dismissal list, while pulling a smaller number of individual cases for further action — including referrals for additional expert-panelist review, a case sent to investigations for expert review by an ophthalmologist and an ENT, and one case where the board directed staff to review and consider possible amendments to board rule 169.26 ([2025-12-11](/board/TX/TX_MD#2025-12-11)). The DPRC also acted on a series of appeals of dismissed complaints, denying most but granting several — including appeals resulting in a warning letter, referral to a new panelist, or return to the intake screening committee ([2025-12-11](/board/TX/TX_MD#2025-12-11)). One case (24-0309 MD) was continued under management of the Texas Physician Health Program ([2025-12-11](/board/TX/TX_MD#2025-12-11)).
+
+On licensing, the Licensure Committee reported 226 physician licensure applicants recommended for approval, along with smaller batches of surgical assistant and Acudetox applicants, and recommended approval of new, recertified, and canceled Nonprofit Health Organization certifications ([2025-12-11](/board/TX/TX_MD#2025-12-11)). Licensure statistics showed non-Compact physician licensing volume easing from 1,023 new licenses in Q1 FY25 (24-day average processing time) to 943 in Q1 FY26 (16-day average), while Interstate Medical Licensure Compact volume rose from 447 to 705 licenses over the same comparison, with processing time holding at 10 days ([2025-12-11](/board/TX/TX_MD#2025-12-11)). The committee also found three individual applicants ineligible for licensure following eligibility hearings, citing unprofessional conduct, malpractice history, application falsification, and postgraduate training deficiencies ([2025-12-11](/board/TX/TX_MD#2025-12-11)).
+
+The full board's December agenda included planned action on proposed rule amendments covering office-based anesthesia/IV ketamine therapy standards, physician graduates, provisional licenses for foreign medical license holders, physician assistants, acupuncture, medical radiologic technology, and respiratory care, as well as discussion of SB31 continuing medical education requirements ([2025-12-11](/board/TX/TX_MD#2025-12-11)). The October 2025 cycle's available record consists only of committee and full-board agendas ([2025-10-16](/board/TX/TX_MD#2025-10-16)); no minutes text was extracted confirming what was ultimately decided, though the agenda listed determination-of-default and proposal-for-decision matters for named physicians and the same slate of rule-chapter amendments later reflected on the December agenda.
+
+## Sources
+| # | Date | Board | Source |
+|---|------|-------|--------|
+| 1 | 2025-12-11 | Texas Medical Board | [Minutes page](https://www.tmb.texas.gov/about-us/boards-and-committees/events-agendas-and-meeting-minutes) |
+| 2 | 2025-10-16 | Texas Medical Board | [Minutes page](https://www.tmb.texas.gov/about-us/boards-and-committees/events-agendas-and-meeting-minutes) |
+
+=== MEETING: 2025-12-11 ===
+topics: [disciplinary, licensing, IMLC, rulemaking, CME, scope-of-practice]
+
+The Executive, Finance, DPRC, Licensure, and Full Board convened December 11-12, 2025, chaired by Board President Sherif Zaafran, M.D. The Finance Committee reviewed the agency's FY2026 budget and discussed the 90th Texas legislative appropriations request for the 2028-29 biennium, with no concerns raised. The DPRC, chaired by Dr. Manuel Quinones, Jr., dismissed the great majority of cases on its non-standard-of-care and standard-of-care dismissal lists, continued Case 24-0309 MD under TXPHP management, approved seven Expert Physician Panel appointments, and worked through numerous individual follow-up files and appeals, granting some (resulting in warning letters or referral to new panelists) and denying others. The Licensure Committee, chaired by Dr. Roberto Martinez, recommended approval of 226 physician licenses, 2 surgical assistant licenses, 15 Acudetox certifications, and multiple Nonprofit Health Organization certifications/recertifications/cancellations. Licensure statistics showed Q1 FY26 non-Compact issuances of 943 (16-day average processing) versus 1,023 in Q1 FY25, and Compact issuances rising to 705 from 447 year-over-year. Three individual license applicants were found ineligible following eligibility hearings, citing unprofessional conduct, malpractice history, application falsification, and training program deficiencies. The full board agenda listed action on SOAH rehearing/decision matters for Mary Talley Bowden, M.D. and Maria Dolores Chapa, M.D., SB31 continuing medical education, and proposed rule amendments to chapters on office-based anesthesia/IV ketamine therapy, physician graduates, foreign medical license holders, physician assistants, acupuncture, medical radiologic technology, and respiratory care.
+
+=== MEETING: 2025-10-16 ===
+topics: [licensing, disciplinary, rulemaking]
+
+Only the committee and full-board agendas were extracted for this date; no minutes text confirming outcomes was available. The Executive Committee (chaired by Dr. Sherif Zaafran) and Finance Committee (chaired by Michael Cokinos) agendas covered routine committee-member and budget reports. The DPRC agenda (chaired by Dr. Manuel Quinones, Jr.) listed TXPHP referrals, enforcement and warning-letter reports, expert panel membership, and dismissal/appeal case categories. The Licensure Committee agenda (chaired by Dr. Roberto Martinez) listed physician, surgical assistant, and Acudetox licensure items, license cancellations, and Nonprofit Health Organization actions. The Full Board agenda for October 17 listed determination-of-default matters for Sheridan Diaz, M.D. and Karthik Sampath, M.D., and proposal-for-decision matters for Cosmin Dobrescu, M.D. and Mary Talley Bowden, M.D., along with the same set of proposed rule-chapter amendments (physician assistants, acupuncture, medical radiologic technology, respiratory care) later appearing on the December agenda, and consideration of the August 15, 2025 board meeting minutes.
+
+=== END ===

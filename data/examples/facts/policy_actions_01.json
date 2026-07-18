@@ -1,0 +1,18 @@
+{
+  "source_excerpt": "Kerrie Webb presented the proposed rulemaking to add Title 16 California Code of\nRegulations (CCR) section 1352.3 (Fees for Petitions for Penalty Relief) and to amend\n16 CCR section 1359 (Petitions for Reinstatement or Modification of Probation). Ms.\nWebb discussed petitions for penalty relief and the costs associated with processing\nand adjudicating the petitions.\n\nMs. Webb indicated that the Board received nine comments during the 45-day public\ncomment period, and that the comments and proposed responses were included in the\nmaterials.\n\nMs. Webb advised that Board staff developed modified text to address some of the\nconcerns raised by several commenters regarding the proposed upfront costs for\npetitions for penalty relief posing a barrier to individuals seeking such relief, among\nother things.\n\n\fMedical Board of California\nMeeting Minutes from February 13-14, 2025\nPage 4\n\nMs. Webb requested a member to make the following motion to:\n\n1)  Approve the proposed responses to written comments received on the originally\nnoticed text for the proposed rulemaking on Fees for Petitions for Penalty Relief\nto add Title 16 California Code of Regulations (CCR) section 1352.3 (Fees for\nPetitions for Penalty Relief) and to amend 16 CCR section 1359 (Petitions for\nReinstatement or Modification of Probation) and direct staff to proceed as\nrecommended to reject the comments as specified and provide the responses to\nthe comments as indicated in the meeting materials; and\n\n2)  Approve the modified regulatory text as well as direct staff to take all steps\n\nnecessary to complete the rulemaking process. This includes preparing modified\ntext for an additional 15-day comment period, which incorporates amendments\ndiscussed at this meeting. If after the 15-day public comment period, the board\ndoes not receive any comments providing objections or adverse recommendation\nspecifically directed at the proposed action or to the procedures followed by the\nboard in proposing or adopting the action, then the Board authorizes the\nexecutive officer to make any non-substantive changes to the proposed\nregulations and the rulemaking file and adopt the proposed regulations as\ndescribed in the modified text notice.",
+  "correct_facts": [
+    {
+      "instrument": "rule",
+      "stage": "comment_period",
+      "topic": "rulemaking",
+      "title": "Fees for Petitions for Penalty Relief (16 CCR 1352.3, amend 1359)",
+      "description": "Board approved responses to nine comments from the 45-day period and approved modified regulatory text, directing staff to run an additional 15-day comment period to complete the rulemaking.",
+      "rule_reference": "16 CCR 1352.3",
+      "action_date": "2025-02-13",
+      "quote": "Approve the modified regulatory text as well as direct staff to take all steps",
+      "source_document": "2025-02-13_brd-Minutes-20250213.pdf",
+      "confidence": "high"
+    }
+  ],
+  "commentary": "instrument='rule' because it is an administrative regulation with a code number (16 CCR 1352.3); stage='comment_period' because the Board approved modified text and directed a further 15-day public comment period rather than final adoption; topic='rulemaking' (the board's own rule process)."
+}

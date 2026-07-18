@@ -190,7 +190,10 @@ async def test_ingest_per_meeting(temp_db, tmp_path, monkeypatch):
     content = WELL_FORMED.replace("2026-05-01", d_in_file.isoformat())
     (tmp_path / "XX_MD_summary.md").write_text(content, encoding="utf-8")
 
-    ok = await ingest_board_summary("XX_MD")
+    # force=True: this test exercises the DB-write semantics (match/skip),
+    # not the ingest gate — the minimal fixture is far below the gate's
+    # content bands. Gate behavior has its own tests in test_gates.py.
+    ok = await ingest_board_summary("XX_MD", force=True)
     assert ok
 
     async with temp_db.async_session() as session:
@@ -204,14 +207,111 @@ async def test_ingest_per_meeting(temp_db, tmp_path, monkeypatch):
         )).scalars().all()
         matched = next(m for m in meetings
                        if m.meeting_date == d_in_file)
-        cleared = next(m for m in meetings
-                       if m.meeting_date == d_not_in_file)
+        survivor = next(m for m in meetings
+                        if m.meeting_date == d_not_in_file)
+        # d_in_file had summarized_at=None (fresh), so its block writes.
         assert "adopted rule 540-X-1" in matched.summary
         assert matched.topics == ["rulemaking", "licensing"]
         assert matched.summarized_at is not None
-        # not in the file -> stale blob cleared
-        assert cleared.summary is None
-        assert cleared.topics is None
+        # Non-destructive: a meeting ABSENT from the file is NOT cleared by
+        # default — its prior content survives (no prune, no sidecar).
+        assert survivor.summary == "OLD BOARD BLOB"
+        assert survivor.topics == ["licensing"]
+
+
+async def test_ingest_write_once_protects_existing_summary(
+        temp_db, tmp_path, monkeypatch):
+    """A meeting that already has a stored summary is never overwritten,
+    even when a new file re-emits a block for that date."""
+    from datetime import datetime, timezone
+    from sqlalchemy import select
+    from app.models import Board, Meeting
+    from app.extractor.summarizer import ingest_board_summary
+
+    d = date.today() - timedelta(days=30)
+    await _seed_board(temp_db, tmp_path, monkeypatch, [d])
+
+    # Promote the meeting to an already-summarized (backfilled) state.
+    async with temp_db.async_session() as session:
+        meeting = (await session.execute(select(Meeting))).scalars().one()
+        meeting.summary = "BACKFILLED ARCHIVE SUMMARY"
+        meeting.topics = ["AI"]
+        meeting.summarized_at = datetime.now(timezone.utc)
+        await session.commit()
+
+    content = WELL_FORMED.replace("2026-05-01", d.isoformat())
+    (tmp_path / "XX_MD_summary.md").write_text(content, encoding="utf-8")
+
+    assert await ingest_board_summary("XX_MD", force=True)
+
+    async with temp_db.async_session() as session:
+        meeting = (await session.execute(select(Meeting))).scalars().one()
+        # Write-once: the block did NOT clobber the backfilled summary.
+        assert meeting.summary == "BACKFILLED ARCHIVE SUMMARY"
+        assert meeting.topics == ["AI"]
+
+
+async def test_prune_only_clears_covered_dates(temp_db, tmp_path, monkeypatch):
+    """prune=True clears summary/topics only for dates in the prompt
+    sidecar's covered_dates that the file dropped — never other meetings,
+    and never without a sidecar."""
+    import json
+    from sqlalchemy import select
+    from app.models import Board, Meeting
+    from app.extractor.summarizer import ingest_board_summary
+
+    today = date.today()
+    d_kept = today - timedelta(days=30)     # in the file -> stays
+    d_dropped = today - timedelta(days=60)  # covered but not in file -> pruned
+    d_uncovered = today - timedelta(days=90)  # not covered -> untouched
+    await _seed_board(temp_db, tmp_path, monkeypatch,
+                      [d_kept, d_dropped, d_uncovered])
+
+    content = WELL_FORMED.replace("2026-05-01", d_kept.isoformat())
+    (tmp_path / "XX_MD_summary.md").write_text(content, encoding="utf-8")
+    # Sidecar covers d_kept + d_dropped, but NOT d_uncovered.
+    (tmp_path / "XX_MD_prompt.meta.json").write_text(json.dumps({
+        "mode": "rollup",
+        "covered_dates": [d_kept.isoformat(), d_dropped.isoformat()],
+        "target_dates": [d_kept.isoformat(), d_dropped.isoformat()],
+    }), encoding="utf-8")
+
+    assert await ingest_board_summary("XX_MD", force=True, prune=True)
+
+    async with temp_db.async_session() as session:
+        meetings = {m.meeting_date: m for m in (await session.execute(
+            select(Meeting))).scalars().all()}
+        # dropped-but-covered -> pruned to None
+        assert meetings[d_dropped].summary is None
+        assert meetings[d_dropped].topics is None
+        # not covered by the sidecar -> untouched
+        assert meetings[d_uncovered].summary == "OLD BOARD BLOB"
+        # in the file -> written
+        assert "adopted rule 540-X-1" in meetings[d_kept].summary
+
+
+async def test_prune_without_sidecar_is_noop(temp_db, tmp_path, monkeypatch):
+    """prune=True with no covered_dates sidecar clears nothing."""
+    from sqlalchemy import select
+    from app.models import Meeting
+    from app.extractor.summarizer import ingest_board_summary
+
+    today = date.today()
+    d_in_file = today - timedelta(days=30)
+    d_absent = today - timedelta(days=60)
+    await _seed_board(temp_db, tmp_path, monkeypatch, [d_in_file, d_absent])
+
+    content = WELL_FORMED.replace("2026-05-01", d_in_file.isoformat())
+    (tmp_path / "XX_MD_summary.md").write_text(content, encoding="utf-8")
+    # No sidecar written -> prune must be a no-op.
+
+    assert await ingest_board_summary("XX_MD", force=True, prune=True)
+
+    async with temp_db.async_session() as session:
+        absent = next(m for m in (await session.execute(
+            select(Meeting))).scalars().all()
+            if m.meeting_date == d_absent)
+        assert absent.summary == "OLD BOARD BLOB"
 
 
 async def test_ingest_legacy_sets_rollup_and_clears_meetings(
@@ -226,7 +326,10 @@ async def test_ingest_legacy_sets_rollup_and_clears_meetings(
         "---\ntopics: [\"licensing\"]\n---\n\nLegacy blob only.",
         encoding="utf-8")
 
-    assert await ingest_board_summary("XX_MD")
+    # Legacy files are rejected by the ingest gate; force=True is now the
+    # only path that lets one through (gate rejection covered in test_gates).
+    assert not await ingest_board_summary("XX_MD")
+    assert await ingest_board_summary("XX_MD", force=True)
     async with temp_db.async_session() as session:
         board = (await session.execute(
             select(Board).where(Board.code == "XX_MD"))).scalar_one()

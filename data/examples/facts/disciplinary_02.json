@@ -1,0 +1,14 @@
+{
+  "source_excerpt": "Benjamin M. Kotinsley, M.D.\nDr. Feibel briefly reviewed the matter of Dr. Kotinsley. The Board has alleged that action was taken by the\nWisconsin Medical Examining Board based on the finding that he engaged in unprofessional conduct by\ndeparting from minimal standards of care with respect to the reading of a chest x-ray. The Wisconsin Board\nreprimanded Dr. Kotinsley, required him to complete educational courses, and required him to pay costs.\nThe Proposed Order, if adopted by the Board, will reprimand Dr. Kotinsley, establish probationary terms\nincluding evidence of compliance with the Wisconsin Board Order, and levy a fine of $3,500.\nDr. Lewis moved to find that the allegations as set forth in the September 13, 2023 Notice of\nOpportunity for Hearing in the matter of Dr. Kotinsley have been proven to be true by a preponderance\nof the evidence and to adopt Ms. Lee’s Proposed Findings and Proposed Order.",
+  "correct_facts": [
+    {
+      "category": "reprimand",
+      "respondent": "Benjamin M. Kotinsley, M.D.",
+      "count": 1,
+      "quote": "The Proposed Order, if adopted by the Board, will reprimand Dr. Kotinsley, establish probationary terms",
+      "source_document": "2024-05-08_Approved_May_2024_Board_Minutes.pdf",
+      "confidence": "medium"
+    }
+  ],
+  "commentary": "A single physician order carrying multiple sanctions. One itemized entry: respondent as written in the heading, category='reprimand' is the primary outcome named ('will reprimand Dr. Kotinsley'), count=1. confidence='medium' because the order is described as 'if adopted by the Board' - proposed rather than already-final in this excerpt."
+}

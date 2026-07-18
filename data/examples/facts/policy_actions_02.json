@@ -1,0 +1,18 @@
+{
+  "source_excerpt": "Report of Board Counsel - Education and Volunteer\n16 Services (16A-5337)\n17 [Jacqueline Wolfgang, Esquire, Regulatory Counsel,\n18 stated 16A-5337, regarding opioid education,\n19 volunteer services, and organ donation continuing\n20 education, was published as proposed in November\n21 2025. The Board did not receive any public comments\n22 or any comments from the Independent Regulatory\n23 Review Commission (IRRC). IRRC indicated the\n24 regulation would be deemed approved if the Board did\n25 not make any changes to the final rulemaking. Ms.\nSargent's Court Reporting Service, Inc.\n(814) 536-8908\n\n1 2\n1 Wolfgang prepared the final rulemaking for the\n2 Board's review and recommended it move forward\n3 without any changes.\n4 Ms. Wolfgang noted, with the organ donation CE\n5 requirements going into effect on May 1, 2026, she\n6 was working with Board Counsel to put a notice on the\n7 Board's website. Licensees will have five years to",
+  "correct_facts": [
+    {
+      "instrument": "rule",
+      "stage": "adopted",
+      "topic": "CME",
+      "title": "Final rulemaking 16A-5337 on continuing education requirements",
+      "description": "Regulation 16A-5337 covering opioid education, volunteer services, and organ donation continuing education drew no public or IRRC comments; Regulatory Counsel prepared the final rulemaking and recommended it move forward without changes, with organ donation CE effective May 1, 2026.",
+      "rule_reference": "16A-5337",
+      "action_date": "2026-02-03",
+      "quote": "Wolfgang prepared the final rulemaking for the\n2 Board's review and recommended it move forward\n3 without any changes.",
+      "source_document": "2026-02-03_f020326%20osteopathic%20medicine%20minutes%20-%20final.pdf",
+      "confidence": "high"
+    }
+  ],
+  "commentary": "instrument='rule' (a numbered regulation, 16A-5337); stage='adopted' because it is the FINAL rulemaking moving forward unchanged after the comment period closed, not a fresh proposal; topic='CME' since the regulation sets continuing-education requirements."
+}

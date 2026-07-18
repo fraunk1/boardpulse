@@ -1,0 +1,39 @@
+{#
+  Zero-JS inline SVG sparkline. Renders straight into the page — no
+  ApexCharts, no script — so it's safe anywhere (board info grid, tables).
+
+  Usage:
+    {% from "partials/charts.html" import sparkline %}
+    {{ sparkline(values, width=120, height=28, color="#139AD0") }}
+
+  values: a list of numbers (oldest -> newest). Draws a polyline scaled to
+  fit, plus a filled dot on the final point.
+#}
+{% macro sparkline(values, width=120, height=28, color="#139AD0") -%}
+{%- set vals = values | list -%}
+{%- if vals | length < 2 -%}
+  {#- Not enough points to draw a line -#}
+  <svg width="{{ width }}" height="{{ height }}" viewBox="0 0 {{ width }} {{ height }}" role="img" aria-label="sparkline" class="inline-block align-middle"></svg>
+{%- else -%}
+  {%- set vmax = vals | max -%}
+  {%- set vmin = vals | min -%}
+  {%- set span = (vmax - vmin) -%}
+  {%- set pad = 3 -%}
+  {%- set n = vals | length -%}
+  {%- set ns = namespace(pts=[]) -%}
+  {%- for v in vals -%}
+    {%- set x = pad + (loop.index0 * (width - 2 * pad) / (n - 1)) -%}
+    {%- if span > 0 -%}
+      {%- set y = (height - pad) - ((v - vmin) * (height - 2 * pad) / span) -%}
+    {%- else -%}
+      {%- set y = height / 2 -%}
+    {%- endif -%}
+    {%- set ns.pts = ns.pts + ["%.1f,%.1f" | format(x, y)] -%}
+  {%- endfor -%}
+  {%- set last = ns.pts[-1].split(",") -%}
+  <svg width="{{ width }}" height="{{ height }}" viewBox="0 0 {{ width }} {{ height }}" role="img" aria-label="sparkline showing {{ n }} points" class="inline-block align-middle">
+    <polyline fill="none" stroke="{{ color }}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" points="{{ ns.pts | join(' ') }}" />
+    <circle cx="{{ last[0] }}" cy="{{ last[1] }}" r="2.2" fill="{{ color }}" />
+  </svg>
+{%- endif -%}
+{%- endmacro %}

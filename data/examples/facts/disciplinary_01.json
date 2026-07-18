@@ -1,0 +1,19 @@
+{
+  "source_excerpt": "Dr. Soin moved to ratify the following proposed settlement agreements:\n\n•\nProposed consent agreements with Scott Steven Katzman, M.D.; Son M. Bach, M.D.; Michael D.\nBobb, Jr., D.O.; Seamus J. Walsh, D.O.; and Roman Kosiborod, D.O.\n•  Proposed step II consent agreement with Marshall Bahr, M.D.\n9\n\nState Medical Board of Ohio Meeting Minutes – May 8, 2024\n\n•  Proposed permanent surrenders with Maura Andronic, M.D.; Gerard Cosgrove, R.C.P.; Sean H.\nMcGrath, L.M.T.; Rodney Wayne Sosa, M.D.; Paris Richardson, L.M.T.; Paul S. Mitch, M.D. and\nAlphonso Vincent Monzo, L.M.T.",
+  "correct_facts": [
+    {"category": "consent_order", "respondent": "Scott Steven Katzman, M.D.", "count": 1, "quote": "Proposed consent agreements with Scott Steven Katzman, M.D.", "source_document": "2024-05-08_Approved_May_2024_Board_Minutes.pdf", "confidence": "high"},
+    {"category": "consent_order", "respondent": "Son M. Bach, M.D.", "count": 1, "quote": "Scott Steven Katzman, M.D.; Son M. Bach, M.D.", "source_document": "2024-05-08_Approved_May_2024_Board_Minutes.pdf", "confidence": "high"},
+    {"category": "consent_order", "respondent": "Michael D. Bobb, Jr., D.O.", "count": 1, "quote": "Michael D. Bobb, Jr., D.O.", "source_document": "2024-05-08_Approved_May_2024_Board_Minutes.pdf", "confidence": "high"},
+    {"category": "consent_order", "respondent": "Seamus J. Walsh, D.O.", "count": 1, "quote": "Seamus J. Walsh, D.O.", "source_document": "2024-05-08_Approved_May_2024_Board_Minutes.pdf", "confidence": "high"},
+    {"category": "consent_order", "respondent": "Roman Kosiborod, D.O.", "count": 1, "quote": "and Roman Kosiborod, D.O.", "source_document": "2024-05-08_Approved_May_2024_Board_Minutes.pdf", "confidence": "high"},
+    {"category": "consent_order", "respondent": "Marshall Bahr, M.D.", "count": 1, "quote": "Proposed step II consent agreement with Marshall Bahr, M.D.", "source_document": "2024-05-08_Approved_May_2024_Board_Minutes.pdf", "confidence": "high"},
+    {"category": "surrender", "respondent": "Maura Andronic, M.D.", "count": 1, "quote": "Proposed permanent surrenders with Maura Andronic, M.D.", "source_document": "2024-05-08_Approved_May_2024_Board_Minutes.pdf", "confidence": "high"},
+    {"category": "surrender", "respondent": "Gerard Cosgrove, R.C.P.", "count": 1, "quote": "Gerard Cosgrove, R.C.P.", "source_document": "2024-05-08_Approved_May_2024_Board_Minutes.pdf", "confidence": "high"},
+    {"category": "surrender", "respondent": "Sean H. McGrath, L.M.T.", "count": 1, "quote": "Sean H. McGrath, L.M.T.", "source_document": "2024-05-08_Approved_May_2024_Board_Minutes.pdf", "confidence": "high"},
+    {"category": "surrender", "respondent": "Rodney Wayne Sosa, M.D.", "count": 1, "quote": "Rodney Wayne Sosa, M.D.", "source_document": "2024-05-08_Approved_May_2024_Board_Minutes.pdf", "confidence": "high"},
+    {"category": "surrender", "respondent": "Paris Richardson, L.M.T.", "count": 1, "quote": "Paris Richardson, L.M.T.", "source_document": "2024-05-08_Approved_May_2024_Board_Minutes.pdf", "confidence": "high"},
+    {"category": "surrender", "respondent": "Paul S. Mitch, M.D.", "count": 1, "quote": "Paul S. Mitch, M.D. and", "source_document": "2024-05-08_Approved_May_2024_Board_Minutes.pdf", "confidence": "high"},
+    {"category": "surrender", "respondent": "Alphonso Vincent Monzo, L.M.T.", "count": 1, "quote": "Alphonso Vincent Monzo, L.M.T.", "source_document": "2024-05-08_Approved_May_2024_Board_Minutes.pdf", "confidence": "high"}
+  ],
+  "commentary": "ITEMIZED extraction: one entry per named individual, count=1 each, respondent copied exactly as written (credentials included). Six consent-order entries (five listed consent agreements plus the step-II consent agreement) and seven surrender entries. Never collapse a named list into one row with a count — the total is computed by summing rows."
+}

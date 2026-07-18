@@ -49,6 +49,36 @@ async def snapshot() -> dict:
     return await per_board_counts()
 
 
+def persist_refresh_run(started_at, finished_at, board_filter, before, after,
+                        changed, regressed, log_path, exit_code) -> None:
+    """Record this run + a full per-board snapshot in the DB so deltas are
+    queryable (v_board_deltas) instead of living only in log files."""
+    con = sqlite3.connect(DB)
+    try:
+        cur = con.execute(
+            "INSERT INTO refresh_runs (started_at, finished_at, board_filter,"
+            " boards_changed, boards_regressed, docs_before, docs_after,"
+            " log_path, exit_code) VALUES (?,?,?,?,?,?,?,?,?)",
+            (started_at.isoformat(sep=" ", timespec="seconds"),
+             finished_at.isoformat(sep=" ", timespec="seconds"),
+             board_filter, len(changed),
+             ",".join(regressed) or None,
+             sum(v["docs"] for v in before.values()),
+             sum(v["docs"] for v in after.values()),
+             str(log_path), exit_code))
+        run_id = cur.lastrowid
+        ids = dict(con.execute("SELECT code, id FROM boards").fetchall())
+        con.executemany(
+            "INSERT INTO board_snapshots (run_id, board_id, mtgs, docs,"
+            " docs_text, mtgs_summarized, mtgs_facts) VALUES (?,?,?,?,?,?,?)",
+            [(run_id, ids[code], v["mtgs"], v["docs"], v["docs_text"],
+              v.get("mtgs_summarized", 0), v.get("mtgs_facts", 0))
+             for code, v in after.items() if code in ids])
+        con.commit()
+    finally:
+        con.close()
+
+
 def rebuild_fts_index() -> None:
     """Rebuild the doc_fts full-text index via a small sync sqlite3 connection.
 
@@ -95,6 +125,7 @@ async def run(
     from app.scraper.url_probe import probe_board
     from app.extractor.extract import extract_all
 
+    started_at = datetime.now()
     log_path = setup_logging(quiet)
     before = await snapshot()
 
@@ -172,10 +203,12 @@ async def run(
         for code in changed:
             await prepare_board_bundle(code)
 
+    exit_code = 1 if regressed else 0
+    persist_refresh_run(started_at, datetime.now(), board, before, after,
+                        changed, regressed, log_path, exit_code)
     if regressed:
         print(f"\nREGRESSION: doc count decreased for {', '.join(regressed)}")
-        return 1
-    return 0
+    return exit_code
 
 
 def main():

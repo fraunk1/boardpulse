@@ -1,0 +1,18 @@
+{
+  "source_excerpt": "AB 1637\nAdds a new law to the Medical Practice Act to state that a physician’s medical document\nis  the  responsibility  of  that  physician  and  that  the  physician’s  patient  notes,  after-visit\nsummaries,  and  diagnosis  and  treatment  plans  shall  not  be  changed  by  anyone  other\nthan the authoring physician.\n\nBoard members and staff discussed the bill.\n\nDr. Tsai moved to support the bill, if amended S:/ Dr. Ayala-Rodriguez, 12-0-1 (Dr.\nMahmood Abstained)",
+  "correct_facts": [
+    {
+      "instrument": "position",
+      "stage": "adopted",
+      "topic": "legislation",
+      "title": "Board position to support AB 1637 if amended",
+      "description": "The Board voted 12-0-1 to take a support-if-amended position on AB 1637, which would make a physician responsible for their medical documentation and bar anyone other than the authoring physician from changing patient notes, after-visit summaries, and diagnosis and treatment plans.",
+      "rule_reference": null,
+      "action_date": "2026-02-26",
+      "quote": "Dr. Tsai moved to support the bill, if amended",
+      "source_document": "2026-02-26_brd-Minutes-20260226.pdf",
+      "confidence": "high"
+    }
+  ],
+  "commentary": "instrument='position' because the board voted to take a formal stance on an outside bill (support-if-amended), not to enact its own rule; stage='adopted' since the motion carried; topic='legislation'. The same AB 1637 also belongs in the legislation array as involvement='supporting'."
+}

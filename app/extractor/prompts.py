@@ -1,6 +1,16 @@
 """Prompt templates for AI summarization."""
 from datetime import date
 
+from app.quality.taxonomy import TOPICS, TOPIC_DEFINITIONS
+
+# Rendered once from the taxonomy so the prompt's allowed-tag list can never
+# drift from the gate that validates against it. "other" stays available but is
+# omitted from the headline list to discourage lazy use.
+_TOPIC_TAGS_LINE = "  " + ", ".join(f"`{t}`" for t in TOPICS if t != "other")
+_TOPIC_DEFS_BLOCK = "\n".join(
+    f"    `{t}` — {TOPIC_DEFINITIONS[t]}"
+    for t in TOPICS if t in TOPIC_DEFINITIONS)
+
 # Cap per-document text so a board's full prompt fits in a standard subagent
 # context window with balanced coverage across all its meetings. Board minutes
 # front-load the substantive actions (agenda, votes, disciplinary decisions),
@@ -30,12 +40,39 @@ def per_board_prompt(
         board_code: Board code (e.g., "CA_MD")
         meetings: List of dicts with keys: meeting_date, title, documents.
                   Each document has keys: doc_type, filename, content_text.
+                  A meeting MAY also carry keys ``already_summarized`` (bool)
+                  and ``stored_summary`` (str). When ``already_summarized`` is
+                  true the meeting is rendered as CONTEXT ONLY: its stored
+                  summary is shown instead of raw document text, and the
+                  authoring instructions tell the model NOT to emit a MEETING
+                  block for it. Only unsummarized, text-bearing meetings are
+                  TARGETS that require a new MEETING block.
     """
     meeting_sections = []
     running_chars = 0
     omitted_meetings = 0
     for m in meetings:
         header = f"### {m['meeting_date']} — {m.get('title') or 'Board Meeting'}"
+
+        # Context-not-target: an already-summarized meeting renders as its
+        # STORED summary under a header that forbids emitting a MEETING block.
+        # It grounds the rollup narrative without re-consuming its full docs.
+        if m.get("already_summarized"):
+            stored = (m.get("stored_summary") or "").strip()
+            body = stored or "*(previously summarized; summary text unavailable)*"
+            section = (
+                header
+                + "\n\n**[ALREADY SUMMARIZED — context only; do NOT emit a "
+                "MEETING block for this date]**\n\n"
+                + body
+            )
+            if meeting_sections and running_chars + len(section) > MAX_PROMPT_CHARS:
+                omitted_meetings = len(meetings) - len(meeting_sections)
+                break
+            meeting_sections.append(section)
+            running_chars += len(section)
+            continue
+
         doc_texts = []
         for doc in m.get("documents", []):
             if doc.get("content_text"):
@@ -63,10 +100,19 @@ def per_board_prompt(
             "context budget.]*"
         )
 
-    # Build a meeting date reference table for citations
+    # Build a meeting date reference table for citations. Already-summarized
+    # meetings are flagged so the model knows they are context, not targets.
     meeting_refs = []
-    for i, m in enumerate(meetings):
-        meeting_refs.append(f"- `[{m['meeting_date']}]` — {m.get('title') or 'Board Meeting'}")
+    target_dates = []
+    for m in meetings:
+        title = m.get("title") or "Board Meeting"
+        if m.get("already_summarized"):
+            meeting_refs.append(
+                f"- `[{m['meeting_date']}]` — {title} "
+                "*(already summarized — context only, no MEETING block)*")
+        else:
+            meeting_refs.append(f"- `[{m['meeting_date']}]` — {title}")
+            target_dates.append(m["meeting_date"])
     meeting_ref_table = "\n".join(meeting_refs)
 
     return f"""You are an expert analyst summarizing state medical board meeting minutes.
@@ -132,8 +178,11 @@ topics: []
 Rules for the per-meeting sections:
 - One `=== MEETING: YYYY-MM-DD ===` block for EVERY meeting above whose text is present, using the exact dates from the reference table, newest first.
 - OMIT blocks for meetings marked "(No extracted text available)".
-- The `topics:` line uses ONLY tags from this standard set that genuinely appear in THAT meeting (an empty `[]` is fine):
-  `AI`, `telehealth`, `opioids`, `IMLC`, `CME`, `scope-of-practice`, `disciplinary`, `rulemaking`, `workforce`, `patient-safety`, `controlled-substances`, `physician-wellness`, `licensing`, `legislation`, `public-health`
+- OMIT blocks for meetings marked "**[ALREADY SUMMARIZED — context only...]**" in the data below (and "*(already summarized — context only, no MEETING block)*" in the reference table). Those meetings already have stored summaries; their text is provided ONLY so you can ground the 12-month rollup narrative. Do NOT emit a `=== MEETING: date ===` block for them. Emit a MEETING block ONLY for the dates that carry full document text and are NOT flagged as already summarized.
+- The `topics:` line: assign a tag ONLY when that subject was a substantive part of the meeting — a distinct agenda item, a decision, a report, or sustained discussion — NOT for a passing mention. Aim for the 2-4 tags that best characterize the meeting; do not pad the list. These tags drive trend charts, so over-tagging distorts the signal. Use ONLY tags from this standard set (an empty `[]` is fine):
+{_TOPIC_TAGS_LINE}
+  Tag meanings (apply precisely):
+{_TOPIC_DEFS_BLOCK}
 - The frontmatter `topics` list is the union of the per-meeting topics.
 - End the file with `=== END ===`.
 
@@ -144,6 +193,128 @@ Sources-table URL: {minutes_url or 'N/A'}
 Board: {board_name}
 State: {state}
 Code: {board_code}
+
+{all_meetings_text}
+"""
+
+
+def archive_bundle_prompt(
+    board_name: str,
+    state: str,
+    board_code: str,
+    year: str,
+    meetings: list[dict],
+    minutes_url: str = "",
+) -> str:
+    """Build an ARCHIVE summary prompt for one board / calendar-year chunk.
+
+    Archive files cover ONLY text-bearing meetings older than the rolling
+    12-month window that have never been summarized. They are pure
+    per-meeting blocks — NO 12-month rollup layer and NO Sources table — so
+    the output starts at the first `=== MEETING: ===` block and ends with
+    `=== END ===`. The per-meeting block rules are identical to
+    per_board_prompt; only the rollup layer is dropped.
+
+    Args:
+        board_name: Full board name.
+        state: Two-letter state code.
+        board_code: Board code (e.g., "CA_MD").
+        year: Calendar year label for this chunk (e.g., "2024").
+        meetings: List of dicts with keys: meeting_date, title, documents
+                  (each document has doc_type, filename, content_text). All
+                  meetings passed here are text-bearing TARGETS.
+        minutes_url: Board minutes URL (informational only; no Sources table).
+    """
+    meeting_sections = []
+    running_chars = 0
+    omitted_meetings = 0
+    for m in meetings:
+        header = f"### {m['meeting_date']} — {m.get('title') or 'Board Meeting'}"
+        doc_texts = []
+        for doc in m.get("documents", []):
+            if doc.get("content_text"):
+                label = f"[{doc['doc_type'].upper()}] {doc['filename']}"
+                text = doc["content_text"]
+                if len(text) > MAX_DOC_CHARS:
+                    text = text[:MAX_DOC_CHARS] + "\n\n*[document truncated for length]*"
+                doc_texts.append(f"**{label}**\n\n{text}")
+        if doc_texts:
+            section = header + "\n\n" + "\n\n---\n\n".join(doc_texts)
+        else:
+            section = header + "\n\n*(No extracted text available)*"
+        if meeting_sections and running_chars + len(section) > MAX_PROMPT_CHARS:
+            omitted_meetings = len(meetings) - len(meeting_sections)
+            break
+        meeting_sections.append(section)
+        running_chars += len(section)
+
+    all_meetings_text = "\n\n---\n\n".join(meeting_sections)
+    if omitted_meetings:
+        all_meetings_text += (
+            f"\n\n---\n\n*[{omitted_meetings} meeting(s) from this chunk omitted "
+            "to fit the context budget; they will be covered by the next "
+            "chunk.]*"
+        )
+
+    meeting_refs = []
+    for m in meetings:
+        meeting_refs.append(
+            f"- `[{m['meeting_date']}]` — {m.get('title') or 'Board Meeting'}")
+    meeting_ref_table = "\n".join(meeting_refs)
+
+    return f"""You are an expert analyst summarizing state medical board meeting minutes.
+
+## Task
+
+Summarize the ARCHIVED (older than 12 months) meeting minutes for **{board_name}** ({state}) covering the {year} meetings listed below.
+
+## Instructions
+
+1. Read all the meeting text provided below carefully.
+2. Produce ONE `=== MEETING: YYYY-MM-DD ===` block for every meeting that has extracted text — NOTHING ELSE. There is NO 12-month rollup and NO Sources table in an archive file.
+3. Write in a professional, neutral tone suitable for a regulatory affairs audience.
+4. Use ONLY information contained in this file. Never invent facts, dates, votes, or names. Every name+date pairing you write must appear together in the source text for that exact date.
+
+## Available Meeting Dates (for section headers)
+
+{meeting_ref_table}
+
+## Output Format
+
+Produce EXACTLY this structure (the `=== MEETING: ... ===` delimiters are parsed by machine — reproduce them exactly). The file starts DIRECTLY with the first MEETING block — no frontmatter, no rollup, no Sources table:
+
+```markdown
+=== MEETING: YYYY-MM-DD ===
+topics: [tag1, tag2]
+
+[80-200 words summarizing ONLY this meeting: what was discussed, decided,
+or noted — no cross-meeting narrative, no citation links needed. Plain
+prose or short bullets.]
+
+=== MEETING: YYYY-MM-DD ===
+topics: []
+
+[...]
+
+=== END ===
+```
+
+Rules for the per-meeting sections:
+- One `=== MEETING: YYYY-MM-DD ===` block for EVERY meeting above whose text is present, using the exact dates from the reference table, newest first.
+- OMIT blocks for meetings marked "(No extracted text available)".
+- The `topics:` line: assign a tag ONLY when that subject was a substantive part of the meeting — a distinct agenda item, a decision, a report, or sustained discussion — NOT for a passing mention. Aim for the 2-4 tags that best characterize the meeting; do not pad the list. These tags drive trend charts, so over-tagging distorts the signal. Use ONLY tags from this standard set (an empty `[]` is fine):
+{_TOPIC_TAGS_LINE}
+  Tag meanings (apply precisely):
+{_TOPIC_DEFS_BLOCK}
+- Do NOT write any 12-month rollup, board summary, YAML frontmatter, or `## Sources` table. The file is per-meeting blocks only.
+- End the file with `=== END ===`.
+
+## Meeting Minutes Data
+
+Board: {board_name}
+State: {state}
+Code: {board_code}
+Year: {year}
 
 {all_meetings_text}
 """

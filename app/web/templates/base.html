@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}boardpulse{% endblock %}</title>
 
-    <!-- Tailwind CSS (CDN for dev) -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tailwind CSS (vendored locally — no CDN) -->
+    <script src="/static/vendor/tailwind.min.js"></script>
     <script>
         tailwind.config = {
             theme: {
@@ -36,22 +36,20 @@
         }
     </script>
 
-    <!-- DM Sans + JetBrains Mono -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <!-- DM Sans + JetBrains Mono (self-hosted woff2 — no CDN) -->
+    <link rel="stylesheet" href="/static/vendor/fonts.css">
 
-    <!-- HTMX -->
-    <script src="https://unpkg.com/htmx.org@2.0.4" integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+" crossorigin="anonymous"></script>
+    <!-- HTMX (vendored) -->
+    <script src="/static/vendor/htmx.min.js"></script>
 
-    <!-- Alpine.js -->
-    <script defer src="https://unpkg.com/alpinejs@3.14.8/dist/cdn.min.js"></script>
+    <!-- Alpine.js (vendored) -->
+    <script defer src="/static/vendor/alpine.min.js"></script>
 
-    <!-- Lucide Icons -->
-    <script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+    <!-- Lucide Icons (vendored) -->
+    <script src="/static/vendor/lucide.min.js"></script>
 
-    <!-- Marked.js for Markdown rendering -->
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- Marked.js for Markdown rendering (vendored) -->
+    <script src="/static/vendor/marked.min.js"></script>
 
     <!-- Custom styles -->
     <link rel="stylesheet" href="/static/styles.css">
@@ -101,9 +99,17 @@
                     <i data-lucide="building-2" class="w-3.5 h-3.5"></i>
                     <span class="hidden sm:inline">Boards</span>
                 </a>
+                <a href="/trends" class="text-xs text-bp-steel hover:text-bp-teal transition-colors flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-bp-frost">
+                    <i data-lucide="trending-up" class="w-3.5 h-3.5"></i>
+                    <span class="hidden sm:inline">Trends</span>
+                </a>
                 <a href="/report" class="text-xs text-bp-steel hover:text-bp-teal transition-colors flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-bp-frost">
                     <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
                     <span class="hidden sm:inline">National Report</span>
+                </a>
+                <a href="/briefs" class="text-xs text-bp-steel hover:text-bp-teal transition-colors flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-bp-frost">
+                    <i data-lucide="mail" class="w-3.5 h-3.5"></i>
+                    <span class="hidden sm:inline">Briefs</span>
                 </a>
                 <a href="/ops" class="text-xs text-bp-steel hover:text-bp-teal transition-colors flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-bp-frost">
                     <i data-lucide="activity" class="w-3.5 h-3.5"></i>
@@ -133,9 +139,38 @@
     </footer>
 
     <script>
-        document.addEventListener('DOMContentLoaded', () => lucide.createIcons());
+        // Robust icon renderer. This Lucide build's own createIcons() silently
+        // fails to match the kebab-case data-lucide attributes (icons never
+        // appeared — the "missing images" bug), so we build each SVG directly
+        // from the confirmed PascalCase icon exports (window.lucide.ChevronRight…).
+        (function () {
+            const NS = "http://www.w3.org/2000/svg";
+            const pascal = k => k.split("-").map(s => s.charAt(0).toUpperCase() + s.slice(1)).join("");
+            function build(node, cls) {
+                const tag = node[0], attrs = node[1] || {}, kids = node[2] || [];
+                const el = document.createElementNS(NS, tag);
+                for (const k in attrs) el.setAttribute(k, attrs[k]);
+                kids.forEach(c => {
+                    const ce = document.createElementNS(NS, c[0]);
+                    const ca = c[1] || {};
+                    for (const k in ca) ce.setAttribute(k, ca[k]);
+                    el.appendChild(ce);
+                });
+                if (cls) el.setAttribute("class", cls);
+                return el;
+            }
+            window.bpIcons = function (root) {
+                if (!window.lucide) return;
+                (root || document).querySelectorAll("[data-lucide]").forEach(i => {
+                    const node = window.lucide[pascal(i.getAttribute("data-lucide"))];
+                    if (node) i.replaceWith(build(node, i.getAttribute("class") || ""));
+                });
+            };
+        })();
+
+        document.addEventListener('DOMContentLoaded', () => bpIcons());
         document.addEventListener('htmx:afterSwap', () => {
-            lucide.createIcons();
+            bpIcons();
             renderMarkdownSummaries();
         });
 
@@ -146,8 +181,7 @@
                 if (md && typeof marked !== 'undefined') {
                     el.innerHTML = marked.parse(md);
                     el.dataset.rendered = 'true';
-                    // Re-render icons inside summaries
-                    lucide.createIcons();
+                    bpIcons(el);  // re-render icons inside summaries
                 }
             });
         }
