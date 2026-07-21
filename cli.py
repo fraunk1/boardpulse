@@ -33,6 +33,15 @@ def main():
     # extract
     sub.add_parser("extract", help="Extract text from collected documents")
 
+    # reattribute — re-date month-placeholder meetings from their minutes text
+    ra = sub.add_parser(
+        "reattribute",
+        help="Re-date meetings stuck on a month placeholder (day 1) using "
+             "the real date printed in their minutes")
+    ra.add_argument("--board", help="Board code (e.g. MD_MD) — one board only")
+    ra.add_argument("--dry-run", action="store_true",
+                    help="Report what would change without writing")
+
     # summarize
     summ = sub.add_parser("summarize", help="Prepare AI summarization data bundles")
     summ.add_argument("--board", type=str, help="Board code (e.g., CA_MD) — one board only")
@@ -237,7 +246,27 @@ async def dispatch(args):
 
     elif args.command == "extract":
         from app.extractor.extract import extract_all
+        from app.scraper.reattribute import reattribute_placeholder_meetings
         await extract_all()
+        # Newly-extracted text is the only place a month-only board publishes
+        # its real meeting day, so re-date placeholders right after extraction.
+        res = await reattribute_placeholder_meetings()
+        if res.moved:
+            print(f"Re-dated {res.moved} document(s) off month placeholders "
+                  f"({res.meetings_created} meeting(s) created, "
+                  f"{res.placeholders_removed} placeholder(s) removed)")
+
+    elif args.command == "reattribute":
+        from app.database import init_db
+        from app.scraper.reattribute import reattribute_placeholder_meetings
+        await init_db()
+        res = await reattribute_placeholder_meetings(
+            board_code=args.board, dry_run=args.dry_run)
+        for line in res.details:
+            print("  " + line)
+        print(res.summary())
+        if args.dry_run:
+            print("DRY RUN -- nothing changed.")
 
     elif args.command == "summarize":
         await handle_summarize(args)
