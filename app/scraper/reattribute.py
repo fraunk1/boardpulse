@@ -141,6 +141,7 @@ async def reattribute_placeholder_meetings(
             return result
 
         for meeting, board in placeholders:
+            moved_here = 0
             docs = (await session.execute(
                 select(MeetingDocument).where(
                     MeetingDocument.meeting_id == meeting.id)
@@ -197,8 +198,17 @@ async def reattribute_placeholder_meetings(
 
                 doc.meeting_id = target.id
                 result.moved += 1
+                moved_here += 1
 
             if dry_run:
+                continue
+
+            # Only dissolve a placeholder THIS RUN emptied. A day-1 meeting
+            # that already had no documents is not our business: boards
+            # legitimately publish scheduled meetings whose minutes have not
+            # appeared yet (future-dated rows), and deleting those would
+            # silently drop known upcoming meetings from the dashboard.
+            if not moved_here:
                 continue
 
             # A placeholder that has given up all its documents described a

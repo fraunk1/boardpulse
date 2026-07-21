@@ -237,6 +237,34 @@ def test_dissolved_placeholder_leaves_no_orphan_facts(seeded):
     assert orphans == 0, "facts must not survive their deleted meeting"
 
 
+def test_pre_existing_empty_meeting_is_left_alone(seeded):
+    """A day-1 meeting that already had no documents is not this operation's
+    business. Boards publish scheduled meetings whose minutes have not appeared
+    yet; deleting those would silently drop known upcoming meetings."""
+    import app.database as db
+    from app.models import Board, Meeting
+    from sqlalchemy import select
+
+    async def _add_empty():
+        async with db.async_session() as s:
+            board = (await s.execute(select(Board))).scalars().first()
+            s.add(Meeting(board_id=board.id, meeting_date=date(2026, 12, 1),
+                          title="Scheduled — December 01, 2026",
+                          scraped_at=datetime.now(timezone.utc)))
+            await s.commit()
+
+    asyncio.run(_add_empty())
+    asyncio.run(reattribute_placeholder_meetings("MD_MD"))
+
+    async def _still_there():
+        async with db.async_session() as s:
+            return (await s.execute(select(Meeting).where(
+                Meeting.meeting_date == date(2026, 12, 1)
+            ))).scalar_one_or_none()
+
+    assert asyncio.run(_still_there()) is not None
+
+
 def test_dry_run_changes_nothing(seeded):
     before = _dates()
     res = asyncio.run(reattribute_placeholder_meetings("MD_MD", dry_run=True))
